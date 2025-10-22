@@ -1,0 +1,44 @@
+[workspace]
+members = ["redis-oxide", "redis-oxide-core"]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.80"
+authors = ["Your Name <your.email@example.com>"]
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/yourusername/redis-oxide"
+homepage = "https://github.com/yourusername/redis-oxide"
+keywords = ["redis", "async", "cluster", "cache"]
+categories = ["database", "asynchronous"]
+
+[workspace.dependencies]
+# Async runtime
+tokio = { version = "1.41", features = ["full"] }
+async-trait = "0.1.83"
+
+# Data structures
+bytes = "1.8"
+
+# Error handling
+thiserror = "2.0"
+
+# Logging and tracing
+tracing = "0.1.41"
+
+# Redis cluster support
+crc16 = "0.4.0"
+
+# Connection pooling
+deadpool = "0.12.1"
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+strip = true
+

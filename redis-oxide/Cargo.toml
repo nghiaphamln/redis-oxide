@@ -1,0 +1,63 @@
+[package]
+name = "redis-oxide"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+keywords.workspace = true
+categories.workspace = true
+description = "High-performance async Redis client for Rust with automatic cluster support"
+
+[dependencies]
+redis-oxide-core = { path = "../redis-oxide-core" }
+
+# Async runtime
+tokio.workspace = true
+async-trait.workspace = true
+
+# Data structures
+bytes.workspace = true
+
+# Error handling
+thiserror.workspace = true
+
+# Logging
+tracing.workspace = true
+
+# Cluster support
+crc16.workspace = true
+
+# Connection pooling
+deadpool.workspace = true
+
+# Serialization
+serde.workspace = true
+
+# Socket utilities
+socket2 = "0.5.7"
+
+[dev-dependencies]
+tokio-test = "0.4.4"
+proptest = "1.5"
+criterion = "0.5.1"
+testcontainers = "0.23.1"
+testcontainers-modules = { version = "0.11.2", features = ["redis"] }
+tracing-subscriber = "0.3.18"
+futures = "0.3"
+
+[[bench]]
+name = "protocol_bench"
+harness = false
+
+[lints.rust]
+unsafe_code = "forbid"
+missing_docs = "warn"
+
+[lints.clippy]
+all = "warn"
+pedantic = "warn"
+nursery = "warn"
+

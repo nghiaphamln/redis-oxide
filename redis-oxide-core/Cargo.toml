@@ -1,0 +1,28 @@
+[package]
+name = "redis-oxide-core"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+keywords.workspace = true
+categories.workspace = true
+description = "Core types and traits for redis-oxide Redis client"
+
+[dependencies]
+thiserror.workspace = true
+bytes.workspace = true
+async-trait.workspace = true
+serde.workspace = true
+
+[lints.rust]
+unsafe_code = "forbid"
+missing_docs = "warn"
+
+[lints.clippy]
+all = "warn"
+pedantic = "warn"
+nursery = "warn"
+
