@@ -55,7 +55,7 @@ jobs:
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
       
       - name: Run Clippy
-        run: cargo clippy --all-targets --all-features -- -D warnings
+        run: cargo clippy --workspace --all-targets -- -D warnings
 
   test:
     name: Test Suite
@@ -91,10 +91,10 @@ jobs:
           key: ${{ runner.os }}-${{ matrix.rust }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
       
       - name: Run unit tests
-        run: cargo test --lib --all-features
+        run: cargo test --lib --workspace
       
       - name: Run doc tests
-        run: cargo test --doc --all-features
+        run: cargo test --doc --workspace
 
   integration:
     name: Integration Tests
@@ -161,7 +161,7 @@ jobs:
         run: cargo install cargo-tarpaulin
       
       - name: Generate coverage
-        run: cargo tarpaulin --out Xml --all-features
+        run: cargo tarpaulin --out Xml --workspace
       
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
@@ -179,7 +179,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
       
       - name: Build release
-        run: cargo build --release --all-features
+        run: cargo build --release --workspace
       
       - name: Check binary size
         run: |
