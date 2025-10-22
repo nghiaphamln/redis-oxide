@@ -80,7 +80,7 @@
 //!
 //! let client = Client::connect(config).await?;
 //!
-//! // If encountering "MOVED 9916 10.90.6.213:6002", 
+//! // If encountering "MOVED 9916 10.90.6.213:6002",
 //! // client automatically retries command to 10.90.6.213:6002
 //! let value = client.get("mykey").await?;
 //! # Ok(())
