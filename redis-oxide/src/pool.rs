@@ -5,7 +5,7 @@
 //! - Pool: Multiple connections managed in a pool
 
 use crate::connection::RedisConnection;
-use redis_oxide_core::{
+use crate::core::{
     config::{ConnectionConfig, PoolStrategy},
     error::{RedisError, RedisResult},
     value::RespValue,
@@ -197,7 +197,7 @@ impl Pool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use redis_oxide_core::config::PoolConfig;
+    use crate::core::config::PoolConfig;
 
     #[test]
     fn test_pool_config() {

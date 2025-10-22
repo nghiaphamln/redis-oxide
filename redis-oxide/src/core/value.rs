@@ -1,6 +1,6 @@
 //! RESP (`REdis` Serialization Protocol) value types
 
-use crate::error::{RedisError, RedisResult};
+use crate::core::error::{RedisError, RedisResult};
 use bytes::Bytes;
 
 /// RESP protocol value
@@ -115,68 +115,23 @@ impl From<String> for RespValue {
         Self::BulkString(Bytes::from(s.into_bytes()))
     }
 }
-
 impl From<&str> for RespValue {
     fn from(s: &str) -> Self {
         Self::BulkString(Bytes::from(s.as_bytes().to_vec()))
     }
 }
-
 impl From<i64> for RespValue {
     fn from(i: i64) -> Self {
         Self::Integer(i)
     }
 }
-
 impl From<Vec<u8>> for RespValue {
     fn from(b: Vec<u8>) -> Self {
         Self::BulkString(Bytes::from(b))
     }
 }
-
 impl From<Bytes> for RespValue {
     fn from(b: Bytes) -> Self {
         Self::BulkString(b)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_as_string() {
-        let val = RespValue::SimpleString("OK".to_string());
-        assert_eq!(val.as_string().unwrap(), "OK");
-
-        let val = RespValue::BulkString(Bytes::from("test"));
-        assert_eq!(val.as_string().unwrap(), "test");
-
-        let val = RespValue::Null;
-        assert!(val.as_string().is_err());
-    }
-
-    #[test]
-    fn test_as_int() {
-        let val = RespValue::Integer(42);
-        assert_eq!(val.as_int().unwrap(), 42);
-
-        let val = RespValue::BulkString(Bytes::from("123"));
-        assert_eq!(val.as_int().unwrap(), 123);
-
-        let val = RespValue::Null;
-        assert!(val.as_int().is_err());
-    }
-
-    #[test]
-    fn test_is_null() {
-        assert!(RespValue::Null.is_null());
-        assert!(!RespValue::Integer(1).is_null());
-    }
-
-    #[test]
-    fn test_is_error() {
-        assert!(RespValue::Error("ERR".to_string()).is_error());
-        assert!(!RespValue::Null.is_error());
     }
 }

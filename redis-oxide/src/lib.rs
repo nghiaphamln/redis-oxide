@@ -59,7 +59,9 @@ pub mod pool;
 pub mod protocol;
 
 pub use client::Client;
-pub use redis_oxide_core::{
+pub mod core;
+
+pub use crate::core::{
     config::{ConnectionConfig, PoolConfig, PoolStrategy, TopologyMode},
     error::{RedisError, RedisResult},
     types::{NodeInfo, RedisValue, SlotRange},

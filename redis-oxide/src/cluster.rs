@@ -6,11 +6,11 @@
 //! - Cluster topology management
 //! - Node discovery
 
-use crc16::{State, XMODEM};
-use redis_oxide_core::{
+use crate::core::{
     error::{RedisError, RedisResult},
     types::{NodeInfo, SlotRange},
 };
+use crc16::{State, XMODEM};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;

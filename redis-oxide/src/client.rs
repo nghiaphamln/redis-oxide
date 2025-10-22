@@ -8,12 +8,12 @@ use crate::commands::{
     IncrByCommand, IncrCommand, SetCommand, TtlCommand,
 };
 use crate::connection::{ConnectionManager, TopologyType};
-use crate::pool::Pool;
-use redis_oxide_core::{
+use crate::core::{
     config::ConnectionConfig,
     error::{RedisError, RedisResult},
     value::RespValue,
 };
+use crate::pool::Pool;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;

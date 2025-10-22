@@ -1,5 +1,5 @@
 [workspace]
-members = ["redis-oxide", "redis-oxide-core"]
+members = ["redis-oxide"]
 resolver = "2"
 
 [workspace.package]

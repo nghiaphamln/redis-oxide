@@ -3,13 +3,13 @@
 //! This module handles low-level TCP connections to Redis servers,
 //! automatic topology detection, and connection lifecycle management.
 
-use crate::protocol::{RespDecoder, RespEncoder};
-use bytes::{Buf, BytesMut};
-use redis_oxide_core::{
+use crate::core::{
     config::{ConnectionConfig, TopologyMode},
     error::{RedisError, RedisResult},
     value::RespValue,
 };
+use crate::protocol::{RespDecoder, RespEncoder};
+use bytes::{Buf, BytesMut};
 use std::io::Cursor;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;

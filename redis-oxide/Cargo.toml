@@ -12,8 +12,6 @@ categories.workspace = true
 description = "High-performance async Redis client for Rust with automatic cluster support"
 
 [dependencies]
-redis-oxide-core = { path = "../redis-oxide-core" }
-
 # Async runtime
 tokio.workspace = true
 async-trait.workspace = true

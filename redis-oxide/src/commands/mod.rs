@@ -2,7 +2,7 @@
 //!
 //! This module provides type-safe command builders for Redis commands.
 
-use redis_oxide_core::{error::RedisResult, value::RespValue};
+use crate::core::{error::RedisResult, value::RespValue};
 use std::time::Duration;
 
 /// Trait for commands that can be executed

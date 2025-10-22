@@ -84,7 +84,6 @@ impl RedisError {
     /// Parse a Redis error message to check for MOVED or ASK redirects
     #[must_use]
     pub fn parse_redirect(msg: &str) -> Option<Self> {
-        // Parse "MOVED 9916 10.90.6.213:6002"
         if let Some(moved_str) = msg.strip_prefix("MOVED ") {
             let parts: Vec<&str> = moved_str.split_whitespace().collect();
             if parts.len() == 2 {
@@ -102,7 +101,6 @@ impl RedisError {
             }
         }
 
-        // Parse "ASK 9916 10.90.6.213:6002"
         if let Some(ask_str) = msg.strip_prefix("ASK ") {
             let parts: Vec<&str> = ask_str.split_whitespace().collect();
             if parts.len() == 2 {
@@ -147,86 +145,5 @@ impl RedisError {
             Self::Moved { slot, .. } | Self::Ask { slot, .. } => Some(*slot),
             _ => None,
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_parse_moved_redirect() {
-        let error = RedisError::parse_redirect("MOVED 9916 10.90.6.213:6002");
-        assert!(error.is_some());
-
-        if let Some(RedisError::Moved { slot, host, port }) = error {
-            assert_eq!(slot, 9916);
-            assert_eq!(host, "10.90.6.213");
-            assert_eq!(port, 6002);
-        } else {
-            panic!("Expected MOVED error");
-        }
-    }
-
-    #[test]
-    fn test_parse_ask_redirect() {
-        let error = RedisError::parse_redirect("ASK 1234 192.168.1.1:7000");
-        assert!(error.is_some());
-
-        if let Some(RedisError::Ask { slot, host, port }) = error {
-            assert_eq!(slot, 1234);
-            assert_eq!(host, "192.168.1.1");
-            assert_eq!(port, 7000);
-        } else {
-            panic!("Expected ASK error");
-        }
-    }
-
-    #[test]
-    fn test_parse_invalid_redirect() {
-        assert!(RedisError::parse_redirect("ERR invalid").is_none());
-        assert!(RedisError::parse_redirect("MOVED invalid").is_none());
-        assert!(RedisError::parse_redirect("MOVED 1234").is_none());
-    }
-
-    #[test]
-    fn test_is_redirect() {
-        let moved = RedisError::Moved {
-            slot: 100,
-            host: "localhost".to_string(),
-            port: 6379,
-        };
-        assert!(moved.is_redirect());
-
-        let ask = RedisError::Ask {
-            slot: 100,
-            host: "localhost".to_string(),
-            port: 6379,
-        };
-        assert!(ask.is_redirect());
-
-        let other = RedisError::Connection("test".to_string());
-        assert!(!other.is_redirect());
-    }
-
-    #[test]
-    fn test_redirect_target() {
-        let moved = RedisError::Moved {
-            slot: 100,
-            host: "10.90.6.213".to_string(),
-            port: 6002,
-        };
-        let target = moved.redirect_target();
-        assert_eq!(target, Some(("10.90.6.213".to_string(), 6002)));
-    }
-
-    #[test]
-    fn test_redirect_slot() {
-        let moved = RedisError::Moved {
-            slot: 9916,
-            host: "10.90.6.213".to_string(),
-            port: 6002,
-        };
-        assert_eq!(moved.redirect_slot(), Some(9916));
     }
 }

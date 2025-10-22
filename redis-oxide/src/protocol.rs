@@ -3,11 +3,11 @@
 //! This module implements the Redis Serialization Protocol (RESP2) for
 //! encoding and decoding Redis commands and responses.
 
-use bytes::{Buf, BufMut, Bytes, BytesMut};
-use redis_oxide_core::{
+use crate::core::{
     error::{RedisError, RedisResult},
     value::RespValue,
 };
+use bytes::{Buf, BufMut, Bytes, BytesMut};
 use std::io::Cursor;
 
 const CRLF: &[u8] = b"\r\n";
