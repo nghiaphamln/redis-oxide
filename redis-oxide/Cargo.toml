@@ -10,6 +10,19 @@ homepage.workspace = true
 keywords.workspace = true
 categories.workspace = true
 description = "High-performance async Redis client for Rust with automatic cluster support"
+documentation = "https://docs.rs/redis-oxide"
+readme = "../README.md"
+include = [
+    "src/**/*",
+    "benches/**/*",
+    "tests/**/*",
+    "examples/**/*",
+    "Cargo.toml",
+    "../README.md",
+    "../LICENSE-MIT",
+    "../LICENSE-APACHE",
+    "../CHANGELOG.md"
+]
 
 [dependencies]
 # Async runtime
@@ -58,4 +71,9 @@ missing_docs = "warn"
 all = "warn"
 pedantic = "warn"
 nursery = "warn"
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+targets = ["x86_64-unknown-linux-gnu", "x86_64-pc-windows-msvc", "x86_64-apple-darwin"]
 

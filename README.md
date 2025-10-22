@@ -196,13 +196,12 @@ config.pool = pool_config;
 
 ```
 redis-oxide/
-├── redis-oxide-core/        # Core types, errors, config
-│   ├── error.rs            # RedisError with MOVED/ASK parsing
-│   ├── config.rs           # ConnectionConfig, PoolConfig
-│   ├── types.rs            # RedisValue, NodeInfo, SlotRange
-│   └── value.rs            # RespValue
-│
 └── redis-oxide/            # Main library
+    ├── core/               # Core types, errors, config
+    │   ├── error.rs        # RedisError with MOVED/ASK parsing
+    │   ├── config.rs       # ConnectionConfig, PoolConfig
+    │   ├── types.rs        # RedisValue, NodeInfo, SlotRange
+    │   └── value.rs        # RespValue
     ├── protocol.rs         # RESP2 encoder/decoder
     ├── connection.rs       # TCP connection, topology detection
     ├── cluster.rs          # Slot calculation, redirect handling
@@ -281,7 +280,11 @@ cargo clippy --all-targets --all-features -- -D warnings
 ### Generate Documentation
 
 ```bash
+# Generate and open documentation
 cargo doc --no-deps --open
+
+# Generate documentation with private items (for development)
+cargo doc --no-deps --document-private-items --open
 ```
 
 ## 📝 Examples
@@ -299,6 +302,17 @@ cargo run --example basic_usage
 cargo run --example cluster_usage
 cargo run --example pool_strategies
 ```
+
+## 📚 API Documentation
+
+Comprehensive API documentation is available at [docs.rs/redis-oxide](https://docs.rs/redis-oxide).
+
+Key modules:
+
+- [`Client`](https://docs.rs/redis-oxide/latest/redis_oxide/struct.Client.html) - High-level Redis client
+- [`ConnectionConfig`](https://docs.rs/redis-oxide/latest/redis_oxide/struct.ConnectionConfig.html) - Connection configuration
+- [`RedisError`](https://docs.rs/redis-oxide/latest/redis_oxide/enum.RedisError.html) - Error types with MOVED/ASK handling
+- [`commands`](https://docs.rs/redis-oxide/latest/redis_oxide/commands/index.html) - Type-safe command builders
 
 ## 🗺️ Roadmap
 
@@ -329,7 +343,10 @@ at your option.
 
 ## 🤝 Contributing
 
-Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+Contributions are welcome! Please see:
+
+- [CONTRIBUTING.md](CONTRIBUTING.md) - Development and contribution guidelines
+- [DOCS.md](DOCS.md) - Documentation writing and maintenance guide
 
 ## 📮 Contact
 
