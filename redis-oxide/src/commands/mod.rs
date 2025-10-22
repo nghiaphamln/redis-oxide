@@ -114,8 +114,7 @@ impl Command for SetCommand {
 
         if let Some(duration) = self.expiration {
             args.push(RespValue::from("EX"));
-            #[allow(clippy::cast_possible_wrap)]
-            args.push(RespValue::from(duration.as_secs() as i64));
+            args.push(RespValue::from(duration.as_secs().to_string()));
         }
 
         if self.nx {
