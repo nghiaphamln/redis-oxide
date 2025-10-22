@@ -23,9 +23,9 @@
 //!     let config = ConnectionConfig::new("redis://localhost:6379");
 //!     let client = Client::connect(config).await?;
 //!     
-//!     client.set("key", "value").await?;
-//!     let value: String = client.get("key").await?;
-//!     println!("Value: {}", value);
+//!     client.set("mykey", "myvalue").await?;
+//!     let value: Option<String> = client.get("mykey").await?;
+//!     println!("Value: {:?}", value);
 //!     
 //!     Ok(())
 //! }
