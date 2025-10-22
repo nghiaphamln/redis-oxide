@@ -304,6 +304,6 @@ Dual licensed under MIT OR Apache-2.0
 ---
 
 **Status**: ✅ COMPLETE - Ready for use
-**Rust Version**: 1.81+
+**Rust Version**: 1.82+
 **Build**: Passing with zero warnings
 **Tests**: 100% passing

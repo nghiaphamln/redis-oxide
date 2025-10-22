@@ -6,7 +6,7 @@ Thank you for your interest in contributing to redis-mux! This document provides
 
 ### Prerequisites
 
-- Rust 1.81 or later
+- Rust 1.82 or later
 - Redis server for testing (6.0+)
 
 ### Clone and Build
