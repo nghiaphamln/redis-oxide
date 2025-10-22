@@ -239,7 +239,7 @@ impl Command for ExpireCommand {
     fn args(&self) -> Vec<RespValue> {
         vec![
             RespValue::from(self.key.as_str()),
-            RespValue::from(self.seconds),
+            RespValue::from(self.seconds.to_string()),
         ]
     }
 
@@ -379,7 +379,7 @@ impl Command for IncrByCommand {
     fn args(&self) -> Vec<RespValue> {
         vec![
             RespValue::from(self.key.as_str()),
-            RespValue::from(self.increment),
+            RespValue::from(self.increment.to_string()),
         ]
     }
 
@@ -418,7 +418,7 @@ impl Command for DecrByCommand {
     fn args(&self) -> Vec<RespValue> {
         vec![
             RespValue::from(self.key.as_str()),
-            RespValue::from(self.decrement),
+            RespValue::from(self.decrement.to_string()),
         ]
     }
 
