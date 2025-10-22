@@ -6,7 +6,7 @@
 //! - Cluster topology management
 //! - Node discovery
 
-use crc16::*;
+use crc16::{State, XMODEM};
 use redis_oxide_core::{
     error::{RedisError, RedisResult},
     types::{NodeInfo, SlotRange},
@@ -150,6 +150,7 @@ impl Default for ClusterTopology {
 }
 
 /// Helper to handle MOVED and ASK redirects
+#[derive(Clone)]
 pub struct RedirectHandler {
     topology: ClusterTopology,
     max_redirects: usize,

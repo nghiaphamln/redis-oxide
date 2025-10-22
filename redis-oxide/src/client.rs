@@ -27,6 +27,7 @@ use tracing::{debug, info, warn};
 /// - MOVED and ASK redirects in cluster mode
 /// - Connection pooling (multiplexed or traditional)
 /// - Reconnection with exponential backoff
+#[derive(Clone)]
 pub struct Client {
     topology_type: TopologyType,
     config: ConnectionConfig,
@@ -130,7 +131,7 @@ impl Client {
                         "Failed to connect to cluster node {}:{}: {:?}",
                         host, port, e
                     );
-                    continue;
+                    // Try next node
                 }
             }
         }
@@ -174,11 +175,13 @@ impl Client {
                         // Retry the command
                         continue;
                     }
-                    
+
                     // No redirect handler available
-                    return Err(RedisError::Cluster("Redirect received but no handler available".to_string()));
+                    return Err(RedisError::Cluster(
+                        "Redirect received but no handler available".to_string(),
+                    ));
                 }
-                Err(_e) if _e.is_redirect() => {
+                Err(e) if e.is_redirect() => {
                     return Err(RedisError::MaxRetriesExceeded(max_retries));
                 }
                 other => {

@@ -114,6 +114,7 @@ impl Command for SetCommand {
 
         if let Some(duration) = self.expiration {
             args.push(RespValue::from("EX"));
+            #[allow(clippy::cast_possible_wrap)]
             args.push(RespValue::from(duration.as_secs() as i64));
         }
 
@@ -131,7 +132,7 @@ impl Command for SetCommand {
     fn parse_response(&self, response: RespValue) -> RedisResult<Self::Output> {
         match response {
             RespValue::SimpleString(ref s) if s == "OK" => Ok(true),
-            RespValue::Null => Ok(false), // NX or XX condition not met
+            // NX or XX condition not met
             _ => Ok(false),
         }
     }
@@ -172,7 +173,7 @@ impl Command for DelCommand {
     }
 
     fn keys(&self) -> Vec<&[u8]> {
-        self.keys.iter().map(|k| k.as_bytes()).collect()
+        self.keys.iter().map(String::as_bytes).collect()
     }
 }
 
@@ -207,7 +208,7 @@ impl Command for ExistsCommand {
     }
 
     fn keys(&self) -> Vec<&[u8]> {
-        self.keys.iter().map(|k| k.as_bytes()).collect()
+        self.keys.iter().map(String::as_bytes).collect()
     }
 }
 
@@ -220,6 +221,7 @@ pub struct ExpireCommand {
 impl ExpireCommand {
     /// Create a new EXPIRE command
     pub fn new(key: impl Into<String>, duration: Duration) -> Self {
+        #[allow(clippy::cast_possible_wrap)]
         Self {
             key: key.into(),
             seconds: duration.as_secs() as i64,

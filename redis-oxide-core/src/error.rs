@@ -82,6 +82,7 @@ pub enum RedisError {
 
 impl RedisError {
     /// Parse a Redis error message to check for MOVED or ASK redirects
+    #[must_use]
     pub fn parse_redirect(msg: &str) -> Option<Self> {
         // Parse "MOVED 9916 10.90.6.213:6002"
         if let Some(moved_str) = msg.strip_prefix("MOVED ") {
@@ -90,7 +91,7 @@ impl RedisError {
                 if let Ok(slot) = parts[0].parse::<u16>() {
                     if let Some((host, port)) = parts[1].rsplit_once(':') {
                         if let Ok(port) = port.parse::<u16>() {
-                            return Some(RedisError::Moved {
+                            return Some(Self::Moved {
                                 slot,
                                 host: host.to_string(),
                                 port,
@@ -108,7 +109,7 @@ impl RedisError {
                 if let Ok(slot) = parts[0].parse::<u16>() {
                     if let Some((host, port)) = parts[1].rsplit_once(':') {
                         if let Ok(port) = port.parse::<u16>() {
-                            return Some(RedisError::Ask {
+                            return Some(Self::Ask {
                                 slot,
                                 host: host.to_string(),
                                 port,
@@ -123,14 +124,16 @@ impl RedisError {
     }
 
     /// Check if this error is a redirect (MOVED or ASK)
-    pub fn is_redirect(&self) -> bool {
-        matches!(self, RedisError::Moved { .. } | RedisError::Ask { .. })
+    #[must_use]
+    pub const fn is_redirect(&self) -> bool {
+        matches!(self, Self::Moved { .. } | Self::Ask { .. })
     }
 
     /// Get the target address from a redirect error
+    #[must_use]
     pub fn redirect_target(&self) -> Option<(String, u16)> {
         match self {
-            RedisError::Moved { host, port, .. } | RedisError::Ask { host, port, .. } => {
+            Self::Moved { host, port, .. } | Self::Ask { host, port, .. } => {
                 Some((host.clone(), *port))
             }
             _ => None,
@@ -138,9 +141,10 @@ impl RedisError {
     }
 
     /// Get the slot number from a redirect error
-    pub fn redirect_slot(&self) -> Option<u16> {
+    #[must_use]
+    pub const fn redirect_slot(&self) -> Option<u16> {
         match self {
-            RedisError::Moved { slot, .. } | RedisError::Ask { slot, .. } => Some(*slot),
+            Self::Moved { slot, .. } | Self::Ask { slot, .. } => Some(*slot),
             _ => None,
         }
     }

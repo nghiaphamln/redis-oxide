@@ -1,7 +1,9 @@
+#![allow(missing_docs)]
+
+use bytes::{Bytes, BytesMut};
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use redis_oxide::protocol::{RespDecoder, RespEncoder};
 use redis_oxide::RespValue;
-use bytes::{Bytes, BytesMut};
 use std::io::Cursor;
 
 fn bench_encode_simple_string(c: &mut Criterion) {
@@ -94,4 +96,3 @@ criterion_group!(
     bench_decode_array,
 );
 criterion_main!(benches);
-

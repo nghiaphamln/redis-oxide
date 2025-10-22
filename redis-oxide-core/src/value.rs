@@ -1,4 +1,4 @@
-//! RESP (REdis Serialization Protocol) value types
+//! RESP (`REdis` Serialization Protocol) value types
 
 use crate::error::{RedisError, RedisResult};
 use bytes::Bytes;
@@ -22,74 +22,89 @@ pub enum RespValue {
 
 impl RespValue {
     /// Convert to a string if possible
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the value cannot be converted to a string.
     pub fn as_string(&self) -> RedisResult<String> {
         match self {
-            RespValue::SimpleString(s) => Ok(s.clone()),
-            RespValue::BulkString(b) => String::from_utf8(b.to_vec())
-                .map_err(|e| RedisError::Type(format!("Invalid UTF-8: {}", e))),
-            RespValue::Null => Err(RedisError::Type("Value is null".to_string())),
+            Self::SimpleString(s) => Ok(s.clone()),
+            Self::BulkString(b) => String::from_utf8(b.to_vec())
+                .map_err(|e| RedisError::Type(format!("Invalid UTF-8: {e}"))),
+            Self::Null => Err(RedisError::Type("Value is null".to_string())),
             _ => Err(RedisError::Type(format!(
-                "Cannot convert {:?} to string",
-                self
+                "Cannot convert {self:?} to string"
             ))),
         }
     }
 
     /// Convert to an integer if possible
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the value cannot be converted to an integer.
     pub fn as_int(&self) -> RedisResult<i64> {
         match self {
-            RespValue::Integer(i) => Ok(*i),
-            RespValue::BulkString(b) => {
+            Self::Integer(i) => Ok(*i),
+            Self::BulkString(b) => {
                 let s = String::from_utf8(b.to_vec())
-                    .map_err(|e| RedisError::Type(format!("Invalid UTF-8: {}", e)))?;
+                    .map_err(|e| RedisError::Type(format!("Invalid UTF-8: {e}")))?;
                 s.parse::<i64>()
-                    .map_err(|e| RedisError::Type(format!("Cannot parse integer: {}", e)))
+                    .map_err(|e| RedisError::Type(format!("Cannot parse integer: {e}")))
             }
             _ => Err(RedisError::Type(format!(
-                "Cannot convert {:?} to integer",
-                self
+                "Cannot convert {self:?} to integer"
             ))),
         }
     }
 
     /// Convert to bytes if possible
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the value cannot be converted to bytes.
     pub fn as_bytes(&self) -> RedisResult<Bytes> {
         match self {
-            RespValue::BulkString(b) => Ok(b.clone()),
-            RespValue::SimpleString(s) => Ok(Bytes::from(s.as_bytes().to_vec())),
-            RespValue::Null => Err(RedisError::Type("Value is null".to_string())),
+            Self::BulkString(b) => Ok(b.clone()),
+            Self::SimpleString(s) => Ok(Bytes::from(s.as_bytes().to_vec())),
+            Self::Null => Err(RedisError::Type("Value is null".to_string())),
             _ => Err(RedisError::Type(format!(
-                "Cannot convert {:?} to bytes",
-                self
+                "Cannot convert {self:?} to bytes"
             ))),
         }
     }
 
     /// Convert to an array if possible
-    pub fn as_array(&self) -> RedisResult<Vec<RespValue>> {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the value cannot be converted to an array.
+    pub fn as_array(&self) -> RedisResult<Vec<Self>> {
         match self {
-            RespValue::Array(arr) => Ok(arr.clone()),
+            Self::Array(arr) => Ok(arr.clone()),
             _ => Err(RedisError::Type(format!(
-                "Cannot convert {:?} to array",
-                self
+                "Cannot convert {self:?} to array"
             ))),
         }
     }
 
     /// Check if this is a null value
-    pub fn is_null(&self) -> bool {
-        matches!(self, RespValue::Null)
+    #[must_use]
+    pub const fn is_null(&self) -> bool {
+        matches!(self, Self::Null)
     }
 
     /// Check if this is an error
-    pub fn is_error(&self) -> bool {
-        matches!(self, RespValue::Error(_))
+    #[must_use]
+    pub const fn is_error(&self) -> bool {
+        matches!(self, Self::Error(_))
     }
 
     /// Extract error message if this is an error
+    #[must_use]
     pub fn into_error(self) -> Option<String> {
         match self {
-            RespValue::Error(msg) => Some(msg),
+            Self::Error(msg) => Some(msg),
             _ => None,
         }
     }
@@ -97,31 +112,31 @@ impl RespValue {
 
 impl From<String> for RespValue {
     fn from(s: String) -> Self {
-        RespValue::BulkString(Bytes::from(s.into_bytes()))
+        Self::BulkString(Bytes::from(s.into_bytes()))
     }
 }
 
 impl From<&str> for RespValue {
     fn from(s: &str) -> Self {
-        RespValue::BulkString(Bytes::from(s.as_bytes().to_vec()))
+        Self::BulkString(Bytes::from(s.as_bytes().to_vec()))
     }
 }
 
 impl From<i64> for RespValue {
     fn from(i: i64) -> Self {
-        RespValue::Integer(i)
+        Self::Integer(i)
     }
 }
 
 impl From<Vec<u8>> for RespValue {
     fn from(b: Vec<u8>) -> Self {
-        RespValue::BulkString(Bytes::from(b))
+        Self::BulkString(Bytes::from(b))
     }
 }
 
 impl From<Bytes> for RespValue {
     fn from(b: Bytes) -> Self {
-        RespValue::BulkString(b)
+        Self::BulkString(b)
     }
 }
 

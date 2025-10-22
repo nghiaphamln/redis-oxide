@@ -3,7 +3,7 @@
 [![Crates.io](https://img.shields.io/crates/v/redis-oxide.svg)](https://crates.io/crates/redis-oxide)
 [![Documentation](https://docs.rs/redis-oxide/badge.svg)](https://docs.rs/redis-oxide)
 [![License](https://img.shields.io/crates/l/redis-oxide.svg)](LICENSE)
-[![Rust](https://img.shields.io/badge/rust-1.80%2B-blue.svg)](https://www.rust-lang.org)
+[![Rust](https://img.shields.io/badge/rust-1.81%2B-blue.svg)](https://www.rust-lang.org)
 
 A high-performance async Redis client for Rust, similar to **StackExchange.Redis** for .NET. Automatically detects topology (Standalone or Cluster) and handles MOVED/ASK redirects transparently.
 
@@ -20,7 +20,7 @@ A high-performance async Redis client for Rust, similar to **StackExchange.Redis
 
 ## 📋 Requirements
 
-- **Rust**: 1.80 or later
+- **Rust**: 1.81 or later
 - **Redis**: 6.0+ (Standalone) or Redis Cluster 6.0+
 
 ## 🚀 Installation

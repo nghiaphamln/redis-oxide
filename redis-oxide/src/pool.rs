@@ -162,7 +162,7 @@ pub enum Pool {
     /// Multiplexed connection
     Multiplexed(MultiplexedPool),
     /// Traditional connection pool
-    Pool(ConnectionPool),
+    Pool(Box<ConnectionPool>),
 }
 
 impl Pool {
@@ -171,12 +171,12 @@ impl Pool {
         match config.pool.strategy {
             PoolStrategy::Multiplexed => {
                 let pool = MultiplexedPool::new(config, host, port).await?;
-                Ok(Pool::Multiplexed(pool))
+                Ok(Self::Multiplexed(pool))
             }
             PoolStrategy::Pool => {
                 let pool =
                     ConnectionPool::new(config.clone(), host, port, config.pool.max_size).await?;
-                Ok(Pool::Pool(pool))
+                Ok(Self::Pool(Box::new(pool)))
             }
         }
     }
@@ -188,8 +188,8 @@ impl Pool {
         args: Vec<RespValue>,
     ) -> RedisResult<RespValue> {
         match self {
-            Pool::Multiplexed(pool) => pool.execute_command(command, args).await,
-            Pool::Pool(pool) => pool.execute_command(command, args).await,
+            Self::Multiplexed(pool) => pool.execute_command(command, args).await,
+            Self::Pool(pool) => pool.execute_command(command, args).await,
         }
     }
 }

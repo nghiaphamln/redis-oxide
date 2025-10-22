@@ -112,7 +112,7 @@ impl RedisConnection {
         )
         .await
         .map_err(|_| RedisError::Timeout)?
-        .map_err(|e| RedisError::Io(e))?;
+        .map_err(RedisError::Io)?;
 
         // Read response with timeout
         let response = timeout(self.config.operation_timeout, self.read_response())
@@ -244,11 +244,11 @@ impl ConnectionManager {
         match self.config.topology_mode {
             TopologyMode::Standalone => {
                 self.topology = Some(TopologyType::Standalone);
-                return Ok(TopologyType::Standalone);
+                Ok(TopologyType::Standalone)
             }
             TopologyMode::Cluster => {
                 self.topology = Some(TopologyType::Cluster);
-                return Ok(TopologyType::Cluster);
+                Ok(TopologyType::Cluster)
             }
             TopologyMode::Auto => {
                 // Auto-detect
@@ -293,7 +293,7 @@ mod tests {
         let config = ConnectionConfig::new("redis://localhost:6379")
             .with_topology_mode(TopologyMode::Standalone);
         let manager = ConnectionManager::new(config);
-        
+
         // This would normally require async, but we can test the logic
         assert_eq!(manager.config.topology_mode, TopologyMode::Standalone);
     }

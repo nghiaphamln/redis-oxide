@@ -1,7 +1,9 @@
 //! Integration tests for redis-oxide
 //!
 //! These tests require a running Redis instance.
-//! Set REDIS_URL environment variable or use default redis://localhost:6379
+//! Set `REDIS_URL` environment variable or use default `<redis://localhost:6379>`
+
+#![allow(clippy::uninlined_format_args)]
 
 use redis_oxide::{Client, ConnectionConfig, PoolConfig, PoolStrategy};
 use std::time::Duration;
@@ -262,11 +264,12 @@ async fn test_multiplexed_pool() {
     // Multiple concurrent operations
     let mut tasks = vec![];
     for i in 0..10 {
+        let client_clone = client.clone();
         let key = format!("test:mux:{}", i);
         let value = format!("value{}", i);
         tasks.push(async move {
-            client.set(&key, &value).await?;
-            client.get(&key).await
+            client_clone.set(&key, &value).await?;
+            client_clone.get(&key).await
         });
     }
 
@@ -293,11 +296,12 @@ async fn test_connection_pool() {
     // Multiple concurrent operations
     let mut tasks = vec![];
     for i in 0..10 {
+        let client_clone = client.clone();
         let key = format!("test:pool:{}", i);
         let value = format!("value{}", i);
         tasks.push(async move {
-            client.set(&key, &value).await?;
-            client.get(&key).await
+            client_clone.set(&key, &value).await?;
+            client_clone.get(&key).await
         });
     }
 

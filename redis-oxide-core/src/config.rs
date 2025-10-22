@@ -49,7 +49,7 @@ pub enum TopologyMode {
 /// Configuration for Redis connection
 #[derive(Debug, Clone)]
 pub struct ConnectionConfig {
-    /// Connection string (e.g., "redis://localhost:6379" or "redis://host1:6379,host2:6379")
+    /// Connection string (e.g., `<redis://localhost:6379>` or `<redis://host1:6379,host2:6379>`)
     pub connection_string: String,
 
     /// Optional password for authentication
@@ -138,48 +138,56 @@ impl ConnectionConfig {
     }
 
     /// Set the password for authentication
+    #[must_use]
     pub fn with_password(mut self, password: impl Into<String>) -> Self {
         self.password = Some(password.into());
         self
     }
 
     /// Set the database number
-    pub fn with_database(mut self, database: u8) -> Self {
+    #[must_use]
+    pub const fn with_database(mut self, database: u8) -> Self {
         self.database = database;
         self
     }
 
     /// Set the connection timeout
-    pub fn with_connect_timeout(mut self, timeout: Duration) -> Self {
+    #[must_use]
+    pub const fn with_connect_timeout(mut self, timeout: Duration) -> Self {
         self.connect_timeout = timeout;
         self
     }
 
     /// Set the operation timeout
-    pub fn with_operation_timeout(mut self, timeout: Duration) -> Self {
+    #[must_use]
+    pub const fn with_operation_timeout(mut self, timeout: Duration) -> Self {
         self.operation_timeout = timeout;
         self
     }
 
     /// Set the topology mode
-    pub fn with_topology_mode(mut self, mode: TopologyMode) -> Self {
+    #[must_use]
+    pub const fn with_topology_mode(mut self, mode: TopologyMode) -> Self {
         self.topology_mode = mode;
         self
     }
 
     /// Set the pool configuration
-    pub fn with_pool_config(mut self, pool: PoolConfig) -> Self {
+    #[must_use]
+    pub const fn with_pool_config(mut self, pool: PoolConfig) -> Self {
         self.pool = pool;
         self
     }
 
     /// Set the maximum number of redirects
-    pub fn with_max_redirects(mut self, max: usize) -> Self {
+    #[must_use]
+    pub const fn with_max_redirects(mut self, max: usize) -> Self {
         self.max_redirects = max;
         self
     }
 
     /// Parse connection endpoints from connection string
+    #[must_use]
     pub fn parse_endpoints(&self) -> Vec<(String, u16)> {
         let conn_str = self.connection_string.trim();
 

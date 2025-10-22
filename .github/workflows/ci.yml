@@ -61,9 +61,9 @@ jobs:
     name: Test Suite
     runs-on: ${{ matrix.os }}
     strategy:
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-        rust: [1.80.0, stable]
+          matrix:
+            os: [ubuntu-latest, windows-latest, macos-latest]
+            rust: [1.81.0, stable]
     steps:
       - uses: actions/checkout@v4
       

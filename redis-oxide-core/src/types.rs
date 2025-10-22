@@ -19,37 +19,37 @@ pub enum RedisValue {
 
 impl From<String> for RedisValue {
     fn from(s: String) -> Self {
-        RedisValue::String(s)
+        Self::String(s)
     }
 }
 
 impl From<&str> for RedisValue {
     fn from(s: &str) -> Self {
-        RedisValue::String(s.to_string())
+        Self::String(s.to_string())
     }
 }
 
 impl From<Vec<u8>> for RedisValue {
     fn from(b: Vec<u8>) -> Self {
-        RedisValue::Bytes(b)
+        Self::Bytes(b)
     }
 }
 
 impl From<i64> for RedisValue {
     fn from(i: i64) -> Self {
-        RedisValue::Int(i)
+        Self::Int(i)
     }
 }
 
 impl From<i32> for RedisValue {
     fn from(i: i32) -> Self {
-        RedisValue::Int(i64::from(i))
+        Self::Int(i64::from(i))
     }
 }
 
-impl From<Vec<RedisValue>> for RedisValue {
-    fn from(arr: Vec<RedisValue>) -> Self {
-        RedisValue::Array(arr)
+impl From<Vec<Self>> for RedisValue {
+    fn from(arr: Vec<Self>) -> Self {
+        Self::Array(arr)
     }
 }
 
@@ -64,12 +64,14 @@ pub struct SlotRange {
 
 impl SlotRange {
     /// Create a new slot range
-    pub fn new(start: u16, end: u16) -> Self {
+    #[must_use]
+    pub const fn new(start: u16, end: u16) -> Self {
         Self { start, end }
     }
 
     /// Check if a slot is within this range
-    pub fn contains(&self, slot: u16) -> bool {
+    #[must_use]
+    pub const fn contains(&self, slot: u16) -> bool {
         slot >= self.start && slot <= self.end
     }
 }
@@ -91,7 +93,8 @@ pub struct NodeInfo {
 
 impl NodeInfo {
     /// Create a new node info
-    pub fn new(id: String, host: String, port: u16) -> Self {
+    #[must_use]
+    pub const fn new(id: String, host: String, port: u16) -> Self {
         Self {
             id,
             host,
@@ -102,6 +105,7 @@ impl NodeInfo {
     }
 
     /// Check if this node owns a given slot
+    #[must_use]
     pub fn owns_slot(&self, slot: u16) -> bool {
         self.slots.iter().any(|range| range.contains(slot))
     }
