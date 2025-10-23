@@ -82,19 +82,20 @@ pub struct Subscriber {
 pub trait PubSubConnection {
     /// Subscribe to channels
     async fn subscribe(&mut self, channels: Vec<String>) -> RedisResult<()>;
-    
+
     /// Unsubscribe from channels
     async fn unsubscribe(&mut self, channels: Vec<String>) -> RedisResult<()>;
-    
+
     /// Subscribe to patterns
     async fn psubscribe(&mut self, patterns: Vec<String>) -> RedisResult<()>;
-    
+
     /// Unsubscribe from patterns
     async fn punsubscribe(&mut self, patterns: Vec<String>) -> RedisResult<()>;
-    
+
     /// Start listening for messages
-    async fn listen(&mut self, message_tx: mpsc::UnboundedSender<PubSubMessage>) -> RedisResult<()>;
-    
+    async fn listen(&mut self, message_tx: mpsc::UnboundedSender<PubSubMessage>)
+        -> RedisResult<()>;
+
     /// Publish a message to a channel
     async fn publish(&mut self, channel: String, message: String) -> RedisResult<i64>;
 }
@@ -103,7 +104,7 @@ impl Subscriber {
     /// Create a new subscriber
     pub fn new(connection: Arc<Mutex<dyn PubSubConnection + Send + Sync>>) -> Self {
         let (message_tx, message_rx) = mpsc::unbounded_channel();
-        
+
         // Start listening for messages in the background
         let conn_clone = connection.clone();
         tokio::spawn(async move {
@@ -132,7 +133,7 @@ impl Subscriber {
     /// # let config = ConnectionConfig::new("redis://localhost:6379");
     /// # let client = Client::connect(config).await?;
     /// let mut subscriber = client.subscriber().await?;
-    /// 
+    ///
     /// // Subscribe to multiple channels
     /// subscriber.subscribe(vec![
     ///     "news".to_string(),
@@ -145,11 +146,11 @@ impl Subscriber {
     pub async fn subscribe(&mut self, channels: Vec<String>) -> RedisResult<()> {
         let mut connection = self.connection.lock().await;
         connection.subscribe(channels.clone()).await?;
-        
+
         for channel in channels {
             self.subscribed_channels.insert(channel, true);
         }
-        
+
         Ok(())
     }
 
@@ -165,7 +166,7 @@ impl Subscriber {
     /// # let client = Client::connect(config).await?;
     /// let mut subscriber = client.subscriber().await?;
     /// subscriber.subscribe(vec!["news".to_string()]).await?;
-    /// 
+    ///
     /// // Later, unsubscribe
     /// subscriber.unsubscribe(vec!["news".to_string()]).await?;
     /// # Ok(())
@@ -174,11 +175,11 @@ impl Subscriber {
     pub async fn unsubscribe(&mut self, channels: Vec<String>) -> RedisResult<()> {
         let mut connection = self.connection.lock().await;
         connection.unsubscribe(channels.clone()).await?;
-        
+
         for channel in channels {
             self.subscribed_channels.remove(&channel);
         }
-        
+
         Ok(())
     }
 
@@ -198,10 +199,10 @@ impl Subscriber {
     /// # let config = ConnectionConfig::new("redis://localhost:6379");
     /// # let client = Client::connect(config).await?;
     /// let mut subscriber = client.subscriber().await?;
-    /// 
+    ///
     /// // Subscribe to all channels starting with "news"
     /// subscriber.psubscribe(vec!["news*".to_string()]).await?;
-    /// 
+    ///
     /// // Subscribe to all channels ending with "log"
     /// subscriber.psubscribe(vec!["*log".to_string()]).await?;
     /// # Ok(())
@@ -210,11 +211,11 @@ impl Subscriber {
     pub async fn psubscribe(&mut self, patterns: Vec<String>) -> RedisResult<()> {
         let mut connection = self.connection.lock().await;
         connection.psubscribe(patterns.clone()).await?;
-        
+
         for pattern in patterns {
             self.subscribed_patterns.insert(pattern, true);
         }
-        
+
         Ok(())
     }
 
@@ -222,11 +223,11 @@ impl Subscriber {
     pub async fn punsubscribe(&mut self, patterns: Vec<String>) -> RedisResult<()> {
         let mut connection = self.connection.lock().await;
         connection.punsubscribe(patterns.clone()).await?;
-        
+
         for pattern in patterns {
             self.subscribed_patterns.remove(&pattern);
         }
-        
+
         Ok(())
     }
 
@@ -244,7 +245,7 @@ impl Subscriber {
     /// # let client = Client::connect(config).await?;
     /// let mut subscriber = client.subscriber().await?;
     /// subscriber.subscribe(vec!["news".to_string()]).await?;
-    /// 
+    ///
     /// // Wait for the next message
     /// if let Some(message) = subscriber.next_message().await? {
     ///     println!("Received: {} on {}", message.payload, message.channel);
@@ -272,7 +273,7 @@ impl Subscriber {
     /// # let client = Client::connect(config).await?;
     /// let mut subscriber = client.subscriber().await?;
     /// subscriber.subscribe(vec!["news".to_string()]).await?;
-    /// 
+    ///
     /// // Wait for a message with 5 second timeout
     /// match subscriber.next_message_timeout(Duration::from_secs(5)).await? {
     ///     Some(message) => println!("Received: {}", message.payload),
@@ -281,11 +282,14 @@ impl Subscriber {
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn next_message_timeout(&mut self, duration: Duration) -> RedisResult<Option<PubSubMessage>> {
+    pub async fn next_message_timeout(
+        &mut self,
+        duration: Duration,
+    ) -> RedisResult<Option<PubSubMessage>> {
         match timeout(duration, self.message_rx.recv()).await {
             Ok(Some(message)) => Ok(Some(message)),
             Ok(None) => Ok(None), // Channel closed
-            Err(_) => Ok(None), // Timeout
+            Err(_) => Ok(None),   // Timeout
         }
     }
 
@@ -351,13 +355,17 @@ impl Publisher {
     /// # let config = ConnectionConfig::new("redis://localhost:6379");
     /// # let client = Client::connect(config).await?;
     /// let publisher = client.publisher().await?;
-    /// 
+    ///
     /// let subscribers = publisher.publish("news", "Breaking news!").await?;
     /// println!("Message delivered to {} subscribers", subscribers);
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn publish(&self, channel: impl Into<String>, message: impl Into<String>) -> RedisResult<i64> {
+    pub async fn publish(
+        &self,
+        channel: impl Into<String>,
+        message: impl Into<String>,
+    ) -> RedisResult<i64> {
         let mut connection = self.connection.lock().await;
         connection.publish(channel.into(), message.into()).await
     }
@@ -374,11 +382,11 @@ impl Publisher {
     /// # let config = ConnectionConfig::new("redis://localhost:6379");
     /// # let client = Client::connect(config).await?;
     /// let publisher = client.publisher().await?;
-    /// 
+    ///
     /// let mut messages = HashMap::new();
     /// messages.insert("news".to_string(), "Breaking news!".to_string());
     /// messages.insert("updates".to_string(), "System update available".to_string());
-    /// 
+    ///
     /// let results = publisher.publish_multiple(messages).await?;
     /// for (channel, count) in results {
     ///     println!("Channel {}: {} subscribers", channel, count);
@@ -386,14 +394,17 @@ impl Publisher {
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn publish_multiple(&self, messages: HashMap<String, String>) -> RedisResult<HashMap<String, i64>> {
+    pub async fn publish_multiple(
+        &self,
+        messages: HashMap<String, String>,
+    ) -> RedisResult<HashMap<String, i64>> {
         let mut results = HashMap::new();
-        
+
         for (channel, message) in messages {
             let count = self.publish(&channel, message).await?;
             results.insert(channel, count);
         }
-        
+
         Ok(results)
     }
 }
@@ -429,12 +440,12 @@ pub fn parse_pubsub_message(response: RespValue) -> RedisResult<Option<PubSubMes
         RespValue::Array(items) if items.len() >= 3 => {
             let message_type = items[0].as_string()?;
             let msg_type = PubSubMessageType::from_str(&message_type);
-            
+
             match msg_type {
                 Some(PubSubMessageType::Message) => {
                     let channel = items[1].as_string()?;
                     let payload = items[2].as_string()?;
-                    
+
                     Ok(Some(PubSubMessage {
                         channel,
                         payload,
@@ -445,17 +456,19 @@ pub fn parse_pubsub_message(response: RespValue) -> RedisResult<Option<PubSubMes
                     let pattern = items[1].as_string()?;
                     let channel = items[2].as_string()?;
                     let payload = items[3].as_string()?;
-                    
+
                     Ok(Some(PubSubMessage {
                         channel,
                         payload,
                         pattern: Some(pattern),
                     }))
                 }
-                Some(PubSubMessageType::Subscribe) |
-                Some(PubSubMessageType::Unsubscribe) |
-                Some(PubSubMessageType::PSubscribe) |
-                Some(PubSubMessageType::PUnsubscribe) => {
+                Some(
+                    PubSubMessageType::Subscribe
+                    | PubSubMessageType::Unsubscribe
+                    | PubSubMessageType::PSubscribe
+                    | PubSubMessageType::PUnsubscribe,
+                ) => {
                     // These are subscription confirmations, not actual messages
                     Ok(None)
                 }
@@ -500,31 +513,34 @@ mod tests {
             self.subscribed_channels.extend(channels);
             Ok(())
         }
-        
+
         async fn unsubscribe(&mut self, channels: Vec<String>) -> RedisResult<()> {
             for channel in channels {
                 self.subscribed_channels.retain(|c| c != &channel);
             }
             Ok(())
         }
-        
+
         async fn psubscribe(&mut self, patterns: Vec<String>) -> RedisResult<()> {
             self.subscribed_patterns.extend(patterns);
             Ok(())
         }
-        
+
         async fn punsubscribe(&mut self, patterns: Vec<String>) -> RedisResult<()> {
             for pattern in patterns {
                 self.subscribed_patterns.retain(|p| p != &pattern);
             }
             Ok(())
         }
-        
-        async fn listen(&mut self, _message_tx: mpsc::UnboundedSender<PubSubMessage>) -> RedisResult<()> {
+
+        async fn listen(
+            &mut self,
+            _message_tx: mpsc::UnboundedSender<PubSubMessage>,
+        ) -> RedisResult<()> {
             // Mock implementation - would normally listen for messages
             Ok(())
         }
-        
+
         async fn publish(&mut self, channel: String, message: String) -> RedisResult<i64> {
             self.published_messages.push((channel, message));
             Ok(1) // Mock: 1 subscriber
@@ -535,7 +551,7 @@ mod tests {
     async fn test_subscriber_creation() {
         let connection = MockPubSubConnection::new();
         let subscriber = Subscriber::new(Arc::new(Mutex::new(connection)));
-        
+
         assert!(subscriber.subscribed_channels().is_empty());
         assert!(subscriber.subscribed_patterns().is_empty());
     }
@@ -544,9 +560,12 @@ mod tests {
     async fn test_subscriber_subscribe() {
         let connection = MockPubSubConnection::new();
         let mut subscriber = Subscriber::new(Arc::new(Mutex::new(connection)));
-        
-        subscriber.subscribe(vec!["news".to_string(), "updates".to_string()]).await.unwrap();
-        
+
+        subscriber
+            .subscribe(vec!["news".to_string(), "updates".to_string()])
+            .await
+            .unwrap();
+
         assert_eq!(subscriber.subscribed_channels().len(), 2);
         assert!(subscriber.is_subscribed_to_channel("news"));
         assert!(subscriber.is_subscribed_to_channel("updates"));
@@ -556,10 +575,16 @@ mod tests {
     async fn test_subscriber_unsubscribe() {
         let connection = MockPubSubConnection::new();
         let mut subscriber = Subscriber::new(Arc::new(Mutex::new(connection)));
-        
-        subscriber.subscribe(vec!["news".to_string(), "updates".to_string()]).await.unwrap();
-        subscriber.unsubscribe(vec!["news".to_string()]).await.unwrap();
-        
+
+        subscriber
+            .subscribe(vec!["news".to_string(), "updates".to_string()])
+            .await
+            .unwrap();
+        subscriber
+            .unsubscribe(vec!["news".to_string()])
+            .await
+            .unwrap();
+
         assert_eq!(subscriber.subscribed_channels().len(), 1);
         assert!(!subscriber.is_subscribed_to_channel("news"));
         assert!(subscriber.is_subscribed_to_channel("updates"));
@@ -569,7 +594,7 @@ mod tests {
     async fn test_publisher_publish() {
         let connection = MockPubSubConnection::new();
         let publisher = Publisher::new(Arc::new(Mutex::new(connection)));
-        
+
         let count = publisher.publish("news", "Breaking news!").await.unwrap();
         assert_eq!(count, 1);
     }
@@ -582,7 +607,7 @@ mod tests {
             RespValue::from("news"),
             RespValue::from("Breaking news!"),
         ]);
-        
+
         let message = parse_pubsub_message(response).unwrap().unwrap();
         assert_eq!(message.channel, "news");
         assert_eq!(message.payload, "Breaking news!");
@@ -598,7 +623,7 @@ mod tests {
             RespValue::from("news-tech"),
             RespValue::from("Tech news!"),
         ]);
-        
+
         let message = parse_pubsub_message(response).unwrap().unwrap();
         assert_eq!(message.channel, "news-tech");
         assert_eq!(message.payload, "Tech news!");
@@ -613,7 +638,7 @@ mod tests {
             RespValue::from("news"),
             RespValue::Integer(1),
         ]);
-        
+
         let message = parse_pubsub_message(response).unwrap();
         assert!(message.is_none());
     }

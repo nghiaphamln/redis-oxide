@@ -232,7 +232,7 @@ impl ProtocolConnection for RedisConnection {
     async fn send_command(&mut self, command: &RespValue) -> RedisResult<()> {
         self.send_command(command).await
     }
-    
+
     async fn read_response(&mut self) -> RedisResult<RespValue> {
         self.read_response().await
     }

@@ -186,8 +186,32 @@
 //! ```
 
 #![deny(warnings)]
-#![allow(unused_imports)]
-#![allow(clippy::unused_self)]
+#![deny(clippy::all)]
+#![deny(clippy::pedantic)]
+#![deny(clippy::nursery)]
+#![allow(clippy::cargo)] // Allow cargo lints for now
+#![allow(rustdoc::broken_intra_doc_links)] // Allow broken doc links for now
+#![allow(rustdoc::invalid_html_tags)] // Allow invalid HTML tags for now
+#![allow(clippy::needless_raw_string_hashes)] // Allow raw string hashes
+#![allow(clippy::missing_panics_doc)] // Allow missing panics doc for now
+#![allow(clippy::option_if_let_else)] // Allow option if let else for readability
+#![allow(clippy::needless_pass_by_value)] // Allow pass by value for API design
+#![allow(clippy::only_used_in_recursion)] // Allow for recursive functions
+#![allow(clippy::should_implement_trait)] // Allow for custom method names
+#![allow(clippy::cast_precision_loss)] // Allow precision loss for performance metrics
+#![allow(clippy::suboptimal_flops)] // Allow for readability
+#![allow(clippy::single_match_else)] // Allow for readability
+#![allow(clippy::redundant_pattern_matching)] // Allow for explicit patterns
+#![allow(clippy::if_same_then_else)] // Allow for optimization code
+#![allow(clippy::match_same_arms)] // Allow for protocol handling
+#![allow(clippy::too_many_lines)] // Allow for complex protocol functions
+#![allow(clippy::significant_drop_in_scrutinee)] // Allow for async code patterns
+#![allow(clippy::needless_borrows_for_generic_args)] // Allow for API consistency
+#![allow(clippy::map_unwrap_or)] // Allow for readability
+#![allow(clippy::ignored_unit_patterns)] // Allow for explicit patterns
+#![allow(clippy::manual_map)] // Allow for readability
+#![allow(clippy::needless_pass_by_ref_mut)] // Allow for API consistency
+#![allow(clippy::unused_self)] // Allow for trait implementations
 #![warn(missing_docs)]
 #![allow(clippy::missing_errors_doc)]
 #![allow(clippy::must_use_candidate)]
@@ -213,6 +237,7 @@ pub mod commands;
 pub mod connection;
 pub mod pipeline;
 pub mod pool;
+pub mod pool_optimized;
 pub mod protocol;
 pub mod pubsub;
 pub mod script;
@@ -223,7 +248,7 @@ pub mod transaction;
 pub use client::Client;
 pub mod core;
 pub use pipeline::{Pipeline, PipelineResult};
-pub use pubsub::{Publisher, PubSubMessage, Subscriber};
+pub use pubsub::{PubSubMessage, Publisher, Subscriber};
 pub use script::{Script, ScriptManager};
 pub use sentinel::{MasterInfo, SentinelClient, SentinelConfig, SentinelEndpoint};
 pub use streams::{

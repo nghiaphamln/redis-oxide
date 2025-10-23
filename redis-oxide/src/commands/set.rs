@@ -1,13 +1,12 @@
 //! Command builders for Redis Set operations
 
+use crate::commands::Command;
 use crate::core::{
     error::{RedisError, RedisResult},
     value::RespValue,
 };
-use crate::commands::Command;
 use crate::pipeline::PipelineCommand;
 use std::collections::HashSet;
-use std::convert::TryFrom;
 
 /// Represents the `SADD` command.
 #[derive(Debug, Clone)]
@@ -55,11 +54,11 @@ impl PipelineCommand for SAddCommand {
     fn name(&self) -> &str {
         self.command_name()
     }
-    
+
     fn args(&self) -> Vec<RespValue> {
         <Self as Command>::args(self)
     }
-    
+
     fn key(&self) -> Option<String> {
         Some(self.key.clone())
     }
@@ -111,11 +110,11 @@ impl PipelineCommand for SRemCommand {
     fn name(&self) -> &str {
         self.command_name()
     }
-    
+
     fn args(&self) -> Vec<RespValue> {
         <Self as Command>::args(self)
     }
-    
+
     fn key(&self) -> Option<String> {
         Some(self.key.clone())
     }
@@ -131,9 +130,7 @@ impl SMembersCommand {
     /// Create a new `SMEMBERS` command.
     #[must_use]
     pub fn new(key: impl Into<String>) -> Self {
-        Self {
-            key: key.into(),
-        }
+        Self { key: key.into() }
     }
 }
 
@@ -162,10 +159,12 @@ impl Command for SMembersCommand {
                         RespValue::Null => {
                             // Skip null values
                         }
-                        _ => return Err(RedisError::Type(format!(
-                            "Unexpected item type in SMEMBERS response: {:?}",
-                            item
-                        ))),
+                        _ => {
+                            return Err(RedisError::Type(format!(
+                                "Unexpected item type in SMEMBERS response: {:?}",
+                                item
+                            )))
+                        }
                     }
                 }
                 Ok(result)
@@ -186,11 +185,11 @@ impl PipelineCommand for SMembersCommand {
     fn name(&self) -> &str {
         self.command_name()
     }
-    
+
     fn args(&self) -> Vec<RespValue> {
         <Self as Command>::args(self)
     }
-    
+
     fn key(&self) -> Option<String> {
         Some(self.key.clone())
     }
@@ -248,11 +247,11 @@ impl PipelineCommand for SIsMemberCommand {
     fn name(&self) -> &str {
         self.command_name()
     }
-    
+
     fn args(&self) -> Vec<RespValue> {
         <Self as Command>::args(self)
     }
-    
+
     fn key(&self) -> Option<String> {
         Some(self.key.clone())
     }
@@ -268,9 +267,7 @@ impl SCardCommand {
     /// Create a new `SCARD` command.
     #[must_use]
     pub fn new(key: impl Into<String>) -> Self {
-        Self {
-            key: key.into(),
-        }
+        Self { key: key.into() }
     }
 }
 
@@ -298,11 +295,11 @@ impl PipelineCommand for SCardCommand {
     fn name(&self) -> &str {
         self.command_name()
     }
-    
+
     fn args(&self) -> Vec<RespValue> {
         <Self as Command>::args(self)
     }
-    
+
     fn key(&self) -> Option<String> {
         Some(self.key.clone())
     }
@@ -318,9 +315,7 @@ impl SPopCommand {
     /// Create a new `SPOP` command.
     #[must_use]
     pub fn new(key: impl Into<String>) -> Self {
-        Self {
-            key: key.into(),
-        }
+        Self { key: key.into() }
     }
 }
 
@@ -337,11 +332,9 @@ impl Command for SPopCommand {
 
     fn parse_response(&self, response: RespValue) -> RedisResult<Self::Output> {
         match response {
-            RespValue::BulkString(b) => {
-                String::from_utf8(b.to_vec())
-                    .map(Some)
-                    .map_err(|e| RedisError::Type(format!("Invalid UTF-8: {e}")))
-            }
+            RespValue::BulkString(b) => String::from_utf8(b.to_vec())
+                .map(Some)
+                .map_err(|e| RedisError::Type(format!("Invalid UTF-8: {e}"))),
             RespValue::Null => Ok(None),
             _ => Err(RedisError::Type(format!(
                 "Unexpected response type for SPOP: {:?}",
@@ -359,11 +352,11 @@ impl PipelineCommand for SPopCommand {
     fn name(&self) -> &str {
         self.command_name()
     }
-    
+
     fn args(&self) -> Vec<RespValue> {
         <Self as Command>::args(self)
     }
-    
+
     fn key(&self) -> Option<String> {
         Some(self.key.clone())
     }
@@ -379,9 +372,7 @@ impl SRandMemberCommand {
     /// Create a new `SRANDMEMBER` command.
     #[must_use]
     pub fn new(key: impl Into<String>) -> Self {
-        Self {
-            key: key.into(),
-        }
+        Self { key: key.into() }
     }
 }
 
@@ -398,11 +389,9 @@ impl Command for SRandMemberCommand {
 
     fn parse_response(&self, response: RespValue) -> RedisResult<Self::Output> {
         match response {
-            RespValue::BulkString(b) => {
-                String::from_utf8(b.to_vec())
-                    .map(Some)
-                    .map_err(|e| RedisError::Type(format!("Invalid UTF-8: {e}")))
-            }
+            RespValue::BulkString(b) => String::from_utf8(b.to_vec())
+                .map(Some)
+                .map_err(|e| RedisError::Type(format!("Invalid UTF-8: {e}"))),
             RespValue::Null => Ok(None),
             _ => Err(RedisError::Type(format!(
                 "Unexpected response type for SRANDMEMBER: {:?}",
@@ -420,11 +409,11 @@ impl PipelineCommand for SRandMemberCommand {
     fn name(&self) -> &str {
         self.command_name()
     }
-    
+
     fn args(&self) -> Vec<RespValue> {
         <Self as Command>::args(self)
     }
-    
+
     fn key(&self) -> Option<String> {
         Some(self.key.clone())
     }

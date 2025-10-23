@@ -1,12 +1,11 @@
 //! Command builders for Redis List operations
 
+use crate::commands::Command;
 use crate::core::{
     error::{RedisError, RedisResult},
     value::RespValue,
 };
-use crate::commands::Command;
 use crate::pipeline::PipelineCommand;
-use std::convert::TryFrom;
 
 /// Represents the `LPUSH` command.
 #[derive(Debug, Clone)]
@@ -54,11 +53,11 @@ impl PipelineCommand for LPushCommand {
     fn name(&self) -> &str {
         self.command_name()
     }
-    
+
     fn args(&self) -> Vec<RespValue> {
         <Self as Command>::args(self)
     }
-    
+
     fn key(&self) -> Option<String> {
         Some(self.key.clone())
     }
@@ -110,11 +109,11 @@ impl PipelineCommand for RPushCommand {
     fn name(&self) -> &str {
         self.command_name()
     }
-    
+
     fn args(&self) -> Vec<RespValue> {
         <Self as Command>::args(self)
     }
-    
+
     fn key(&self) -> Option<String> {
         Some(self.key.clone())
     }
@@ -130,9 +129,7 @@ impl LPopCommand {
     /// Create a new `LPOP` command.
     #[must_use]
     pub fn new(key: impl Into<String>) -> Self {
-        Self {
-            key: key.into(),
-        }
+        Self { key: key.into() }
     }
 }
 
@@ -149,11 +146,9 @@ impl Command for LPopCommand {
 
     fn parse_response(&self, response: RespValue) -> RedisResult<Self::Output> {
         match response {
-            RespValue::BulkString(b) => {
-                String::from_utf8(b.to_vec())
-                    .map(Some)
-                    .map_err(|e| RedisError::Type(format!("Invalid UTF-8: {e}")))
-            }
+            RespValue::BulkString(b) => String::from_utf8(b.to_vec())
+                .map(Some)
+                .map_err(|e| RedisError::Type(format!("Invalid UTF-8: {e}"))),
             RespValue::Null => Ok(None),
             _ => Err(RedisError::Type(format!(
                 "Unexpected response type for LPOP: {:?}",
@@ -171,11 +166,11 @@ impl PipelineCommand for LPopCommand {
     fn name(&self) -> &str {
         self.command_name()
     }
-    
+
     fn args(&self) -> Vec<RespValue> {
         <Self as Command>::args(self)
     }
-    
+
     fn key(&self) -> Option<String> {
         Some(self.key.clone())
     }
@@ -191,9 +186,7 @@ impl RPopCommand {
     /// Create a new `RPOP` command.
     #[must_use]
     pub fn new(key: impl Into<String>) -> Self {
-        Self {
-            key: key.into(),
-        }
+        Self { key: key.into() }
     }
 }
 
@@ -210,11 +203,9 @@ impl Command for RPopCommand {
 
     fn parse_response(&self, response: RespValue) -> RedisResult<Self::Output> {
         match response {
-            RespValue::BulkString(b) => {
-                String::from_utf8(b.to_vec())
-                    .map(Some)
-                    .map_err(|e| RedisError::Type(format!("Invalid UTF-8: {e}")))
-            }
+            RespValue::BulkString(b) => String::from_utf8(b.to_vec())
+                .map(Some)
+                .map_err(|e| RedisError::Type(format!("Invalid UTF-8: {e}"))),
             RespValue::Null => Ok(None),
             _ => Err(RedisError::Type(format!(
                 "Unexpected response type for RPOP: {:?}",
@@ -232,11 +223,11 @@ impl PipelineCommand for RPopCommand {
     fn name(&self) -> &str {
         self.command_name()
     }
-    
+
     fn args(&self) -> Vec<RespValue> {
         <Self as Command>::args(self)
     }
-    
+
     fn key(&self) -> Option<String> {
         Some(self.key.clone())
     }
@@ -291,10 +282,12 @@ impl Command for LRangeCommand {
                         RespValue::Null => {
                             // Skip null values
                         }
-                        _ => return Err(RedisError::Type(format!(
-                            "Unexpected item type in LRANGE response: {:?}",
-                            item
-                        ))),
+                        _ => {
+                            return Err(RedisError::Type(format!(
+                                "Unexpected item type in LRANGE response: {:?}",
+                                item
+                            )))
+                        }
                     }
                 }
                 Ok(result)
@@ -315,11 +308,11 @@ impl PipelineCommand for LRangeCommand {
     fn name(&self) -> &str {
         self.command_name()
     }
-    
+
     fn args(&self) -> Vec<RespValue> {
         <Self as Command>::args(self)
     }
-    
+
     fn key(&self) -> Option<String> {
         Some(self.key.clone())
     }
@@ -335,9 +328,7 @@ impl LLenCommand {
     /// Create a new `LLEN` command.
     #[must_use]
     pub fn new(key: impl Into<String>) -> Self {
-        Self {
-            key: key.into(),
-        }
+        Self { key: key.into() }
     }
 }
 
@@ -365,11 +356,11 @@ impl PipelineCommand for LLenCommand {
     fn name(&self) -> &str {
         self.command_name()
     }
-    
+
     fn args(&self) -> Vec<RespValue> {
         <Self as Command>::args(self)
     }
-    
+
     fn key(&self) -> Option<String> {
         Some(self.key.clone())
     }
@@ -409,11 +400,9 @@ impl Command for LIndexCommand {
 
     fn parse_response(&self, response: RespValue) -> RedisResult<Self::Output> {
         match response {
-            RespValue::BulkString(b) => {
-                String::from_utf8(b.to_vec())
-                    .map(Some)
-                    .map_err(|e| RedisError::Type(format!("Invalid UTF-8: {e}")))
-            }
+            RespValue::BulkString(b) => String::from_utf8(b.to_vec())
+                .map(Some)
+                .map_err(|e| RedisError::Type(format!("Invalid UTF-8: {e}"))),
             RespValue::Null => Ok(None),
             _ => Err(RedisError::Type(format!(
                 "Unexpected response type for LINDEX: {:?}",
@@ -431,11 +420,11 @@ impl PipelineCommand for LIndexCommand {
     fn name(&self) -> &str {
         self.command_name()
     }
-    
+
     fn args(&self) -> Vec<RespValue> {
         <Self as Command>::args(self)
     }
-    
+
     fn key(&self) -> Option<String> {
         Some(self.key.clone())
     }
@@ -489,11 +478,11 @@ impl PipelineCommand for LSetCommand {
     fn name(&self) -> &str {
         self.command_name()
     }
-    
+
     fn args(&self) -> Vec<RespValue> {
         <Self as Command>::args(self)
     }
-    
+
     fn key(&self) -> Option<String> {
         Some(self.key.clone())
     }

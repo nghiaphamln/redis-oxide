@@ -2,9 +2,9 @@
 //!
 //! This module provides command builders for Redis Hash operations.
 
+use super::Command;
 use crate::core::{error::RedisResult, value::RespValue};
 use crate::pipeline::PipelineCommand;
-use super::Command;
 use std::collections::HashMap;
 
 /// HGET command - Get the value of a hash field
@@ -61,11 +61,11 @@ impl PipelineCommand for HGetCommand {
     fn name(&self) -> &str {
         self.command_name()
     }
-    
+
     fn args(&self) -> Vec<RespValue> {
         <Self as Command>::args(self)
     }
-    
+
     fn key(&self) -> Option<String> {
         Some(self.key.clone())
     }
@@ -118,11 +118,11 @@ impl PipelineCommand for HSetCommand {
     fn name(&self) -> &str {
         self.command_name()
     }
-    
+
     fn args(&self) -> Vec<RespValue> {
         <Self as Command>::args(self)
     }
-    
+
     fn key(&self) -> Option<String> {
         Some(self.key.clone())
     }
@@ -173,11 +173,11 @@ impl PipelineCommand for HDelCommand {
     fn name(&self) -> &str {
         self.command_name()
     }
-    
+
     fn args(&self) -> Vec<RespValue> {
         <Self as Command>::args(self)
     }
-    
+
     fn key(&self) -> Option<String> {
         Some(self.key.clone())
     }
@@ -192,9 +192,7 @@ pub struct HGetAllCommand {
 impl HGetAllCommand {
     /// Create a new HGETALL command
     pub fn new(key: impl Into<String>) -> Self {
-        Self {
-            key: key.into(),
-        }
+        Self { key: key.into() }
     }
 }
 
@@ -214,13 +212,13 @@ impl Command for HGetAllCommand {
             RespValue::Array(items) => {
                 let mut result = HashMap::new();
                 let mut iter = items.into_iter();
-                
+
                 while let (Some(field), Some(value)) = (iter.next(), iter.next()) {
                     let field_str = field.as_string()?;
                     let value_str = value.as_string()?;
                     result.insert(field_str, value_str);
                 }
-                
+
                 Ok(result)
             }
             _ => Err(crate::core::error::RedisError::Type(format!(
@@ -239,11 +237,11 @@ impl PipelineCommand for HGetAllCommand {
     fn name(&self) -> &str {
         self.command_name()
     }
-    
+
     fn args(&self) -> Vec<RespValue> {
         <Self as Command>::args(self)
     }
-    
+
     fn key(&self) -> Option<String> {
         Some(self.key.clone())
     }
@@ -292,10 +290,12 @@ impl Command for HMGetCommand {
                             let s = String::from_utf8_lossy(&bytes).to_string();
                             result.push(Some(s));
                         }
-                        _ => return Err(crate::core::error::RedisError::Type(format!(
-                            "Unexpected item type in HMGET response: {:?}",
-                            item
-                        ))),
+                        _ => {
+                            return Err(crate::core::error::RedisError::Type(format!(
+                                "Unexpected item type in HMGET response: {:?}",
+                                item
+                            )))
+                        }
                     }
                 }
                 Ok(result)
@@ -316,11 +316,11 @@ impl PipelineCommand for HMGetCommand {
     fn name(&self) -> &str {
         self.command_name()
     }
-    
+
     fn args(&self) -> Vec<RespValue> {
         <Self as Command>::args(self)
     }
-    
+
     fn key(&self) -> Option<String> {
         Some(self.key.clone())
     }
@@ -372,11 +372,11 @@ impl PipelineCommand for HMSetCommand {
     fn name(&self) -> &str {
         self.command_name()
     }
-    
+
     fn args(&self) -> Vec<RespValue> {
         <Self as Command>::args(self)
     }
-    
+
     fn key(&self) -> Option<String> {
         Some(self.key.clone())
     }
@@ -391,9 +391,7 @@ pub struct HLenCommand {
 impl HLenCommand {
     /// Create a new HLEN command
     pub fn new(key: impl Into<String>) -> Self {
-        Self {
-            key: key.into(),
-        }
+        Self { key: key.into() }
     }
 }
 
@@ -421,11 +419,11 @@ impl PipelineCommand for HLenCommand {
     fn name(&self) -> &str {
         self.command_name()
     }
-    
+
     fn args(&self) -> Vec<RespValue> {
         <Self as Command>::args(self)
     }
-    
+
     fn key(&self) -> Option<String> {
         Some(self.key.clone())
     }
@@ -482,11 +480,11 @@ impl PipelineCommand for HExistsCommand {
     fn name(&self) -> &str {
         self.command_name()
     }
-    
+
     fn args(&self) -> Vec<RespValue> {
         <Self as Command>::args(self)
     }
-    
+
     fn key(&self) -> Option<String> {
         Some(self.key.clone())
     }
@@ -501,7 +499,7 @@ mod tests {
         let cmd = HGetCommand::new("myhash", "field1");
         assert_eq!(cmd.command_name(), "HGET");
         assert_eq!(cmd.keys(), vec![b"myhash"]);
-        
+
         let args = <HGetCommand as Command>::args(&cmd);
         assert_eq!(args.len(), 2);
     }
@@ -511,7 +509,7 @@ mod tests {
         let cmd = HSetCommand::new("myhash", "field1", "value1");
         assert_eq!(cmd.command_name(), "HSET");
         assert_eq!(cmd.keys(), vec![b"myhash"]);
-        
+
         let args = <HSetCommand as Command>::args(&cmd);
         assert_eq!(args.len(), 3);
     }
@@ -521,7 +519,7 @@ mod tests {
         let cmd = HDelCommand::new("myhash", vec!["field1".to_string(), "field2".to_string()]);
         assert_eq!(cmd.command_name(), "HDEL");
         assert_eq!(cmd.keys(), vec![b"myhash"]);
-        
+
         let args = <HDelCommand as Command>::args(&cmd);
         assert_eq!(args.len(), 3); // key + 2 fields
     }
@@ -531,7 +529,7 @@ mod tests {
         let cmd = HGetAllCommand::new("myhash");
         assert_eq!(cmd.command_name(), "HGETALL");
         assert_eq!(cmd.keys(), vec![b"myhash"]);
-        
+
         let args = <HGetAllCommand as Command>::args(&cmd);
         assert_eq!(args.len(), 1);
     }
@@ -541,7 +539,7 @@ mod tests {
         let cmd = HMGetCommand::new("myhash", vec!["field1".to_string(), "field2".to_string()]);
         assert_eq!(cmd.command_name(), "HMGET");
         assert_eq!(cmd.keys(), vec![b"myhash"]);
-        
+
         let args = <HMGetCommand as Command>::args(&cmd);
         assert_eq!(args.len(), 3); // key + 2 fields
     }
@@ -551,11 +549,11 @@ mod tests {
         let mut fields = HashMap::new();
         fields.insert("field1".to_string(), "value1".to_string());
         fields.insert("field2".to_string(), "value2".to_string());
-        
+
         let cmd = HMSetCommand::new("myhash", fields);
         assert_eq!(cmd.command_name(), "HMSET");
         assert_eq!(cmd.keys(), vec![b"myhash"]);
-        
+
         let args = <HMSetCommand as Command>::args(&cmd);
         assert_eq!(args.len(), 5); // key + 2 * (field + value)
     }
@@ -565,7 +563,7 @@ mod tests {
         let cmd = HLenCommand::new("myhash");
         assert_eq!(cmd.command_name(), "HLEN");
         assert_eq!(cmd.keys(), vec![b"myhash"]);
-        
+
         let args = <HLenCommand as Command>::args(&cmd);
         assert_eq!(args.len(), 1);
     }
@@ -575,7 +573,7 @@ mod tests {
         let cmd = HExistsCommand::new("myhash", "field1");
         assert_eq!(cmd.command_name(), "HEXISTS");
         assert_eq!(cmd.keys(), vec![b"myhash"]);
-        
+
         let args = <HExistsCommand as Command>::args(&cmd);
         assert_eq!(args.len(), 2);
     }

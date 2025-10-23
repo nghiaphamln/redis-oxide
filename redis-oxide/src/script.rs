@@ -117,7 +117,7 @@ impl Script {
     pub fn new(source: impl Into<String>) -> Self {
         let source = source.into();
         let sha = calculate_sha1(&source);
-        
+
         Self { source, sha }
     }
 
@@ -153,13 +153,13 @@ impl Script {
     /// # let config = ConnectionConfig::new("redis://localhost:6379");
     /// # let client = Client::connect(config).await?;
     /// let script = Script::new("return KEYS[1] .. ':' .. ARGV[1]");
-    /// 
+    ///
     /// let result: String = script.execute(
     ///     &client,
     ///     vec!["user".to_string()],
     ///     vec!["123".to_string()]
     /// ).await?;
-    /// 
+    ///
     /// assert_eq!(result, "user:123");
     /// # Ok(())
     /// # }
@@ -199,7 +199,7 @@ impl Script {
     /// # let config = ConnectionConfig::new("redis://localhost:6379");
     /// # let client = Client::connect(config).await?;
     /// let script = Script::new("return 'Hello, World!'");
-    /// 
+    ///
     /// // Preload the script
     /// let sha = script.load(&client).await?;
     /// println!("Script loaded with SHA: {}", sha);
@@ -235,7 +235,7 @@ impl ScriptManager {
     ///
     /// let mut manager = ScriptManager::new();
     /// let script = Script::new("return 'Hello'");
-    /// 
+    ///
     /// manager.register("greeting", script).await;
     /// ```
     pub async fn register(&self, name: impl Into<String>, script: Script) {
@@ -254,7 +254,7 @@ impl ScriptManager {
     /// let manager = ScriptManager::new();
     /// let script = Script::new("return 'Hello'");
     /// manager.register("greeting", script).await;
-    /// 
+    ///
     /// if let Some(script) = manager.get("greeting").await {
     ///     println!("Found script with SHA: {}", script.sha());
     /// }
@@ -278,7 +278,7 @@ impl ScriptManager {
     /// let manager = ScriptManager::new();
     /// let script = Script::new("return KEYS[1]");
     /// manager.register("get_key", script).await;
-    /// 
+    ///
     /// let result: String = manager.execute(
     ///     "get_key",
     ///     &client,
@@ -299,9 +299,11 @@ impl ScriptManager {
         T: TryFrom<RespValue>,
         T::Error: Into<RedisError>,
     {
-        let script = self.get(name).await
+        let script = self
+            .get(name)
+            .await
             .ok_or_else(|| RedisError::Protocol(format!("Script '{}' not found", name)))?;
-        
+
         script.execute(client, keys, args).await
     }
 
@@ -316,11 +318,11 @@ impl ScriptManager {
     /// # let config = ConnectionConfig::new("redis://localhost:6379");
     /// # let client = Client::connect(config).await?;
     /// let manager = ScriptManager::new();
-    /// 
+    ///
     /// // Register some scripts
     /// manager.register("script1", Script::new("return 1")).await;
     /// manager.register("script2", Script::new("return 2")).await;
-    /// 
+    ///
     /// // Load all scripts at once
     /// let results = manager.load_all(&client).await?;
     /// println!("Loaded {} scripts", results.len());
@@ -330,12 +332,12 @@ impl ScriptManager {
     pub async fn load_all(&self, client: &crate::Client) -> RedisResult<HashMap<String, String>> {
         let scripts = self.scripts.read().await;
         let mut results = HashMap::new();
-        
+
         for (name, script) in scripts.iter() {
             let sha = script.load(client).await?;
             results.insert(name.clone(), sha);
         }
-        
+
         Ok(results)
     }
 
@@ -394,10 +396,11 @@ pub mod patterns {
     ///
     /// # Arguments
     /// - KEYS[1]: The key to increment
-    /// - ARGV[1]: Increment amount
-    /// - ARGV[2]: Expiration time in seconds
+    /// - ARGV\[1\]: Increment amount
+    /// - ARGV\[2\]: Expiration time in seconds
     pub fn atomic_increment_with_expiration() -> Script {
-        Script::new(r#"
+        Script::new(
+            r"
             local key = KEYS[1]
             local increment = tonumber(ARGV[1])
             local expiration = tonumber(ARGV[2])
@@ -415,17 +418,19 @@ pub mod patterns {
             redis.call('EXPIRE', key, expiration)
             
             return new_value
-        "#)
+        ",
+        )
     }
 
     /// Conditional set (SET if value matches)
     ///
     /// # Arguments
-    /// - KEYS[1]: The key to set
-    /// - ARGV[1]: Expected current value
-    /// - ARGV[2]: New value to set
+    /// - KEYS\[1\]: The key to set
+    /// - ARGV\[1\]: Expected current value
+    /// - ARGV\[2\]: New value to set
     pub fn conditional_set() -> Script {
-        Script::new(r#"
+        Script::new(
+            r"
             local key = KEYS[1]
             local expected = ARGV[1]
             local new_value = ARGV[2]
@@ -438,17 +443,19 @@ pub mod patterns {
             else
                 return 0
             end
-        "#)
+        ",
+        )
     }
 
     /// Rate limiting with sliding window
     ///
     /// # Arguments
-    /// - KEYS[1]: The rate limit key
-    /// - ARGV[1]: Window size in seconds
-    /// - ARGV[2]: Maximum requests per window
+    /// - KEYS\[1\]: The rate limit key
+    /// - ARGV\[1\]: Window size in seconds
+    /// - ARGV\[2\]: Maximum requests per window
     pub fn sliding_window_rate_limit() -> Script {
-        Script::new(r#"
+        Script::new(
+            r#"
             local key = KEYS[1]
             local window = tonumber(ARGV[1])
             local limit = tonumber(ARGV[2])
@@ -468,17 +475,19 @@ pub mod patterns {
             else
                 return { 0, 0 }
             end
-        "#)
+        "#,
+        )
     }
 
     /// Distributed lock with expiration
     ///
     /// # Arguments
-    /// - KEYS[1]: The lock key
-    /// - ARGV[1]: Lock identifier (unique per client)
-    /// - ARGV[2]: Lock expiration in seconds
+    /// - KEYS\[1\]: The lock key
+    /// - ARGV\[1\]: Lock identifier (unique per client)
+    /// - ARGV\[2\]: Lock expiration in seconds
     pub fn distributed_lock() -> Script {
-        Script::new(r#"
+        Script::new(
+            r#"
             local key = KEYS[1]
             local identifier = ARGV[1]
             local expiration = tonumber(ARGV[2])
@@ -488,16 +497,18 @@ pub mod patterns {
             else
                 return 0
             end
-        "#)
+        "#,
+        )
     }
 
     /// Release distributed lock
     ///
     /// # Arguments
-    /// - KEYS[1]: The lock key
-    /// - ARGV[1]: Lock identifier (must match)
+    /// - KEYS\[1\]: The lock key
+    /// - ARGV\[1\]: Lock identifier (must match)
     pub fn release_lock() -> Script {
-        Script::new(r#"
+        Script::new(
+            r#"
             local key = KEYS[1]
             local identifier = ARGV[1]
             
@@ -506,7 +517,8 @@ pub mod patterns {
             else
                 return 0
             end
-        "#)
+        "#,
+        )
     }
 }
 
@@ -554,12 +566,12 @@ mod tests {
         let manager = ScriptManager::new();
         let script = Script::new("return 'test'");
         let sha = script.sha().to_string();
-        
+
         manager.register("test_script", script).await;
-        
+
         assert!(!manager.is_empty().await);
         assert_eq!(manager.len().await, 1);
-        
+
         let retrieved = manager.get("test_script").await.unwrap();
         assert_eq!(retrieved.sha(), sha);
         assert_eq!(retrieved.source(), "return 'test'");
@@ -569,14 +581,14 @@ mod tests {
     async fn test_script_manager_remove() {
         let manager = ScriptManager::new();
         let script = Script::new("return 'test'");
-        
+
         manager.register("test_script", script).await;
         assert_eq!(manager.len().await, 1);
-        
+
         let removed = manager.remove("test_script").await;
         assert!(removed.is_some());
         assert_eq!(manager.len().await, 0);
-        
+
         let not_found = manager.remove("nonexistent").await;
         assert!(not_found.is_none());
     }
@@ -584,11 +596,11 @@ mod tests {
     #[tokio::test]
     async fn test_script_manager_clear() {
         let manager = ScriptManager::new();
-        
+
         manager.register("script1", Script::new("return 1")).await;
         manager.register("script2", Script::new("return 2")).await;
         assert_eq!(manager.len().await, 2);
-        
+
         manager.clear().await;
         assert_eq!(manager.len().await, 0);
         assert!(manager.is_empty().await);
@@ -597,13 +609,17 @@ mod tests {
     #[tokio::test]
     async fn test_script_manager_list_scripts() {
         let manager = ScriptManager::new();
-        
-        manager.register("script_a", Script::new("return 'a'")).await;
-        manager.register("script_b", Script::new("return 'b'")).await;
-        
+
+        manager
+            .register("script_a", Script::new("return 'a'"))
+            .await;
+        manager
+            .register("script_b", Script::new("return 'b'"))
+            .await;
+
         let mut scripts = manager.list_scripts().await;
         scripts.sort();
-        
+
         assert_eq!(scripts, vec!["script_a", "script_b"]);
     }
 

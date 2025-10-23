@@ -1,13 +1,12 @@
 //! Command builders for Redis Sorted Set operations
 
+use crate::commands::Command;
 use crate::core::{
     error::{RedisError, RedisResult},
     value::RespValue,
 };
-use crate::commands::Command;
 use crate::pipeline::PipelineCommand;
 use std::collections::HashMap;
-use std::convert::TryFrom;
 
 /// Represents the `ZADD` command.
 #[derive(Debug, Clone)]
@@ -56,11 +55,11 @@ impl PipelineCommand for ZAddCommand {
     fn name(&self) -> &str {
         self.command_name()
     }
-    
+
     fn args(&self) -> Vec<RespValue> {
         <Self as Command>::args(self)
     }
-    
+
     fn key(&self) -> Option<String> {
         Some(self.key.clone())
     }
@@ -112,11 +111,11 @@ impl PipelineCommand for ZRemCommand {
     fn name(&self) -> &str {
         self.command_name()
     }
-    
+
     fn args(&self) -> Vec<RespValue> {
         <Self as Command>::args(self)
     }
-    
+
     fn key(&self) -> Option<String> {
         Some(self.key.clone())
     }
@@ -171,10 +170,12 @@ impl Command for ZRangeCommand {
                         RespValue::Null => {
                             // Skip null values
                         }
-                        _ => return Err(RedisError::Type(format!(
-                            "Unexpected item type in ZRANGE response: {:?}",
-                            item
-                        ))),
+                        _ => {
+                            return Err(RedisError::Type(format!(
+                                "Unexpected item type in ZRANGE response: {:?}",
+                                item
+                            )))
+                        }
                     }
                 }
                 Ok(result)
@@ -195,11 +196,11 @@ impl PipelineCommand for ZRangeCommand {
     fn name(&self) -> &str {
         self.command_name()
     }
-    
+
     fn args(&self) -> Vec<RespValue> {
         <Self as Command>::args(self)
     }
-    
+
     fn key(&self) -> Option<String> {
         Some(self.key.clone())
     }
@@ -242,7 +243,8 @@ impl Command for ZScoreCommand {
             RespValue::BulkString(b) => {
                 let s = String::from_utf8(b.to_vec())
                     .map_err(|e| RedisError::Type(format!("Invalid UTF-8: {e}")))?;
-                let score = s.parse::<f64>()
+                let score = s
+                    .parse::<f64>()
                     .map_err(|e| RedisError::Type(format!("Invalid float: {e}")))?;
                 Ok(Some(score))
             }
@@ -263,11 +265,11 @@ impl PipelineCommand for ZScoreCommand {
     fn name(&self) -> &str {
         self.command_name()
     }
-    
+
     fn args(&self) -> Vec<RespValue> {
         <Self as Command>::args(self)
     }
-    
+
     fn key(&self) -> Option<String> {
         Some(self.key.clone())
     }
@@ -283,9 +285,7 @@ impl ZCardCommand {
     /// Create a new `ZCARD` command.
     #[must_use]
     pub fn new(key: impl Into<String>) -> Self {
-        Self {
-            key: key.into(),
-        }
+        Self { key: key.into() }
     }
 }
 
@@ -313,11 +313,11 @@ impl PipelineCommand for ZCardCommand {
     fn name(&self) -> &str {
         self.command_name()
     }
-    
+
     fn args(&self) -> Vec<RespValue> {
         <Self as Command>::args(self)
     }
-    
+
     fn key(&self) -> Option<String> {
         Some(self.key.clone())
     }
@@ -375,11 +375,11 @@ impl PipelineCommand for ZRankCommand {
     fn name(&self) -> &str {
         self.command_name()
     }
-    
+
     fn args(&self) -> Vec<RespValue> {
         <Self as Command>::args(self)
     }
-    
+
     fn key(&self) -> Option<String> {
         Some(self.key.clone())
     }
@@ -437,11 +437,11 @@ impl PipelineCommand for ZRevRankCommand {
     fn name(&self) -> &str {
         self.command_name()
     }
-    
+
     fn args(&self) -> Vec<RespValue> {
         <Self as Command>::args(self)
     }
-    
+
     fn key(&self) -> Option<String> {
         Some(self.key.clone())
     }

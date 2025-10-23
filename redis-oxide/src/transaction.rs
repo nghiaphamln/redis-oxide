@@ -49,10 +49,10 @@ pub struct Transaction {
 pub trait TransactionCommand: Send + Sync {
     /// Get the command name
     fn name(&self) -> &str;
-    
+
     /// Get the command arguments
     fn args(&self) -> Vec<RespValue>;
-    
+
     /// Get the key(s) involved in this command (for WATCH)
     fn key(&self) -> Option<String>;
 }
@@ -62,19 +62,19 @@ pub trait TransactionCommand: Send + Sync {
 pub trait TransactionExecutor {
     /// Start a transaction with MULTI
     async fn multi(&mut self) -> RedisResult<()>;
-    
+
     /// Execute a command in the transaction
     async fn queue_command(&mut self, command: Box<dyn TransactionCommand>) -> RedisResult<()>;
-    
+
     /// Execute the transaction with EXEC
     async fn exec(&mut self) -> RedisResult<Vec<RespValue>>;
-    
+
     /// Discard the transaction with DISCARD
     async fn discard(&mut self) -> RedisResult<()>;
-    
+
     /// Watch keys for changes
     async fn watch(&mut self, keys: Vec<String>) -> RedisResult<()>;
-    
+
     /// Unwatch all keys
     async fn unwatch(&mut self) -> RedisResult<()>;
 }
@@ -103,14 +103,14 @@ impl Transaction {
     /// # let config = ConnectionConfig::new("redis://localhost:6379");
     /// # let client = Client::connect(config).await?;
     /// let mut transaction = client.transaction().await?;
-    /// 
+    ///
     /// // Watch keys before starting transaction
     /// transaction.watch(vec!["balance".to_string(), "account".to_string()]).await?;
-    /// 
+    ///
     /// // Add commands
     /// transaction.set("balance", "100");
     /// transaction.incr("account");
-    /// 
+    ///
     /// // Execute - will fail if watched keys were modified
     /// let results = transaction.exec().await?;
     /// # Ok(())
@@ -221,7 +221,12 @@ impl Transaction {
     }
 
     /// Add an HSET command to the transaction
-    pub fn hset(&mut self, key: impl Into<String>, field: impl Into<String>, value: impl Into<String>) -> &mut Self {
+    pub fn hset(
+        &mut self,
+        key: impl Into<String>,
+        field: impl Into<String>,
+        value: impl Into<String>,
+    ) -> &mut Self {
         use crate::commands::HSetCommand;
         let cmd = HSetCommand::new(key.into(), field.into(), value.into());
         self.add_command(Box::new(cmd))
@@ -268,7 +273,7 @@ impl Transaction {
     /// let mut transaction = client.transaction().await?;
     /// transaction.set("key1", "value1");
     /// transaction.get("key1");
-    /// 
+    ///
     /// let results = transaction.exec().await?;
     /// assert_eq!(results.len(), 2);
     /// # Ok(())
@@ -280,7 +285,7 @@ impl Transaction {
         }
 
         let mut connection = self.connection.lock().await;
-        
+
         // Start transaction if not already started
         if !self.is_started {
             connection.multi().await?;
@@ -296,7 +301,7 @@ impl Transaction {
         // Execute the transaction
         let results = connection.exec().await?;
         self.is_started = false;
-        
+
         Ok(results)
     }
 
@@ -315,7 +320,7 @@ impl Transaction {
     /// let mut transaction = client.transaction().await?;
     /// transaction.set("key1", "value1");
     /// transaction.set("key2", "value2");
-    /// 
+    ///
     /// // Cancel the transaction
     /// transaction.discard().await?;
     /// # Ok(())
@@ -355,12 +360,14 @@ impl TransactionResult {
         T::Error: Into<RedisError>,
     {
         if self.index >= self.results.len() {
-            return Err(RedisError::Protocol("No more results in transaction".to_string()));
+            return Err(RedisError::Protocol(
+                "No more results in transaction".to_string(),
+            ));
         }
 
         let result = self.results[self.index].clone();
         self.index += 1;
-        
+
         T::try_from(result).map_err(Into::into)
     }
 
@@ -375,7 +382,10 @@ impl TransactionResult {
         T::Error: Into<RedisError>,
     {
         if index >= self.results.len() {
-            return Err(RedisError::Protocol(format!("Index {} out of bounds", index)));
+            return Err(RedisError::Protocol(format!(
+                "Index {} out of bounds",
+                index
+            )));
         }
 
         let result = self.results[index].clone();
@@ -406,11 +416,11 @@ impl TransactionCommand for crate::commands::GetCommand {
     fn name(&self) -> &str {
         self.command_name()
     }
-    
+
     fn args(&self) -> Vec<RespValue> {
         <Self as Command>::args(self)
     }
-    
+
     fn key(&self) -> Option<String> {
         Some(self.keys()[0].iter().map(|&b| b as char).collect())
     }
@@ -420,11 +430,11 @@ impl TransactionCommand for crate::commands::SetCommand {
     fn name(&self) -> &str {
         self.command_name()
     }
-    
+
     fn args(&self) -> Vec<RespValue> {
         <Self as Command>::args(self)
     }
-    
+
     fn key(&self) -> Option<String> {
         Some(self.keys()[0].iter().map(|&b| b as char).collect())
     }
@@ -434,11 +444,11 @@ impl TransactionCommand for crate::commands::DelCommand {
     fn name(&self) -> &str {
         self.command_name()
     }
-    
+
     fn args(&self) -> Vec<RespValue> {
         <Self as Command>::args(self)
     }
-    
+
     fn key(&self) -> Option<String> {
         if let Some(first_key) = self.keys().first() {
             Some(first_key.iter().map(|&b| b as char).collect())
@@ -452,11 +462,11 @@ impl TransactionCommand for crate::commands::IncrCommand {
     fn name(&self) -> &str {
         self.command_name()
     }
-    
+
     fn args(&self) -> Vec<RespValue> {
         <Self as Command>::args(self)
     }
-    
+
     fn key(&self) -> Option<String> {
         Some(self.keys()[0].iter().map(|&b| b as char).collect())
     }
@@ -466,11 +476,11 @@ impl TransactionCommand for crate::commands::DecrCommand {
     fn name(&self) -> &str {
         self.command_name()
     }
-    
+
     fn args(&self) -> Vec<RespValue> {
         <Self as Command>::args(self)
     }
-    
+
     fn key(&self) -> Option<String> {
         Some(self.keys()[0].iter().map(|&b| b as char).collect())
     }
@@ -480,11 +490,11 @@ impl TransactionCommand for crate::commands::IncrByCommand {
     fn name(&self) -> &str {
         self.command_name()
     }
-    
+
     fn args(&self) -> Vec<RespValue> {
         <Self as Command>::args(self)
     }
-    
+
     fn key(&self) -> Option<String> {
         Some(self.keys()[0].iter().map(|&b| b as char).collect())
     }
@@ -494,11 +504,11 @@ impl TransactionCommand for crate::commands::DecrByCommand {
     fn name(&self) -> &str {
         self.command_name()
     }
-    
+
     fn args(&self) -> Vec<RespValue> {
         <Self as Command>::args(self)
     }
-    
+
     fn key(&self) -> Option<String> {
         Some(self.keys()[0].iter().map(|&b| b as char).collect())
     }
@@ -508,11 +518,11 @@ impl TransactionCommand for crate::commands::ExistsCommand {
     fn name(&self) -> &str {
         self.command_name()
     }
-    
+
     fn args(&self) -> Vec<RespValue> {
         <Self as Command>::args(self)
     }
-    
+
     fn key(&self) -> Option<String> {
         if let Some(first_key) = self.keys().first() {
             Some(first_key.iter().map(|&b| b as char).collect())
@@ -526,11 +536,11 @@ impl TransactionCommand for crate::commands::ExpireCommand {
     fn name(&self) -> &str {
         self.command_name()
     }
-    
+
     fn args(&self) -> Vec<RespValue> {
         <Self as Command>::args(self)
     }
-    
+
     fn key(&self) -> Option<String> {
         Some(self.keys()[0].iter().map(|&b| b as char).collect())
     }
@@ -540,11 +550,11 @@ impl TransactionCommand for crate::commands::TtlCommand {
     fn name(&self) -> &str {
         self.command_name()
     }
-    
+
     fn args(&self) -> Vec<RespValue> {
         <Self as Command>::args(self)
     }
-    
+
     fn key(&self) -> Option<String> {
         Some(self.keys()[0].iter().map(|&b| b as char).collect())
     }
@@ -554,11 +564,11 @@ impl TransactionCommand for crate::commands::HGetCommand {
     fn name(&self) -> &str {
         self.command_name()
     }
-    
+
     fn args(&self) -> Vec<RespValue> {
         <Self as Command>::args(self)
     }
-    
+
     fn key(&self) -> Option<String> {
         Some(self.keys()[0].iter().map(|&b| b as char).collect())
     }
@@ -568,11 +578,11 @@ impl TransactionCommand for crate::commands::HSetCommand {
     fn name(&self) -> &str {
         self.command_name()
     }
-    
+
     fn args(&self) -> Vec<RespValue> {
         <Self as Command>::args(self)
     }
-    
+
     fn key(&self) -> Option<String> {
         Some(self.keys()[0].iter().map(|&b| b as char).collect())
     }
@@ -606,12 +616,12 @@ mod tests {
             self.multi_called = true;
             Ok(())
         }
-        
+
         async fn queue_command(&mut self, command: Box<dyn TransactionCommand>) -> RedisResult<()> {
             self.commands.push(command.name().to_string());
             Ok(())
         }
-        
+
         async fn exec(&mut self) -> RedisResult<Vec<RespValue>> {
             self.exec_called = true;
             let mut results = Vec::new();
@@ -620,17 +630,17 @@ mod tests {
             }
             Ok(results)
         }
-        
+
         async fn discard(&mut self) -> RedisResult<()> {
             self.commands.clear();
             self.multi_called = false;
             Ok(())
         }
-        
+
         async fn watch(&mut self, _keys: Vec<String>) -> RedisResult<()> {
             Ok(())
         }
-        
+
         async fn unwatch(&mut self) -> RedisResult<()> {
             Ok(())
         }
@@ -640,7 +650,7 @@ mod tests {
     async fn test_transaction_creation() {
         let executor = MockTransactionExecutor::new();
         let transaction = Transaction::new(Arc::new(Mutex::new(executor)));
-        
+
         assert!(transaction.is_empty());
         assert_eq!(transaction.len(), 0);
     }
@@ -649,10 +659,10 @@ mod tests {
     async fn test_transaction_add_commands() {
         let executor = MockTransactionExecutor::new();
         let mut transaction = Transaction::new(Arc::new(Mutex::new(executor)));
-        
+
         transaction.set("key1", "value1");
         transaction.get("key1");
-        
+
         assert_eq!(transaction.len(), 2);
         assert!(!transaction.is_empty());
     }
@@ -661,10 +671,10 @@ mod tests {
     async fn test_transaction_exec() {
         let executor = MockTransactionExecutor::new();
         let mut transaction = Transaction::new(Arc::new(Mutex::new(executor)));
-        
+
         transaction.set("key1", "value1");
         transaction.get("key1");
-        
+
         let results = transaction.exec().await.unwrap();
         assert_eq!(results.len(), 2);
         assert!(transaction.is_empty()); // Commands should be consumed
@@ -674,11 +684,11 @@ mod tests {
     async fn test_transaction_discard() {
         let executor = MockTransactionExecutor::new();
         let mut transaction = Transaction::new(Arc::new(Mutex::new(executor)));
-        
+
         transaction.set("key1", "value1");
         transaction.get("key1");
         assert_eq!(transaction.len(), 2);
-        
+
         transaction.discard().await.unwrap();
         assert!(transaction.is_empty());
     }
@@ -690,15 +700,15 @@ mod tests {
             RespValue::BulkString("value1".as_bytes().into()),
             RespValue::Integer(42),
         ];
-        
+
         let mut transaction_result = TransactionResult::new(results);
-        
+
         assert_eq!(transaction_result.len(), 3);
         assert!(!transaction_result.is_empty());
-        
+
         let first: String = transaction_result.next().unwrap();
         assert_eq!(first, "OK");
-        
+
         let second: String = transaction_result.get(1).unwrap();
         assert_eq!(second, "value1");
     }

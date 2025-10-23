@@ -10,10 +10,9 @@ async fn setup_client_resp3(docker: &Cli) -> Result<Client, redis_oxide::RedisEr
     let container = docker.run(Redis::default());
     let host_port = container.get_host_port_ipv4(6379);
     let redis_url = format!("redis://localhost:{}", host_port);
-    
-    let config = ConnectionConfig::new(&redis_url)
-        .with_protocol_version(ProtocolVersion::Resp3);
-    
+
+    let config = ConnectionConfig::new(&redis_url).with_protocol_version(ProtocolVersion::Resp3);
+
     Client::connect(config).await
 }
 
@@ -21,17 +20,16 @@ async fn setup_client_resp2(docker: &Cli) -> Result<Client, redis_oxide::RedisEr
     let container = docker.run(Redis::default());
     let host_port = container.get_host_port_ipv4(6379);
     let redis_url = format!("redis://localhost:{}", host_port);
-    
-    let config = ConnectionConfig::new(&redis_url)
-        .with_protocol_version(ProtocolVersion::Resp2);
-    
+
+    let config = ConnectionConfig::new(&redis_url).with_protocol_version(ProtocolVersion::Resp2);
+
     Client::connect(config).await
 }
 
 #[tokio::test]
 async fn test_resp3_basic_data_types() -> Result<(), Box<dyn std::error::Error>> {
-    use redis_oxide::protocol::resp3::{Resp3Encoder, Resp3Decoder};
-    
+    use redis_oxide::protocol::resp3::{Resp3Decoder, Resp3Encoder};
+
     let mut encoder = Resp3Encoder::new();
     let mut decoder = Resp3Decoder::new();
 
@@ -49,7 +47,10 @@ async fn test_resp3_basic_data_types() -> Result<(), Box<dyn std::error::Error>>
 
     // Test Map
     let mut map = HashMap::new();
-    map.insert("key1".to_string(), Resp3Value::SimpleString("value1".to_string()));
+    map.insert(
+        "key1".to_string(),
+        Resp3Value::SimpleString("value1".to_string()),
+    );
     map.insert("key2".to_string(), Resp3Value::Number(42));
     let map_val = Resp3Value::Map(map);
     let encoded = encoder.encode(&map_val)?;
@@ -71,8 +72,8 @@ async fn test_resp3_basic_data_types() -> Result<(), Box<dyn std::error::Error>>
 
 #[tokio::test]
 async fn test_resp3_verbatim_string() -> Result<(), Box<dyn std::error::Error>> {
-    use redis_oxide::protocol::resp3::{Resp3Encoder, Resp3Decoder};
-    
+    use redis_oxide::protocol::resp3::{Resp3Decoder, Resp3Encoder};
+
     let mut encoder = Resp3Encoder::new();
     let mut decoder = Resp3Decoder::new();
 
@@ -99,8 +100,8 @@ async fn test_resp3_verbatim_string() -> Result<(), Box<dyn std::error::Error>> 
 
 #[tokio::test]
 async fn test_resp3_big_number() -> Result<(), Box<dyn std::error::Error>> {
-    use redis_oxide::protocol::resp3::{Resp3Encoder, Resp3Decoder};
-    
+    use redis_oxide::protocol::resp3::{Resp3Decoder, Resp3Encoder};
+
     let mut encoder = Resp3Encoder::new();
     let mut decoder = Resp3Decoder::new();
 
@@ -115,21 +116,24 @@ async fn test_resp3_big_number() -> Result<(), Box<dyn std::error::Error>> {
 
 #[tokio::test]
 async fn test_resp3_attribute() -> Result<(), Box<dyn std::error::Error>> {
-    use redis_oxide::protocol::resp3::{Resp3Encoder, Resp3Decoder};
-    
+    use redis_oxide::protocol::resp3::{Resp3Decoder, Resp3Encoder};
+
     let mut encoder = Resp3Encoder::new();
     let mut decoder = Resp3Decoder::new();
 
     // Test Attribute
     let mut attrs = HashMap::new();
     attrs.insert("ttl".to_string(), Resp3Value::Number(3600));
-    attrs.insert("type".to_string(), Resp3Value::SimpleString("string".to_string()));
-    
+    attrs.insert(
+        "type".to_string(),
+        Resp3Value::SimpleString("string".to_string()),
+    );
+
     let attr_val = Resp3Value::Attribute {
         attrs,
         data: Box::new(Resp3Value::BlobString("actual_data".to_string())),
     };
-    
+
     let encoded = encoder.encode(&attr_val)?;
     let decoded = decoder.decode(&encoded)?;
     assert_eq!(attr_val, decoded);
@@ -139,8 +143,8 @@ async fn test_resp3_attribute() -> Result<(), Box<dyn std::error::Error>> {
 
 #[tokio::test]
 async fn test_resp3_push_type() -> Result<(), Box<dyn std::error::Error>> {
-    use redis_oxide::protocol::resp3::{Resp3Encoder, Resp3Decoder};
-    
+    use redis_oxide::protocol::resp3::{Resp3Decoder, Resp3Encoder};
+
     let mut encoder = Resp3Encoder::new();
     let mut decoder = Resp3Decoder::new();
 
@@ -151,7 +155,7 @@ async fn test_resp3_push_type() -> Result<(), Box<dyn std::error::Error>> {
         Resp3Value::SimpleString("channel1".to_string()),
         Resp3Value::BlobString("Hello from channel!".to_string()),
     ]);
-    
+
     let encoded = encoder.encode(&push_val)?;
     let decoded = decoder.decode(&encoded)?;
     assert_eq!(push_val, decoded);
@@ -161,8 +165,8 @@ async fn test_resp3_push_type() -> Result<(), Box<dyn std::error::Error>> {
 
 #[tokio::test]
 async fn test_resp3_null_handling() -> Result<(), Box<dyn std::error::Error>> {
-    use redis_oxide::protocol::resp3::{Resp3Encoder, Resp3Decoder};
-    
+    use redis_oxide::protocol::resp3::{Resp3Decoder, Resp3Encoder};
+
     let mut encoder = Resp3Encoder::new();
     let mut decoder = Resp3Decoder::new();
 
@@ -219,18 +223,21 @@ async fn test_resp3_value_conversions() -> Result<(), Box<dyn std::error::Error>
 #[tokio::test]
 async fn test_resp3_resp2_compatibility() -> Result<(), Box<dyn std::error::Error>> {
     use redis_oxide::core::value::RespValue;
-    
+
     // Test RESP3 to RESP2 conversion
     let resp3_bool = Resp3Value::Boolean(true);
     let resp2_val: RespValue = resp3_bool.into();
     match resp2_val {
-        RespValue::Integer(1) => {}, // Boolean true becomes integer 1
+        RespValue::Integer(1) => {} // Boolean true becomes integer 1
         _ => panic!("Expected integer 1"),
     }
 
     let resp3_map = {
         let mut map = HashMap::new();
-        map.insert("key".to_string(), Resp3Value::SimpleString("value".to_string()));
+        map.insert(
+            "key".to_string(),
+            Resp3Value::SimpleString("value".to_string()),
+        );
         Resp3Value::Map(map)
     };
     let resp2_val: RespValue = resp3_map.into();
@@ -254,20 +261,26 @@ async fn test_resp3_resp2_compatibility() -> Result<(), Box<dyn std::error::Erro
 
 #[tokio::test]
 async fn test_resp3_type_names() -> Result<(), Box<dyn std::error::Error>> {
-    assert_eq!(Resp3Value::SimpleString("test".to_string()).type_name(), "simple-string");
+    assert_eq!(
+        Resp3Value::SimpleString("test".to_string()).type_name(),
+        "simple-string"
+    );
     assert_eq!(Resp3Value::Number(42).type_name(), "number");
     assert_eq!(Resp3Value::Boolean(true).type_name(), "boolean");
     assert_eq!(Resp3Value::Double(3.14).type_name(), "double");
     assert_eq!(Resp3Value::Null.type_name(), "null");
-    
+
     let map = HashMap::new();
     assert_eq!(Resp3Value::Map(map).type_name(), "map");
-    
+
     let set = HashSet::new();
     assert_eq!(Resp3Value::Set(set).type_name(), "set");
-    
-    assert_eq!(Resp3Value::BigNumber("123".to_string()).type_name(), "big-number");
-    
+
+    assert_eq!(
+        Resp3Value::BigNumber("123".to_string()).type_name(),
+        "big-number"
+    );
+
     let verbatim = Resp3Value::VerbatimString {
         encoding: "txt".to_string(),
         data: "test".to_string(),
@@ -279,8 +292,8 @@ async fn test_resp3_type_names() -> Result<(), Box<dyn std::error::Error>> {
 
 #[tokio::test]
 async fn test_resp3_complex_nested_structures() -> Result<(), Box<dyn std::error::Error>> {
-    use redis_oxide::protocol::resp3::{Resp3Encoder, Resp3Decoder};
-    
+    use redis_oxide::protocol::resp3::{Resp3Decoder, Resp3Encoder};
+
     let mut encoder = Resp3Encoder::new();
     let mut decoder = Resp3Decoder::new();
 
@@ -296,7 +309,10 @@ async fn test_resp3_complex_nested_structures() -> Result<(), Box<dyn std::error
     let mut outer_map = HashMap::new();
     outer_map.insert("inner_map".to_string(), Resp3Value::Map(inner_map));
     outer_map.insert("inner_set".to_string(), Resp3Value::Set(inner_set));
-    outer_map.insert("simple_value".to_string(), Resp3Value::BlobString("simple".to_string()));
+    outer_map.insert(
+        "simple_value".to_string(),
+        Resp3Value::BlobString("simple".to_string()),
+    );
 
     let complex_val = Resp3Value::Array(vec![
         Resp3Value::Map(outer_map),
@@ -320,8 +336,8 @@ async fn test_resp3_complex_nested_structures() -> Result<(), Box<dyn std::error
 
 #[tokio::test]
 async fn test_resp3_error_types() -> Result<(), Box<dyn std::error::Error>> {
-    use redis_oxide::protocol::resp3::{Resp3Encoder, Resp3Decoder};
-    
+    use redis_oxide::protocol::resp3::{Resp3Decoder, Resp3Encoder};
+
     let mut encoder = Resp3Encoder::new();
     let mut decoder = Resp3Decoder::new();
 
@@ -346,7 +362,7 @@ async fn test_resp3_error_types() -> Result<(), Box<dyn std::error::Error>> {
 #[tokio::test]
 async fn test_protocol_version_configuration() -> Result<(), Box<dyn std::error::Error>> {
     let docker = Cli::default();
-    
+
     // Test RESP2 configuration (default)
     let config_resp2 = ConnectionConfig::new("redis://localhost:6379")
         .with_protocol_version(ProtocolVersion::Resp2);
@@ -366,8 +382,8 @@ async fn test_protocol_version_configuration() -> Result<(), Box<dyn std::error:
 
 #[tokio::test]
 async fn test_resp3_encoding_edge_cases() -> Result<(), Box<dyn std::error::Error>> {
-    use redis_oxide::protocol::resp3::{Resp3Encoder, Resp3Decoder};
-    
+    use redis_oxide::protocol::resp3::{Resp3Decoder, Resp3Encoder};
+
     let mut encoder = Resp3Encoder::new();
     let mut decoder = Resp3Decoder::new();
 

@@ -3,6 +3,9 @@
 //! This example demonstrates all major features of redis-oxide:
 //! - String, Hash, List, Set, and Sorted Set operations
 //! - Pipeline support for batch operations
+
+#![allow(unused_imports)]
+#![allow(clippy::needless_raw_string_hashes)]
 //! - Transactions with MULTI/EXEC/WATCH
 //! - Pub/Sub messaging
 //! - Lua scripting with EVAL/EVALSHA
@@ -11,8 +14,8 @@
 //! - Error handling and configuration
 
 use redis_oxide::{
-    Client, ConnectionConfig, PoolConfig, PoolStrategy, ProtocolVersion, 
-    TransactionResult, Script, ScriptManager
+    Client, ConnectionConfig, PoolConfig, PoolStrategy, ProtocolVersion, Script, ScriptManager,
+    TransactionResult,
 };
 use std::collections::HashMap;
 use std::time::Duration;
@@ -21,7 +24,7 @@ use tokio::time::sleep;
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Initialize tracing for better debugging
-    tracing_subscriber::init();
+    tracing_subscriber::fmt::init();
 
     println!("🚀 redis-oxide Comprehensive Demo");
     println!("==================================\n");
@@ -38,7 +41,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_operation_timeout(Duration::from_secs(30));
 
     let client = Client::connect(config).await?;
-    println!("✅ Connected to Redis ({})", client.topology_type());
+    println!("✅ Connected to Redis ({:?})", client.topology_type());
 
     // Demo all features
     demo_string_operations(&client).await?;
@@ -66,7 +69,9 @@ async fn demo_string_operations(client: &Client) -> Result<(), Box<dyn std::erro
     println!("SET/GET: {:?}", value);
 
     // SET with expiration
-    client.set_ex("demo:temp", "temporary", Duration::from_secs(2)).await?;
+    client
+        .set_ex("demo:temp", "temporary", Duration::from_secs(2))
+        .await?;
     let ttl = client.ttl("demo:temp").await?;
     println!("SET EX: TTL = {:?} seconds", ttl);
 
@@ -83,7 +88,9 @@ async fn demo_string_operations(client: &Client) -> Result<(), Box<dyn std::erro
     println!("INCRBY 5: {}", val);
 
     // Multiple key operations
-    let exists = client.exists(vec!["demo:string".to_string(), "demo:counter".to_string()]).await?;
+    let exists = client
+        .exists(vec!["demo:string".to_string(), "demo:counter".to_string()])
+        .await?;
     println!("EXISTS (2 keys): {}", exists);
 
     println!();
@@ -130,7 +137,9 @@ async fn demo_list_operations(client: &Client) -> Result<(), Box<dyn std::error:
     let list_key = "demo:tasks";
 
     // Push operations
-    let len = client.lpush(list_key, vec!["task1".to_string(), "task2".to_string()]).await?;
+    let len = client
+        .lpush(list_key, vec!["task1".to_string(), "task2".to_string()])
+        .await?;
     println!("LPUSH: length = {}", len);
 
     let len = client.rpush(list_key, vec!["task3".to_string()]).await?;
@@ -166,7 +175,12 @@ async fn demo_set_operations(client: &Client) -> Result<(), Box<dyn std::error::
     let set_key = "demo:tags";
 
     // Add members
-    let added = client.sadd(set_key, vec!["rust".to_string(), "redis".to_string(), "async".to_string()]).await?;
+    let added = client
+        .sadd(
+            set_key,
+            vec!["rust".to_string(), "redis".to_string(), "async".to_string()],
+        )
+        .await?;
     println!("SADD: {} members added", added);
 
     // Get all members
@@ -216,7 +230,10 @@ async fn demo_sorted_set_operations(client: &Client) -> Result<(), Box<dyn std::
     let score = client.zscore(zset_key, "alice").await?;
     let rank = client.zrank(zset_key, "alice").await?;
     let rev_rank = client.zrevrank(zset_key, "alice").await?;
-    println!("alice - score: {:?}, rank: {:?}, rev_rank: {:?}", score, rank, rev_rank);
+    println!(
+        "alice - score: {:?}, rank: {:?}, rev_rank: {:?}",
+        score, rank, rev_rank
+    );
 
     // Cardinality
     let cardinality = client.zcard(zset_key).await?;
@@ -242,7 +259,7 @@ async fn demo_pipeline_operations(client: &Client) -> Result<(), Box<dyn std::er
     // Execute all commands in one round-trip
     let results = pipeline.execute().await?;
     println!("Pipeline executed {} commands", results.len());
-    
+
     for (i, result) in results.iter().enumerate() {
         println!("  Result {}: {:?}", i, result);
     }
@@ -264,20 +281,14 @@ async fn demo_transaction_operations(client: &Client) -> Result<(), Box<dyn std:
 
     // Queue commands
     transaction.get("tx:balance");
-    transaction.set("tx:balance", "80");  // Withdraw 20
+    transaction.set("tx:balance", "80"); // Withdraw 20
     transaction.set("tx:last_transaction", "withdrawal");
 
     // Execute transaction
-    match transaction.exec().await? {
-        TransactionResult::Success(results) => {
-            println!("Transaction succeeded with {} results", results.len());
-            for (i, result) in results.iter().enumerate() {
-                println!("  Result {}: {:?}", i, result);
-            }
-        }
-        TransactionResult::Aborted => {
-            println!("Transaction was aborted (watched key changed)");
-        }
+    let transaction_result = transaction.exec().await?;
+    println!("Transaction succeeded with {} results", transaction_result.len());
+    for (i, result) in transaction_result.iter().enumerate() {
+        println!("  Result {}: {:?}", i, result);
     }
 
     // Verify final state
@@ -307,22 +318,26 @@ async fn demo_lua_scripting(client: &Client) -> Result<(), Box<dyn std::error::E
     "#;
 
     // Execute with EVAL
-    let result: i64 = client.eval(
-        script_source,
-        vec!["script:counter".to_string()],
-        vec!["5".to_string(), "60".to_string()]
-    ).await?;
+    let result: i64 = client
+        .eval(
+            script_source,
+            vec!["script:counter".to_string()],
+            vec!["5".to_string(), "60".to_string()],
+        )
+        .await?;
     println!("EVAL result: {}", result);
 
     // Load script and execute with EVALSHA
     let sha = client.script_load(script_source).await?;
     println!("Script loaded with SHA: {}", sha);
 
-    let result: i64 = client.evalsha(
-        &sha,
-        vec!["script:counter".to_string()],
-        vec!["3".to_string(), "60".to_string()]
-    ).await?;
+    let result: i64 = client
+        .evalsha(
+            &sha,
+            vec!["script:counter".to_string()],
+            vec!["3".to_string(), "60".to_string()],
+        )
+        .await?;
     println!("EVALSHA result: {}", result);
 
     // Script management
@@ -330,12 +345,14 @@ async fn demo_lua_scripting(client: &Client) -> Result<(), Box<dyn std::error::E
     let manager = ScriptManager::new();
     manager.register("atomic_incr", script).await;
 
-    let result: i64 = manager.execute(
-        "atomic_incr",
-        &client,
-        vec!["script:counter".to_string()],
-        vec!["2".to_string(), "60".to_string()]
-    ).await?;
+    let result: i64 = manager
+        .execute(
+            "atomic_incr",
+            &client,
+            vec!["script:counter".to_string()],
+            vec!["2".to_string(), "60".to_string()],
+        )
+        .await?;
     println!("ScriptManager result: {}", result);
 
     println!();
@@ -378,18 +395,16 @@ async fn demo_redis_streams(client: &Client) -> Result<(), Box<dyn std::error::E
     }
 
     // Create consumer group
-    client.xgroup_create(stream_name, group_name, "0", false).await?;
+    client
+        .xgroup_create(stream_name, group_name, "0", false)
+        .await?;
     println!("Consumer group '{}' created", group_name);
 
     // Read from consumer group
     let streams = vec![(stream_name.to_string(), ">".to_string())];
-    let messages = client.xreadgroup(
-        group_name,
-        consumer_name,
-        streams,
-        Some(10),
-        None
-    ).await?;
+    let messages = client
+        .xreadgroup(group_name, consumer_name, streams, Some(10), None)
+        .await?;
 
     println!("XREADGROUP: {} streams", messages.len());
     for (stream, entries) in &messages {
@@ -425,7 +440,7 @@ async fn demo_error_handling(client: &Client) -> Result<(), Box<dyn std::error::
 
     // Try operations on wrong data types
     client.set("error:string_key", "string_value").await?;
-    
+
     // This will return None/empty rather than error (Redis behavior)
     let hash_result: Option<String> = client.hget("error:string_key", "field").await?;
     println!("HGET on string key: {:?}", hash_result);

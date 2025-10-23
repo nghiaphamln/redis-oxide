@@ -42,10 +42,10 @@ use tokio::sync::Mutex;
 pub trait PipelineCommand: Send + Sync {
     /// Get the command name
     fn name(&self) -> &str;
-    
+
     /// Get the command arguments
     fn args(&self) -> Vec<RespValue>;
-    
+
     /// Get the key(s) involved in this command (for cluster routing)
     fn key(&self) -> Option<String>;
 }
@@ -64,7 +64,10 @@ pub struct Pipeline {
 #[async_trait::async_trait]
 pub trait PipelineExecutor {
     /// Execute a batch of commands and return their results
-    async fn execute_pipeline(&mut self, commands: Vec<Box<dyn PipelineCommand>>) -> RedisResult<Vec<RespValue>>;
+    async fn execute_pipeline(
+        &mut self,
+        commands: Vec<Box<dyn PipelineCommand>>,
+    ) -> RedisResult<Vec<RespValue>>;
 }
 
 impl Pipeline {
@@ -162,7 +165,12 @@ impl Pipeline {
     }
 
     /// Add an HSET command to the pipeline
-    pub fn hset(&mut self, key: impl Into<String>, field: impl Into<String>, value: impl Into<String>) -> &mut Self {
+    pub fn hset(
+        &mut self,
+        key: impl Into<String>,
+        field: impl Into<String>,
+        value: impl Into<String>,
+    ) -> &mut Self {
         use crate::commands::HSetCommand;
         let cmd = HSetCommand::new(key.into(), field.into(), value.into());
         self.add_command(Box::new(cmd))
@@ -190,7 +198,11 @@ impl Pipeline {
     }
 
     /// Add an HMSET command to the pipeline
-    pub fn hmset(&mut self, key: impl Into<String>, fields: std::collections::HashMap<String, String>) -> &mut Self {
+    pub fn hmset(
+        &mut self,
+        key: impl Into<String>,
+        fields: std::collections::HashMap<String, String>,
+    ) -> &mut Self {
         use crate::commands::HMSetCommand;
         let cmd = HMSetCommand::new(key.into(), fields);
         self.add_command(Box::new(cmd))
@@ -250,7 +262,7 @@ impl Pipeline {
     /// let mut pipeline = client.pipeline();
     /// pipeline.set("key1", "value1");
     /// pipeline.get("key1");
-    /// 
+    ///
     /// let results = pipeline.execute().await?;
     /// assert_eq!(results.len(), 2);
     /// # Ok(())
@@ -263,11 +275,11 @@ impl Pipeline {
 
         // Convert VecDeque to Vec for execution
         let commands: Vec<Box<dyn PipelineCommand>> = self.commands.drain(..).collect();
-        
+
         // Execute the pipeline
         let mut connection = self.connection.lock().await;
         let results = connection.execute_pipeline(commands).await?;
-        
+
         Ok(results)
     }
 
@@ -286,12 +298,12 @@ impl Pipeline {
     {
         let results = self.execute().await?;
         let mut typed_results = Vec::with_capacity(results.len());
-        
+
         for result in results {
             let typed_result = T::try_from(result).map_err(Into::into)?;
             typed_results.push(typed_result);
         }
-        
+
         Ok(typed_results)
     }
 }
@@ -321,12 +333,14 @@ impl PipelineResult {
         T::Error: Into<RedisError>,
     {
         if self.index >= self.results.len() {
-            return Err(RedisError::Protocol("No more results in pipeline".to_string()));
+            return Err(RedisError::Protocol(
+                "No more results in pipeline".to_string(),
+            ));
         }
 
         let result = self.results[self.index].clone();
         self.index += 1;
-        
+
         T::try_from(result).map_err(Into::into)
     }
 
@@ -341,7 +355,10 @@ impl PipelineResult {
         T::Error: Into<RedisError>,
     {
         if index >= self.results.len() {
-            return Err(RedisError::Protocol(format!("Index {} out of bounds", index)));
+            return Err(RedisError::Protocol(format!(
+                "Index {} out of bounds",
+                index
+            )));
         }
 
         let result = self.results[index].clone();
@@ -379,9 +396,12 @@ mod tests {
 
     #[async_trait::async_trait]
     impl PipelineExecutor for MockExecutor {
-        async fn execute_pipeline(&mut self, commands: Vec<Box<dyn PipelineCommand>>) -> RedisResult<Vec<RespValue>> {
+        async fn execute_pipeline(
+            &mut self,
+            commands: Vec<Box<dyn PipelineCommand>>,
+        ) -> RedisResult<Vec<RespValue>> {
             assert_eq!(commands.len(), self.expected_commands);
-            
+
             // Return mock results
             let mut results = Vec::new();
             for _ in 0..commands.len() {
@@ -393,33 +413,39 @@ mod tests {
 
     #[tokio::test]
     async fn test_pipeline_creation() {
-        let executor = MockExecutor { expected_commands: 0 };
+        let executor = MockExecutor {
+            expected_commands: 0,
+        };
         let pipeline = Pipeline::new(Arc::new(Mutex::new(executor)));
-        
+
         assert!(pipeline.is_empty());
         assert_eq!(pipeline.len(), 0);
     }
 
     #[tokio::test]
     async fn test_pipeline_add_commands() {
-        let executor = MockExecutor { expected_commands: 2 };
+        let executor = MockExecutor {
+            expected_commands: 2,
+        };
         let mut pipeline = Pipeline::new(Arc::new(Mutex::new(executor)));
-        
+
         pipeline.set("key1", "value1");
         pipeline.get("key1");
-        
+
         assert_eq!(pipeline.len(), 2);
         assert!(!pipeline.is_empty());
     }
 
     #[tokio::test]
     async fn test_pipeline_execute() {
-        let executor = MockExecutor { expected_commands: 2 };
+        let executor = MockExecutor {
+            expected_commands: 2,
+        };
         let mut pipeline = Pipeline::new(Arc::new(Mutex::new(executor)));
-        
+
         pipeline.set("key1", "value1");
         pipeline.get("key1");
-        
+
         let results = pipeline.execute().await.unwrap();
         assert_eq!(results.len(), 2);
         assert!(pipeline.is_empty()); // Commands should be consumed
@@ -427,13 +453,15 @@ mod tests {
 
     #[tokio::test]
     async fn test_pipeline_clear() {
-        let executor = MockExecutor { expected_commands: 0 };
+        let executor = MockExecutor {
+            expected_commands: 0,
+        };
         let mut pipeline = Pipeline::new(Arc::new(Mutex::new(executor)));
-        
+
         pipeline.set("key1", "value1");
         pipeline.get("key1");
         assert_eq!(pipeline.len(), 2);
-        
+
         pipeline.clear();
         assert!(pipeline.is_empty());
         assert_eq!(pipeline.len(), 0);
@@ -446,15 +474,15 @@ mod tests {
             RespValue::BulkString("value1".as_bytes().into()),
             RespValue::Integer(42),
         ];
-        
+
         let mut pipeline_result = PipelineResult::new(results);
-        
+
         assert_eq!(pipeline_result.len(), 3);
         assert!(!pipeline_result.is_empty());
-        
+
         let first: String = pipeline_result.next().unwrap();
         assert_eq!(first, "OK");
-        
+
         let second: String = pipeline_result.get(1).unwrap();
         assert_eq!(second, "value1");
     }

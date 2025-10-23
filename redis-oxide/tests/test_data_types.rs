@@ -3,6 +3,7 @@
 //! These tests verify that all Redis data type operations work correctly
 //! with both standalone and cluster configurations.
 
+#![allow(unused_imports)]
 #![allow(clippy::uninlined_format_args)]
 
 use redis_oxide::{Client, ConnectionConfig, PoolConfig, PoolStrategy};
@@ -10,11 +11,13 @@ use std::collections::{HashMap, HashSet};
 use std::time::Duration;
 use testcontainers::{core::WaitFor, runners::AsyncRunner, ContainerAsync, GenericImage};
 
-async fn setup_client(config_modifier: Option<fn(&mut ConnectionConfig)>) -> Result<Client, redis_oxide::RedisError> {
+async fn setup_client(
+    config_modifier: Option<fn(&mut ConnectionConfig)>,
+) -> Result<Client, redis_oxide::RedisError> {
     let redis_image = GenericImage::new("redis", "7-alpine")
         .with_exposed_port(6379)
         .with_wait_for(WaitFor::message_on_stdout("Ready to accept connections"));
-    
+
     let container = redis_image.start().await.unwrap();
     let host_port = container.get_host_port_ipv4(6379).await.unwrap();
     let redis_url = format!("redis://localhost:{}", host_port);
@@ -36,10 +39,12 @@ async fn test_string_operations_comprehensive() -> Result<(), Box<dyn std::error
     assert_eq!(value, Some("hello world".to_string()));
 
     // SET with expiration
-    client.set_ex("str:expire", "temporary", Duration::from_secs(1)).await?;
+    client
+        .set_ex("str:expire", "temporary", Duration::from_secs(1))
+        .await?;
     let value: Option<String> = client.get("str:expire").await?;
     assert_eq!(value, Some("temporary".to_string()));
-    
+
     // Wait for expiration
     tokio::time::sleep(Duration::from_millis(1100)).await;
     let value: Option<String> = client.get("str:expire").await?;
@@ -68,10 +73,10 @@ async fn test_string_operations_comprehensive() -> Result<(), Box<dyn std::error
     let keys = vec!["str:multi1".to_string(), "str:multi2".to_string()];
     client.set("str:multi1", "value1").await?;
     client.set("str:multi2", "value2").await?;
-    
+
     let exists_count: i64 = client.exists(keys.clone()).await?;
     assert_eq!(exists_count, 2);
-    
+
     let deleted: i64 = client.del(keys).await?;
     assert_eq!(deleted, 2);
 
@@ -98,12 +103,24 @@ async fn test_hash_operations_comprehensive() -> Result<(), Box<dyn std::error::
     fields.insert("field3".to_string(), "value3".to_string());
     client.hmset(hash_key, fields).await?;
 
-    let multi_values: Vec<Option<String>> = client.hmget(hash_key, vec!["field1".to_string(), "field2".to_string(), "field3".to_string()]).await?;
-    assert_eq!(multi_values, vec![
-        Some("value1".to_string()),
-        Some("value2".to_string()),
-        Some("value3".to_string())
-    ]);
+    let multi_values: Vec<Option<String>> = client
+        .hmget(
+            hash_key,
+            vec![
+                "field1".to_string(),
+                "field2".to_string(),
+                "field3".to_string(),
+            ],
+        )
+        .await?;
+    assert_eq!(
+        multi_values,
+        vec![
+            Some("value1".to_string()),
+            Some("value2".to_string()),
+            Some("value3".to_string())
+        ]
+    );
 
     // HGETALL operation
     let all_fields: HashMap<String, String> = client.hgetall(hash_key).await?;
@@ -125,7 +142,7 @@ async fn test_hash_operations_comprehensive() -> Result<(), Box<dyn std::error::
     // HDEL operation
     let deleted: i64 = client.hdel(hash_key, vec!["field2".to_string()]).await?;
     assert_eq!(deleted, 1);
-    
+
     let length_after_del: i64 = client.hlen(hash_key).await?;
     assert_eq!(length_after_del, 2);
 
@@ -140,7 +157,9 @@ async fn test_list_operations_comprehensive() -> Result<(), Box<dyn std::error::
     let list_key = "list:test";
 
     // LPUSH operations
-    let length1: i64 = client.lpush(list_key, vec!["item1".to_string(), "item2".to_string()]).await?;
+    let length1: i64 = client
+        .lpush(list_key, vec!["item1".to_string(), "item2".to_string()])
+        .await?;
     assert_eq!(length1, 2);
 
     // RPUSH operations
@@ -187,7 +206,16 @@ async fn test_set_operations_comprehensive() -> Result<(), Box<dyn std::error::E
     let set_key = "set:test";
 
     // SADD operations
-    let added1: i64 = client.sadd(set_key, vec!["member1".to_string(), "member2".to_string(), "member3".to_string()]).await?;
+    let added1: i64 = client
+        .sadd(
+            set_key,
+            vec![
+                "member1".to_string(),
+                "member2".to_string(),
+                "member3".to_string(),
+            ],
+        )
+        .await?;
     assert_eq!(added1, 3);
 
     // Adding duplicate member
@@ -207,7 +235,9 @@ async fn test_set_operations_comprehensive() -> Result<(), Box<dyn std::error::E
     // SMEMBERS operation
     let members: HashSet<String> = client.smembers(set_key).await?;
     let expected: HashSet<String> = ["member1", "member2", "member3"]
-        .iter().map(|s| s.to_string()).collect();
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
     assert_eq!(members, expected);
 
     // SRANDMEMBER operation
@@ -218,7 +248,7 @@ async fn test_set_operations_comprehensive() -> Result<(), Box<dyn std::error::E
     // SPOP operation
     let popped: Option<String> = client.spop(set_key).await?;
     assert!(popped.is_some());
-    
+
     let cardinality_after_pop: i64 = client.scard(set_key).await?;
     assert_eq!(cardinality_after_pop, 2);
 
@@ -241,7 +271,7 @@ async fn test_sorted_set_operations_comprehensive() -> Result<(), Box<dyn std::e
     members.insert("member1".to_string(), 1.0);
     members.insert("member2".to_string(), 2.0);
     members.insert("member3".to_string(), 3.0);
-    
+
     let added: i64 = client.zadd(zset_key, members).await?;
     assert_eq!(added, 3);
 
@@ -278,16 +308,20 @@ async fn test_sorted_set_operations_comprehensive() -> Result<(), Box<dyn std::e
 #[tokio::test]
 async fn test_operations_with_connection_pool() -> Result<(), Box<dyn std::error::Error>> {
     let docker = Cli::default();
-    
+
     // Test with connection pool strategy
-    let client = setup_client(&docker, Some(|config| {
-        config.pool = PoolConfig {
-            strategy: PoolStrategy::Pool,
-            max_size: 10,
-            min_idle: 2,
-            connection_timeout: Duration::from_secs(5),
-        };
-    })).await?;
+    let client = setup_client(
+        &docker,
+        Some(|config| {
+            config.pool = PoolConfig {
+                strategy: PoolStrategy::Pool,
+                max_size: 10,
+                min_idle: 2,
+                connection_timeout: Duration::from_secs(5),
+            };
+        }),
+    )
+    .await?;
 
     // Run basic operations to ensure pool works
     client.set("pool:test", "value").await?;
@@ -320,16 +354,20 @@ async fn test_operations_with_connection_pool() -> Result<(), Box<dyn std::error
 #[tokio::test]
 async fn test_operations_with_multiplexed_connection() -> Result<(), Box<dyn std::error::Error>> {
     let docker = Cli::default();
-    
+
     // Test with multiplexed strategy (default)
-    let client = setup_client(&docker, Some(|config| {
-        config.pool = PoolConfig {
-            strategy: PoolStrategy::Multiplexed,
-            max_size: 1, // Only one connection
-            min_idle: 1,
-            connection_timeout: Duration::from_secs(5),
-        };
-    })).await?;
+    let client = setup_client(
+        &docker,
+        Some(|config| {
+            config.pool = PoolConfig {
+                strategy: PoolStrategy::Multiplexed,
+                max_size: 1, // Only one connection
+                min_idle: 1,
+                connection_timeout: Duration::from_secs(5),
+            };
+        }),
+    )
+    .await?;
 
     // Test that multiplexed connection can handle concurrent operations
     let mut handles = Vec::new();
@@ -361,7 +399,7 @@ async fn test_error_handling() -> Result<(), Box<dyn std::error::Error>> {
 
     // Test operations on wrong data types
     client.set("string_key", "string_value").await?;
-    
+
     // Try to use string key as hash - should return appropriate error or empty result
     let hash_result: Option<String> = client.hget("string_key", "field").await?;
     assert_eq!(hash_result, None); // Redis returns nil for wrong type operations
@@ -382,8 +420,10 @@ async fn test_expiration_and_ttl() -> Result<(), Box<dyn std::error::Error>> {
     let client = setup_client(&docker, None).await?;
 
     // Set key with expiration
-    client.set_ex("expire_test", "value", Duration::from_secs(2)).await?;
-    
+    client
+        .set_ex("expire_test", "value", Duration::from_secs(2))
+        .await?;
+
     // Check TTL
     let ttl: Option<i64> = client.ttl("expire_test").await?;
     assert!(ttl.is_some());
@@ -391,8 +431,10 @@ async fn test_expiration_and_ttl() -> Result<(), Box<dyn std::error::Error>> {
 
     // Set expiration on existing key
     client.set("expire_test2", "value").await?;
-    client.expire("expire_test2", Duration::from_secs(1)).await?;
-    
+    client
+        .expire("expire_test2", Duration::from_secs(1))
+        .await?;
+
     let ttl2: Option<i64> = client.ttl("expire_test2").await?;
     assert!(ttl2.is_some());
     assert!(ttl2.unwrap() > 0 && ttl2.unwrap() <= 1);

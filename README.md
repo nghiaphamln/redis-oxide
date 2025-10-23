@@ -25,6 +25,7 @@
 - **🧮 Lua Scripting**: EVAL/EVALSHA with script caching
 - **🌊 Redis Streams**: Event sourcing with consumer groups
 - **🏛️ Sentinel Support**: High availability with automatic failover
+- **⚡ Performance Optimizations**: Advanced optimizations for high-throughput scenarios
 - **✅ High test coverage**: Extensive unit and integration tests
 
 ## 📦 Installation
@@ -389,6 +390,44 @@ let client = Client::connect(config).await?;
 // RESP3 provides richer data types like maps, sets, booleans, etc.
 // The client automatically handles protocol negotiation
 ```
+
+## ⚡ Performance Optimizations
+
+Redis-oxide includes advanced performance optimizations for high-throughput scenarios:
+
+### Optimized Protocol Encoding
+```rust
+use redis_oxide::protocol::resp2_optimized::OptimizedRespEncoder;
+
+let mut encoder = OptimizedRespEncoder::with_capacity(1024);
+let encoded = encoder.encode(&value)?; // 66%+ faster than standard encoder
+```
+
+### Optimized Connection Pools
+```rust
+use redis_oxide::pool_optimized::OptimizedMultiplexedPool;
+
+let pool = OptimizedMultiplexedPool::new(config, host, port).await?;
+// Features: multiple workers, health monitoring, auto-scaling
+```
+
+### Optimized Commands (for repeated operations)
+```rust
+use redis_oxide::commands::optimized::{OptimizedGetCommand, init_string_interner};
+
+// Initialize string interning once
+init_string_interner(1000);
+
+// Use for high-frequency operations
+let cmd = OptimizedGetCommand::new("hot_key").with_cached_args();
+```
+
+### Performance Results
+- **RESP2 Encoding**: 66%+ improvement
+- **Memory Allocation**: 10%+ reduction  
+- **Connection Management**: Better scalability and fault tolerance
+
+See [OPTIMIZATIONS.md](OPTIMIZATIONS.md) for detailed performance analysis and usage guidelines.
 
 ## ⚙️ Configuration
 

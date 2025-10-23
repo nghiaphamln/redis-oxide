@@ -1,5 +1,7 @@
 //! Integration tests for Redis Streams functionality
 
+#![allow(unused_imports)]
+#![allow(clippy::similar_names)]
 #![allow(clippy::uninlined_format_args)]
 
 use redis_oxide::{Client, ConnectionConfig, StreamEntry};
@@ -99,12 +101,15 @@ async fn test_xread_operations() -> Result<(), Box<dyn std::error::Error>> {
     // Read from beginning
     let streams = vec![(stream_name.to_string(), "0".to_string())];
     let messages = client.xread(streams.clone(), Some(10), None).await?;
-    
+
     assert_eq!(messages.len(), 1);
     assert!(messages.contains_key(stream_name));
     let entries = &messages[stream_name];
     assert_eq!(entries.len(), 1);
-    assert_eq!(entries[0].get_field("message"), Some(&"initial".to_string()));
+    assert_eq!(
+        entries[0].get_field("message"),
+        Some(&"initial".to_string())
+    );
 
     // Add more entries
     for i in 1..=3 {
@@ -116,7 +121,7 @@ async fn test_xread_operations() -> Result<(), Box<dyn std::error::Error>> {
     // Read new entries only
     let streams = vec![(stream_name.to_string(), initial_id)];
     let new_messages = client.xread(streams, Some(10), None).await?;
-    
+
     assert_eq!(new_messages.len(), 1);
     let new_entries = &new_messages[stream_name];
     assert_eq!(new_entries.len(), 3);
@@ -142,17 +147,15 @@ async fn test_consumer_groups() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // Create consumer group
-    client.xgroup_create(stream_name, group_name, "0", false).await?;
+    client
+        .xgroup_create(stream_name, group_name, "0", false)
+        .await?;
 
     // Read from consumer group (should get all existing messages)
     let streams = vec![(stream_name.to_string(), ">".to_string())];
-    let messages = client.xreadgroup(
-        group_name,
-        consumer_name,
-        streams,
-        Some(10),
-        None
-    ).await?;
+    let messages = client
+        .xreadgroup(group_name, consumer_name, streams, Some(10), None)
+        .await?;
 
     assert_eq!(messages.len(), 1);
     let entries = &messages[stream_name];
@@ -180,7 +183,9 @@ async fn test_consumer_group_with_new_messages() -> Result<(), Box<dyn std::erro
     let consumer_name = "worker_1";
 
     // Create consumer group starting from latest messages
-    client.xgroup_create(stream_name, group_name, "$", true).await?;
+    client
+        .xgroup_create(stream_name, group_name, "$", true)
+        .await?;
 
     // Add new messages after group creation
     let mut message_ids = Vec::new();
@@ -194,13 +199,9 @@ async fn test_consumer_group_with_new_messages() -> Result<(), Box<dyn std::erro
 
     // Read new messages from group
     let streams = vec![(stream_name.to_string(), ">".to_string())];
-    let messages = client.xreadgroup(
-        group_name,
-        consumer_name,
-        streams,
-        Some(10),
-        None
-    ).await?;
+    let messages = client
+        .xreadgroup(group_name, consumer_name, streams, Some(10), None)
+        .await?;
 
     assert_eq!(messages.len(), 1);
     let entries = &messages[stream_name];
@@ -213,7 +214,9 @@ async fn test_consumer_group_with_new_messages() -> Result<(), Box<dyn std::erro
     }
 
     // Acknowledge one message
-    let acked = client.xack(stream_name, group_name, vec![entries[0].id.clone()]).await?;
+    let acked = client
+        .xack(stream_name, group_name, vec![entries[0].id.clone()])
+        .await?;
     assert_eq!(acked, 1);
 
     Ok(())
@@ -238,17 +241,18 @@ async fn test_blocking_xread() -> Result<(), Box<dyn std::error::Error>> {
 
     // Blocking read with short timeout
     let streams = vec![(stream_name.to_string(), "$".to_string())];
-    let messages = client.xread(
-        streams,
-        Some(1),
-        Some(Duration::from_millis(200))
-    ).await?;
+    let messages = client
+        .xread(streams, Some(1), Some(Duration::from_millis(200)))
+        .await?;
 
     // Should receive the delayed message
     assert_eq!(messages.len(), 1);
     let entries = &messages[stream_name];
     assert_eq!(entries.len(), 1);
-    assert_eq!(entries[0].get_field("delayed_message"), Some(&"hello".to_string()));
+    assert_eq!(
+        entries[0].get_field("delayed_message"),
+        Some(&"hello".to_string())
+    );
 
     Ok(())
 }
@@ -288,8 +292,14 @@ async fn test_multiple_streams() -> Result<(), Box<dyn std::error::Error>> {
     assert_eq!(entries1.len(), 1);
     assert_eq!(entries2.len(), 1);
 
-    assert_eq!(entries1[0].get_field("source"), Some(&"stream1".to_string()));
-    assert_eq!(entries2[0].get_field("source"), Some(&"stream2".to_string()));
+    assert_eq!(
+        entries1[0].get_field("source"),
+        Some(&"stream1".to_string())
+    );
+    assert_eq!(
+        entries2[0].get_field("source"),
+        Some(&"stream2".to_string())
+    );
 
     Ok(())
 }
@@ -311,14 +321,22 @@ async fn test_stream_entry_parsing() -> Result<(), Box<dyn std::error::Error>> {
     let entry_id = client.xadd(stream_name, "*", fields).await?;
 
     // Read back the entry
-    let entries = client.xrange(stream_name, &entry_id, &entry_id, None).await?;
+    let entries = client
+        .xrange(stream_name, &entry_id, &entry_id, None)
+        .await?;
     assert_eq!(entries.len(), 1);
 
     let entry = &entries[0];
     assert_eq!(entry.id, entry_id);
-    assert_eq!(entry.get_field("string_field"), Some(&"hello world".to_string()));
+    assert_eq!(
+        entry.get_field("string_field"),
+        Some(&"hello world".to_string())
+    );
     assert_eq!(entry.get_field("number_field"), Some(&"42".to_string()));
-    assert_eq!(entry.get_field("json_field"), Some(&r#"{"key":"value"}"#.to_string()));
+    assert_eq!(
+        entry.get_field("json_field"),
+        Some(&r#"{"key":"value"}"#.to_string())
+    );
     assert_eq!(entry.get_field("empty_field"), Some(&"".to_string()));
     assert_eq!(entry.get_field("nonexistent"), None);
 
@@ -353,19 +371,21 @@ async fn test_stream_error_conditions() -> Result<(), Box<dyn std::error::Error>
 
     // Test XREAD on non-existent stream with timeout
     let streams = vec![("nonexistent_stream".to_string(), "$".to_string())];
-    let messages = client.xread(
-        streams,
-        Some(1),
-        Some(Duration::from_millis(100))
-    ).await?;
+    let messages = client
+        .xread(streams, Some(1), Some(Duration::from_millis(100)))
+        .await?;
     assert!(messages.is_empty());
 
     // Test creating consumer group on non-existent stream without MKSTREAM
-    let result = client.xgroup_create("nonexistent_stream", "test_group", "$", false).await;
+    let result = client
+        .xgroup_create("nonexistent_stream", "test_group", "$", false)
+        .await;
     assert!(result.is_err()); // Should fail without MKSTREAM
 
     // Test creating consumer group with MKSTREAM should succeed
-    client.xgroup_create("auto_created_stream", "test_group", "$", true).await?;
+    client
+        .xgroup_create("auto_created_stream", "test_group", "$", true)
+        .await?;
     let length = client.xlen("auto_created_stream").await?;
     assert_eq!(length, 0); // Stream exists but is empty
 
@@ -382,17 +402,17 @@ async fn test_stream_with_specific_ids() -> Result<(), Box<dyn std::error::Error
     // Add entry with specific timestamp-based ID
     let timestamp = chrono::Utc::now().timestamp_millis() as u64;
     let specific_id = format!("{}-0", timestamp);
-    
+
     let mut fields = HashMap::new();
     fields.insert("message".to_string(), "specific_id_message".to_string());
-    
+
     let returned_id = client.xadd(stream_name, &specific_id, fields).await?;
     assert_eq!(returned_id, specific_id);
 
     // Add another entry with auto-generated ID
     let mut fields2 = HashMap::new();
     fields2.insert("message".to_string(), "auto_id_message".to_string());
-    
+
     let auto_id = client.xadd(stream_name, "*", fields2).await?;
     assert_ne!(auto_id, specific_id);
 
@@ -434,7 +454,7 @@ async fn test_concurrent_stream_operations() -> Result<(), Box<dyn std::error::E
 
     // Verify all entries were added
     assert_eq!(entry_ids.len(), num_tasks);
-    
+
     let final_length = client.xlen(stream_name).await?;
     assert_eq!(final_length, num_tasks as u64);
 

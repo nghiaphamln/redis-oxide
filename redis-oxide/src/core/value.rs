@@ -161,7 +161,8 @@ impl TryFrom<RespValue> for bool {
             RespValue::Integer(0) => Ok(false),
             RespValue::SimpleString(s) if s == "OK" => Ok(true),
             _ => Err(RedisError::Type(format!(
-                "Cannot convert {:?} to bool", value
+                "Cannot convert {:?} to bool",
+                value
             ))),
         }
     }

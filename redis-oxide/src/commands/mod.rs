@@ -4,6 +4,7 @@
 
 pub mod hash;
 pub mod list;
+pub mod optimized;
 pub mod set;
 pub mod sorted_set;
 
@@ -31,7 +32,7 @@ pub use set::{
 
 // Re-export sorted set commands
 pub use sorted_set::{
-    ZAddCommand, ZCardCommand, ZRankCommand, ZRangeCommand, ZRemCommand, ZRevRankCommand,
+    ZAddCommand, ZCardCommand, ZRangeCommand, ZRankCommand, ZRemCommand, ZRevRankCommand,
     ZScoreCommand,
 };
 
@@ -513,11 +514,11 @@ impl PipelineCommand for GetCommand {
     fn name(&self) -> &str {
         self.command_name()
     }
-    
+
     fn args(&self) -> Vec<RespValue> {
         <Self as Command>::args(self)
     }
-    
+
     fn key(&self) -> Option<String> {
         Some(self.key.clone())
     }
@@ -527,11 +528,11 @@ impl PipelineCommand for SetCommand {
     fn name(&self) -> &str {
         self.command_name()
     }
-    
+
     fn args(&self) -> Vec<RespValue> {
         <Self as Command>::args(self)
     }
-    
+
     fn key(&self) -> Option<String> {
         Some(self.key.clone())
     }
@@ -541,11 +542,11 @@ impl PipelineCommand for DelCommand {
     fn name(&self) -> &str {
         self.command_name()
     }
-    
+
     fn args(&self) -> Vec<RespValue> {
         <Self as Command>::args(self)
     }
-    
+
     fn key(&self) -> Option<String> {
         self.keys.first().cloned()
     }
@@ -555,11 +556,11 @@ impl PipelineCommand for IncrCommand {
     fn name(&self) -> &str {
         self.command_name()
     }
-    
+
     fn args(&self) -> Vec<RespValue> {
         <Self as Command>::args(self)
     }
-    
+
     fn key(&self) -> Option<String> {
         Some(self.key.clone())
     }
@@ -569,11 +570,11 @@ impl PipelineCommand for DecrCommand {
     fn name(&self) -> &str {
         self.command_name()
     }
-    
+
     fn args(&self) -> Vec<RespValue> {
         <Self as Command>::args(self)
     }
-    
+
     fn key(&self) -> Option<String> {
         Some(self.key.clone())
     }
@@ -583,11 +584,11 @@ impl PipelineCommand for IncrByCommand {
     fn name(&self) -> &str {
         self.command_name()
     }
-    
+
     fn args(&self) -> Vec<RespValue> {
         <Self as Command>::args(self)
     }
-    
+
     fn key(&self) -> Option<String> {
         Some(self.key.clone())
     }
@@ -597,11 +598,11 @@ impl PipelineCommand for DecrByCommand {
     fn name(&self) -> &str {
         self.command_name()
     }
-    
+
     fn args(&self) -> Vec<RespValue> {
         <Self as Command>::args(self)
     }
-    
+
     fn key(&self) -> Option<String> {
         Some(self.key.clone())
     }
@@ -611,11 +612,11 @@ impl PipelineCommand for ExistsCommand {
     fn name(&self) -> &str {
         self.command_name()
     }
-    
+
     fn args(&self) -> Vec<RespValue> {
         <Self as Command>::args(self)
     }
-    
+
     fn key(&self) -> Option<String> {
         self.keys.first().cloned()
     }
@@ -625,11 +626,11 @@ impl PipelineCommand for ExpireCommand {
     fn name(&self) -> &str {
         self.command_name()
     }
-    
+
     fn args(&self) -> Vec<RespValue> {
         <Self as Command>::args(self)
     }
-    
+
     fn key(&self) -> Option<String> {
         Some(self.key.clone())
     }
@@ -639,11 +640,11 @@ impl PipelineCommand for TtlCommand {
     fn name(&self) -> &str {
         self.command_name()
     }
-    
+
     fn args(&self) -> Vec<RespValue> {
         <Self as Command>::args(self)
     }
-    
+
     fn key(&self) -> Option<String> {
         Some(self.key.clone())
     }

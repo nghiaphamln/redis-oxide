@@ -284,16 +284,16 @@ pub fn parse_stream_entries(response: RespValue) -> RedisResult<Vec<StreamEntry>
     match response {
         RespValue::Array(items) => {
             let mut entries = Vec::new();
-            
+
             for item in items {
                 match item {
                     RespValue::Array(entry_data) if entry_data.len() == 2 => {
                         let id = entry_data[0].as_string()?;
-                        
+
                         match &entry_data[1] {
                             RespValue::Array(field_values) => {
                                 let mut fields = HashMap::new();
-                                
+
                                 // Fields are stored as [field1, value1, field2, value2, ...]
                                 for chunk in field_values.chunks(2) {
                                     if chunk.len() == 2 {
@@ -302,22 +302,26 @@ pub fn parse_stream_entries(response: RespValue) -> RedisResult<Vec<StreamEntry>
                                         fields.insert(field, value);
                                     }
                                 }
-                                
+
                                 entries.push(StreamEntry::new(id, fields));
                             }
-                            _ => return Err(RedisError::Type(format!(
-                                "Invalid stream entry field format: {:?}",
-                                entry_data[1]
-                            ))),
+                            _ => {
+                                return Err(RedisError::Type(format!(
+                                    "Invalid stream entry field format: {:?}",
+                                    entry_data[1]
+                                )))
+                            }
                         }
                     }
-                    _ => return Err(RedisError::Type(format!(
-                        "Invalid stream entry format: {:?}",
-                        item
-                    ))),
+                    _ => {
+                        return Err(RedisError::Type(format!(
+                            "Invalid stream entry format: {:?}",
+                            item
+                        )))
+                    }
                 }
             }
-            
+
             Ok(entries)
         }
         _ => Err(RedisError::Type(format!(
@@ -332,7 +336,7 @@ pub fn parse_xread_response(response: RespValue) -> RedisResult<HashMap<String, 
     match response {
         RespValue::Array(streams) => {
             let mut result = HashMap::new();
-            
+
             for stream in streams {
                 match stream {
                     RespValue::Array(stream_data) if stream_data.len() == 2 => {
@@ -340,13 +344,15 @@ pub fn parse_xread_response(response: RespValue) -> RedisResult<HashMap<String, 
                         let entries = parse_stream_entries(stream_data[1].clone())?;
                         result.insert(stream_name, entries);
                     }
-                    _ => return Err(RedisError::Type(format!(
-                        "Invalid XREAD response format: {:?}",
-                        stream
-                    ))),
+                    _ => {
+                        return Err(RedisError::Type(format!(
+                            "Invalid XREAD response format: {:?}",
+                            stream
+                        )))
+                    }
                 }
             }
-            
+
             Ok(result)
         }
         RespValue::Null => Ok(HashMap::new()), // No new entries
@@ -366,7 +372,7 @@ pub fn parse_stream_info(response: RespValue) -> RedisResult<StreamInfo> {
             let mut first_entry = None;
             let mut last_entry = None;
             let mut last_generated_id = String::new();
-            
+
             // Parse key-value pairs
             for chunk in items.chunks(2) {
                 if chunk.len() == 2 {
@@ -397,7 +403,7 @@ pub fn parse_stream_info(response: RespValue) -> RedisResult<StreamInfo> {
                     }
                 }
             }
-            
+
             Ok(StreamInfo {
                 length,
                 groups,
@@ -422,9 +428,9 @@ mod tests {
         let mut fields = HashMap::new();
         fields.insert("user".to_string(), "alice".to_string());
         fields.insert("action".to_string(), "login".to_string());
-        
+
         let entry = StreamEntry::new("1234567890123-0".to_string(), fields.clone());
-        
+
         assert_eq!(entry.id, "1234567890123-0");
         assert_eq!(entry.fields, fields);
         assert_eq!(entry.get_field("user"), Some(&"alice".to_string()));
@@ -435,7 +441,7 @@ mod tests {
     #[test]
     fn test_stream_entry_timestamp_parsing() {
         let entry = StreamEntry::new("1234567890123-5".to_string(), HashMap::new());
-        
+
         assert_eq!(entry.timestamp(), Some(1234567890123));
         assert_eq!(entry.sequence(), Some(5));
     }
@@ -443,7 +449,7 @@ mod tests {
     #[test]
     fn test_stream_entry_invalid_id() {
         let entry = StreamEntry::new("invalid-id".to_string(), HashMap::new());
-        
+
         assert_eq!(entry.timestamp(), None);
         assert_eq!(entry.sequence(), None);
     }
@@ -451,7 +457,7 @@ mod tests {
     #[test]
     fn test_stream_range_creation() {
         let range = StreamRange::new("1000", "2000").with_count(10);
-        
+
         assert_eq!(range.start, "1000");
         assert_eq!(range.end, "2000");
         assert_eq!(range.count, Some(10));
@@ -462,11 +468,11 @@ mod tests {
         let all = StreamRange::all();
         assert_eq!(all.start, "-");
         assert_eq!(all.end, "+");
-        
+
         let from = StreamRange::from("1000");
         assert_eq!(from.start, "1000");
         assert_eq!(from.end, "+");
-        
+
         let to = StreamRange::to("2000");
         assert_eq!(to.start, "-");
         assert_eq!(to.end, "2000");
@@ -477,13 +483,13 @@ mod tests {
         let options = ReadOptions::new()
             .with_count(5)
             .with_block(Duration::from_secs(1));
-        
+
         assert_eq!(options.count, Some(5));
         assert_eq!(options.block, Some(Duration::from_secs(1)));
-        
+
         let blocking = ReadOptions::blocking(Duration::from_millis(500));
         assert_eq!(blocking.block, Some(Duration::from_millis(500)));
-        
+
         let non_blocking = ReadOptions::non_blocking(10);
         assert_eq!(non_blocking.count, Some(10));
         assert_eq!(non_blocking.block, None);
@@ -511,14 +517,14 @@ mod tests {
                 ]),
             ]),
         ]);
-        
+
         let entries = parse_stream_entries(response).unwrap();
         assert_eq!(entries.len(), 2);
-        
+
         assert_eq!(entries[0].id, "1234567890123-0");
         assert_eq!(entries[0].get_field("user"), Some(&"alice".to_string()));
         assert_eq!(entries[0].get_field("action"), Some(&"login".to_string()));
-        
+
         assert_eq!(entries[1].id, "1234567890124-0");
         assert_eq!(entries[1].get_field("user"), Some(&"bob".to_string()));
         assert_eq!(entries[1].get_field("action"), Some(&"logout".to_string()));
@@ -526,25 +532,18 @@ mod tests {
 
     #[test]
     fn test_parse_xread_response() {
-        let response = RespValue::Array(vec![
-            RespValue::Array(vec![
-                RespValue::from("stream1"),
-                RespValue::Array(vec![
-                    RespValue::Array(vec![
-                        RespValue::from("1234567890123-0"),
-                        RespValue::Array(vec![
-                            RespValue::from("field1"),
-                            RespValue::from("value1"),
-                        ]),
-                    ]),
-                ]),
-            ]),
-        ]);
-        
+        let response = RespValue::Array(vec![RespValue::Array(vec![
+            RespValue::from("stream1"),
+            RespValue::Array(vec![RespValue::Array(vec![
+                RespValue::from("1234567890123-0"),
+                RespValue::Array(vec![RespValue::from("field1"), RespValue::from("value1")]),
+            ])]),
+        ])]);
+
         let result = parse_xread_response(response).unwrap();
         assert_eq!(result.len(), 1);
         assert!(result.contains_key("stream1"));
-        
+
         let entries = &result["stream1"];
         assert_eq!(entries.len(), 1);
         assert_eq!(entries[0].id, "1234567890123-0");

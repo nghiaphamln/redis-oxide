@@ -57,6 +57,9 @@ hex.workspace = true
 # Socket utilities
 socket2 = "0.5.7"
 
+# Fast integer formatting
+itoa = "1.0"
+
 [dev-dependencies]
 tokio-test = "0.4.4"
 proptest = "1.5"
