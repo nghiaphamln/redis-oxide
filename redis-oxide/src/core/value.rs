@@ -100,6 +100,27 @@ impl RespValue {
         matches!(self, Self::Error(_))
     }
 
+    /// Convert to a boolean if possible
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the value cannot be converted to a boolean.
+    pub fn as_bool(&self) -> RedisResult<bool> {
+        match self {
+            Self::Integer(1) => Ok(true),
+            Self::Integer(0) => Ok(false),
+            Self::SimpleString(s) if s == "OK" => Ok(true),
+            Self::BulkString(b) => {
+                let s = String::from_utf8(b.to_vec())
+                    .map_err(|e| RedisError::Type(format!("Invalid UTF-8: {e}")))?;
+                Ok(s == "1" || s.to_lowercase() == "true")
+            }
+            _ => Err(RedisError::Type(format!(
+                "Cannot convert {self:?} to boolean"
+            ))),
+        }
+    }
+
     /// Extract error message if this is an error
     #[must_use]
     pub fn into_error(self) -> Option<String> {
@@ -162,6 +183,79 @@ impl TryFrom<RespValue> for bool {
             RespValue::SimpleString(s) if s == "OK" => Ok(true),
             _ => Err(RedisError::Type(format!(
                 "Cannot convert {:?} to bool",
+                value
+            ))),
+        }
+    }
+}
+
+impl TryFrom<RespValue> for Option<String> {
+    type Error = RedisError;
+
+    fn try_from(value: RespValue) -> Result<Self, Self::Error> {
+        match value {
+            RespValue::BulkString(b) => String::from_utf8(b.to_vec())
+                .map(Some)
+                .map_err(|e| RedisError::Type(format!("Invalid UTF-8: {e}"))),
+            RespValue::SimpleString(s) => Ok(Some(s)),
+            RespValue::Null => Ok(None),
+            _ => Err(RedisError::Type(format!(
+                "Cannot convert {:?} to Option<String>",
+                value
+            ))),
+        }
+    }
+}
+
+impl TryFrom<RespValue> for Vec<String> {
+    type Error = RedisError;
+
+    fn try_from(value: RespValue) -> Result<Self, Self::Error> {
+        match value {
+            RespValue::Array(items) => {
+                let mut result = Self::new();
+                for item in items {
+                    match item {
+                        RespValue::BulkString(b) => {
+                            let s = String::from_utf8(b.to_vec())
+                                .map_err(|e| RedisError::Type(format!("Invalid UTF-8: {e}")))?;
+                            result.push(s);
+                        }
+                        RespValue::SimpleString(s) => result.push(s),
+                        RespValue::Null => {} // Skip null values
+                        _ => {
+                            return Err(RedisError::Type(format!(
+                                "Cannot convert array item {:?} to string",
+                                item
+                            )))
+                        }
+                    }
+                }
+                Ok(result)
+            }
+            _ => Err(RedisError::Type(format!(
+                "Cannot convert {:?} to Vec<String>",
+                value
+            ))),
+        }
+    }
+}
+
+impl TryFrom<RespValue> for Vec<i64> {
+    type Error = RedisError;
+
+    fn try_from(value: RespValue) -> Result<Self, Self::Error> {
+        match value {
+            RespValue::Array(items) => {
+                let mut result = Self::new();
+                for item in items {
+                    let i = item.as_int()?;
+                    result.push(i);
+                }
+                Ok(result)
+            }
+            _ => Err(RedisError::Type(format!(
+                "Cannot convert {:?} to Vec<i64>",
                 value
             ))),
         }

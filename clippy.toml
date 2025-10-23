@@ -1,3 +1,4 @@
-msrv = "1.82"
-cognitive-complexity-threshold = 30
-
+# Configuration to disable the problematic lint that conflicts 
+# with the pedantic setting in this clippy version
+disallowed-macros = []
+disallowed-types = []

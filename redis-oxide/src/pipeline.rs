@@ -215,6 +215,52 @@ impl Pipeline {
         self.add_command(Box::new(cmd))
     }
 
+    // List commands
+
+    /// Add an LPUSH command to the pipeline
+    pub fn lpush(&mut self, key: impl Into<String>, values: Vec<String>) -> &mut Self {
+        use crate::commands::LPushCommand;
+        let cmd = LPushCommand::new(key.into(), values);
+        self.add_command(Box::new(cmd))
+    }
+
+    /// Add an RPUSH command to the pipeline
+    pub fn rpush(&mut self, key: impl Into<String>, values: Vec<String>) -> &mut Self {
+        use crate::commands::RPushCommand;
+        let cmd = RPushCommand::new(key.into(), values);
+        self.add_command(Box::new(cmd))
+    }
+
+    /// Add an LRANGE command to the pipeline
+    pub fn lrange(&mut self, key: impl Into<String>, start: i64, stop: i64) -> &mut Self {
+        use crate::commands::LRangeCommand;
+        let cmd = LRangeCommand::new(key.into(), start, stop);
+        self.add_command(Box::new(cmd))
+    }
+
+    /// Add an LLEN command to the pipeline
+    pub fn llen(&mut self, key: impl Into<String>) -> &mut Self {
+        use crate::commands::LLenCommand;
+        let cmd = LLenCommand::new(key.into());
+        self.add_command(Box::new(cmd))
+    }
+
+    // Set commands
+
+    /// Add an SADD command to the pipeline
+    pub fn sadd(&mut self, key: impl Into<String>, members: Vec<String>) -> &mut Self {
+        use crate::commands::SAddCommand;
+        let cmd = SAddCommand::new(key.into(), members);
+        self.add_command(Box::new(cmd))
+    }
+
+    /// Add an SMEMBERS command to the pipeline
+    pub fn smembers(&mut self, key: impl Into<String>) -> &mut Self {
+        use crate::commands::SMembersCommand;
+        let cmd = SMembersCommand::new(key.into());
+        self.add_command(Box::new(cmd))
+    }
+
     /// Add an HEXISTS command to the pipeline
     pub fn hexists(&mut self, key: impl Into<String>, field: impl Into<String>) -> &mut Self {
         use crate::commands::HExistsCommand;

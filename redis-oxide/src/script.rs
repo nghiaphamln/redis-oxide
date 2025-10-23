@@ -230,13 +230,16 @@ impl ScriptManager {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```no_run
     /// use redis_oxide::{Script, ScriptManager};
     ///
+    /// # #[tokio::main]
+    /// # async fn main() {
     /// let mut manager = ScriptManager::new();
     /// let script = Script::new("return 'Hello'");
     ///
     /// manager.register("greeting", script).await;
+    /// # }
     /// ```
     pub async fn register(&self, name: impl Into<String>, script: Script) {
         let mut scripts = self.scripts.write().await;

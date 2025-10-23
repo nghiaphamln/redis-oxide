@@ -6,11 +6,15 @@
 
 use redis_oxide::{Client, ConnectionConfig, Script, ScriptManager};
 use std::collections::HashMap;
-use testcontainers::{clients::Cli, images::redis::Redis, Container};
+use testcontainers::{core::WaitFor, runners::AsyncRunner, ContainerAsync, GenericImage};
 
-async fn setup_client(docker: &Cli) -> Result<Client, redis_oxide::RedisError> {
-    let container = docker.run(Redis::default());
-    let host_port = container.get_host_port_ipv4(6379);
+async fn setup_client() -> Result<Client, redis_oxide::RedisError> {
+    let redis_image = GenericImage::new("redis", "7-alpine")
+        .with_exposed_port(testcontainers::core::ContainerPort::Tcp(6379))
+        .with_wait_for(WaitFor::message_on_stdout("Ready to accept connections"));
+
+    let container = redis_image.start().await.unwrap();
+    let host_port = container.get_host_port_ipv4(6379).await.unwrap();
     let redis_url = format!("redis://localhost:{}", host_port);
     let config = ConnectionConfig::new(&redis_url);
     Client::connect(config).await
@@ -18,8 +22,7 @@ async fn setup_client(docker: &Cli) -> Result<Client, redis_oxide::RedisError> {
 
 #[tokio::test]
 async fn test_basic_script_execution() -> Result<(), Box<dyn std::error::Error>> {
-    let docker = Cli::default();
-    let client = setup_client(&docker).await?;
+    let client = setup_client().await?;
 
     // Simple script that returns a string
     let script = "return 'Hello, World!'";
@@ -50,8 +53,7 @@ async fn test_basic_script_execution() -> Result<(), Box<dyn std::error::Error>>
 
 #[tokio::test]
 async fn test_script_with_redis_operations() -> Result<(), Box<dyn std::error::Error>> {
-    let docker = Cli::default();
-    let client = setup_client(&docker).await?;
+    let client = setup_client().await?;
 
     // Script that performs SET and GET operations
     let script = r#"
@@ -77,8 +79,7 @@ async fn test_script_with_redis_operations() -> Result<(), Box<dyn std::error::E
 
 #[tokio::test]
 async fn test_script_load_and_evalsha() -> Result<(), Box<dyn std::error::Error>> {
-    let docker = Cli::default();
-    let client = setup_client(&docker).await?;
+    let client = setup_client().await?;
 
     // Load a script
     let script = "return KEYS[1] .. ':' .. ARGV[1]";
@@ -105,8 +106,7 @@ async fn test_script_load_and_evalsha() -> Result<(), Box<dyn std::error::Error>
 
 #[tokio::test]
 async fn test_script_struct() -> Result<(), Box<dyn std::error::Error>> {
-    let docker = Cli::default();
-    let client = setup_client(&docker).await?;
+    let client = setup_client().await?;
 
     // Create a Script instance
     let script = Script::new("return KEYS[1] .. ':' .. ARGV[1]");
@@ -142,8 +142,7 @@ async fn test_script_struct() -> Result<(), Box<dyn std::error::Error>> {
 
 #[tokio::test]
 async fn test_script_manager() -> Result<(), Box<dyn std::error::Error>> {
-    let docker = Cli::default();
-    let client = setup_client(&docker).await?;
+    let client = setup_client().await?;
 
     let manager = ScriptManager::new();
 
@@ -185,8 +184,7 @@ async fn test_script_manager() -> Result<(), Box<dyn std::error::Error>> {
 
 #[tokio::test]
 async fn test_atomic_increment_script() -> Result<(), Box<dyn std::error::Error>> {
-    let docker = Cli::default();
-    let client = setup_client(&docker).await?;
+    let client = setup_client().await?;
 
     // Atomic increment with expiration script
     let script = r#"
@@ -236,8 +234,7 @@ async fn test_atomic_increment_script() -> Result<(), Box<dyn std::error::Error>
 
 #[tokio::test]
 async fn test_conditional_set_script() -> Result<(), Box<dyn std::error::Error>> {
-    let docker = Cli::default();
-    let client = setup_client(&docker).await?;
+    let client = setup_client().await?;
 
     // Conditional set script
     let script = r#"
@@ -291,8 +288,7 @@ async fn test_conditional_set_script() -> Result<(), Box<dyn std::error::Error>>
 
 #[tokio::test]
 async fn test_script_with_multiple_keys() -> Result<(), Box<dyn std::error::Error>> {
-    let docker = Cli::default();
-    let client = setup_client(&docker).await?;
+    let client = setup_client().await?;
 
     // Script that operates on multiple keys
     let script = r#"
@@ -327,8 +323,7 @@ async fn test_script_with_multiple_keys() -> Result<(), Box<dyn std::error::Erro
 
 #[tokio::test]
 async fn test_script_flush() -> Result<(), Box<dyn std::error::Error>> {
-    let docker = Cli::default();
-    let client = setup_client(&docker).await?;
+    let client = setup_client().await?;
 
     // Load a script
     let script = "return 'test'";
@@ -350,8 +345,7 @@ async fn test_script_flush() -> Result<(), Box<dyn std::error::Error>> {
 
 #[tokio::test]
 async fn test_script_error_handling() -> Result<(), Box<dyn std::error::Error>> {
-    let docker = Cli::default();
-    let client = setup_client(&docker).await?;
+    let client = setup_client().await?;
 
     // Try to execute EVALSHA with non-existent script
     let fake_sha = "0000000000000000000000000000000000000000";
@@ -372,8 +366,7 @@ async fn test_script_error_handling() -> Result<(), Box<dyn std::error::Error>> 
 
 #[tokio::test]
 async fn test_script_pattern_examples() -> Result<(), Box<dyn std::error::Error>> {
-    let docker = Cli::default();
-    let client = setup_client(&docker).await?;
+    let client = setup_client().await?;
 
     // Test rate limiting pattern
     let rate_limit_script = r#"

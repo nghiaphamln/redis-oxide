@@ -55,7 +55,7 @@ sha1.workspace = true
 hex.workspace = true
 
 # Socket utilities
-socket2 = "0.5.7"
+socket2 = "0.6.1"
 
 # Fast integer formatting
 itoa = "1.0"
@@ -63,9 +63,9 @@ itoa = "1.0"
 [dev-dependencies]
 tokio-test = "0.4.4"
 proptest = "1.5"
-criterion = "0.5.1"
-testcontainers = "0.23.1"
-testcontainers-modules = { version = "0.11.2", features = ["redis"] }
+criterion = "0.7.0"
+testcontainers = "0.25.0"
+testcontainers-modules = { version = "0.13.0", features = ["redis"] }
 tracing-subscriber = "0.3.18"
 futures = "0.3"
 
