@@ -185,6 +185,7 @@
 //! config.pool = pool_config;
 //! ```
 
+#![allow(clippy::unnecessary_literal_bound)]
 #![deny(warnings)]
 #![deny(clippy::all)]
 //#![deny(clippy::pedantic)]  // Temporarily disabled due to clippy::unnecessary_literal_bound incompatibility
@@ -230,7 +231,6 @@
 #![allow(clippy::unnecessary_wraps)]
 #![allow(clippy::unused_async)]
 #![allow(clippy::module_name_repetitions)]
-#![allow(clippy::unnecessary_literal_bound)]
 
 pub mod client;
 pub mod cluster;
