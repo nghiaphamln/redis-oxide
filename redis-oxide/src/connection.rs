@@ -8,7 +8,7 @@ use crate::core::{
     error::{RedisError, RedisResult},
     value::RespValue,
 };
-use crate::protocol::{RespDecoder, RespEncoder};
+use crate::protocol::{ProtocolConnection, RespDecoder, RespEncoder};
 use bytes::{Buf, BytesMut};
 use std::io::Cursor;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -96,6 +96,14 @@ impl RedisConnection {
         }
     }
 
+    /// Send a command to the server
+    pub async fn send_command(&mut self, command: &RespValue) -> RedisResult<()> {
+        let mut buffer = BytesMut::new();
+        RespEncoder::encode(command, &mut buffer)?;
+        self.stream.write_all(&buffer).await?;
+        Ok(())
+    }
+
     /// Execute a command and return the response
     pub async fn execute_command(
         &mut self,
@@ -131,7 +139,7 @@ impl RedisConnection {
     }
 
     /// Read a complete RESP response from the connection
-    async fn read_response(&mut self) -> RedisResult<RespValue> {
+    pub async fn read_response(&mut self) -> RedisResult<RespValue> {
         loop {
             // Try to decode from existing buffer
             let mut cursor = Cursor::new(&self.read_buffer[..]);
@@ -216,6 +224,17 @@ impl RedisConnection {
             RespValue::Error(e) => Err(RedisError::Server(e)),
             _ => Err(RedisError::UnexpectedResponse(format!("{:?}", response))),
         }
+    }
+}
+
+#[async_trait::async_trait]
+impl ProtocolConnection for RedisConnection {
+    async fn send_command(&mut self, command: &RespValue) -> RedisResult<()> {
+        self.send_command(command).await
+    }
+    
+    async fn read_response(&mut self) -> RedisResult<RespValue> {
+        self.read_response().await
     }
 }
 

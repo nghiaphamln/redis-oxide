@@ -63,6 +63,10 @@ pub enum RedisError {
     #[error("Cluster error: {0}")]
     Cluster(String),
 
+    /// Sentinel error
+    #[error("Sentinel error: {0}")]
+    Sentinel(String),
+
     /// Authentication error
     #[error("Authentication failed: {0}")]
     Auth(String),

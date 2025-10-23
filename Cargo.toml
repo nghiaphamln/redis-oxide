@@ -38,6 +38,13 @@ deadpool = "0.12.1"
 # Serialization
 serde = { version = "1.0", features = ["derive"] }
 
+# For async streams in Pub/Sub
+futures-util = "0.3"
+
+# For Lua script hashing
+sha1 = "0.10"
+hex = "0.4"
+
 [profile.release]
 opt-level = 3
 lto = true

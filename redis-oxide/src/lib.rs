@@ -186,6 +186,8 @@
 //! ```
 
 #![deny(warnings)]
+#![allow(unused_imports)]
+#![allow(clippy::unused_self)]
 #![warn(missing_docs)]
 #![allow(clippy::missing_errors_doc)]
 #![allow(clippy::must_use_candidate)]
@@ -209,15 +211,33 @@ pub mod client;
 pub mod cluster;
 pub mod commands;
 pub mod connection;
+pub mod pipeline;
 pub mod pool;
 pub mod protocol;
+pub mod pubsub;
+pub mod script;
+pub mod sentinel;
+pub mod streams;
+pub mod transaction;
 
 pub use client::Client;
 pub mod core;
+pub use pipeline::{Pipeline, PipelineResult};
+pub use pubsub::{Publisher, PubSubMessage, Subscriber};
+pub use script::{Script, ScriptManager};
+pub use sentinel::{MasterInfo, SentinelClient, SentinelConfig, SentinelEndpoint};
+pub use streams::{
+    ConsumerGroupInfo, ConsumerInfo, PendingMessage, ReadOptions, StreamEntry, StreamInfo,
+    StreamRange,
+};
+pub use transaction::{Transaction, TransactionResult};
 
 pub use crate::core::{
-    config::{ConnectionConfig, PoolConfig, PoolStrategy, TopologyMode},
+    config::{ConnectionConfig, PoolConfig, PoolStrategy, ProtocolVersion, TopologyMode},
     error::{RedisError, RedisResult},
     types::{NodeInfo, RedisValue, SlotRange},
     value::RespValue,
 };
+
+// Re-export protocol types
+pub use crate::protocol::{ProtocolNegotiation, ProtocolNegotiator, Resp3Value};

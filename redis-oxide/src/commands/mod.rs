@@ -2,8 +2,38 @@
 //!
 //! This module provides type-safe command builders for Redis commands.
 
+pub mod hash;
+pub mod list;
+pub mod set;
+pub mod sorted_set;
+
 use crate::core::{error::RedisResult, value::RespValue};
+use crate::pipeline::PipelineCommand;
 use std::time::Duration;
+
+// Re-export hash commands
+pub use hash::{
+    HDelCommand, HExistsCommand, HGetAllCommand, HGetCommand, HLenCommand, HMGetCommand,
+    HMSetCommand, HSetCommand,
+};
+
+// Re-export list commands
+pub use list::{
+    LIndexCommand, LLenCommand, LPopCommand, LPushCommand, LRangeCommand, LSetCommand, RPopCommand,
+    RPushCommand,
+};
+
+// Re-export set commands
+pub use set::{
+    SAddCommand, SCardCommand, SIsMemberCommand, SMembersCommand, SPopCommand, SRandMemberCommand,
+    SRemCommand,
+};
+
+// Re-export sorted set commands
+pub use sorted_set::{
+    ZAddCommand, ZCardCommand, ZRankCommand, ZRangeCommand, ZRemCommand, ZRevRankCommand,
+    ZScoreCommand,
+};
 
 /// Trait for commands that can be executed
 pub trait Command {
@@ -445,21 +475,21 @@ mod tests {
     fn test_set_command_basic() {
         let cmd = SetCommand::new("key", "value");
         assert_eq!(cmd.command_name(), "SET");
-        let args = cmd.args();
+        let args = <SetCommand as Command>::args(&cmd);
         assert_eq!(args.len(), 2);
     }
 
     #[test]
     fn test_set_command_with_expiration() {
         let cmd = SetCommand::new("key", "value").expire(Duration::from_secs(60));
-        let args = cmd.args();
+        let args = <SetCommand as Command>::args(&cmd);
         assert_eq!(args.len(), 4); // key, value, EX, 60
     }
 
     #[test]
     fn test_set_command_nx() {
         let cmd = SetCommand::new("key", "value").only_if_not_exists();
-        let args = cmd.args();
+        let args = <SetCommand as Command>::args(&cmd);
         assert!(args.len() >= 3); // key, value, NX
     }
 
@@ -475,5 +505,146 @@ mod tests {
         let cmd = IncrCommand::new("counter");
         assert_eq!(cmd.command_name(), "INCR");
         assert_eq!(cmd.keys(), vec![b"counter"]);
+    }
+}
+
+// Implement PipelineCommand for all command types
+impl PipelineCommand for GetCommand {
+    fn name(&self) -> &str {
+        self.command_name()
+    }
+    
+    fn args(&self) -> Vec<RespValue> {
+        <Self as Command>::args(self)
+    }
+    
+    fn key(&self) -> Option<String> {
+        Some(self.key.clone())
+    }
+}
+
+impl PipelineCommand for SetCommand {
+    fn name(&self) -> &str {
+        self.command_name()
+    }
+    
+    fn args(&self) -> Vec<RespValue> {
+        <Self as Command>::args(self)
+    }
+    
+    fn key(&self) -> Option<String> {
+        Some(self.key.clone())
+    }
+}
+
+impl PipelineCommand for DelCommand {
+    fn name(&self) -> &str {
+        self.command_name()
+    }
+    
+    fn args(&self) -> Vec<RespValue> {
+        <Self as Command>::args(self)
+    }
+    
+    fn key(&self) -> Option<String> {
+        self.keys.first().cloned()
+    }
+}
+
+impl PipelineCommand for IncrCommand {
+    fn name(&self) -> &str {
+        self.command_name()
+    }
+    
+    fn args(&self) -> Vec<RespValue> {
+        <Self as Command>::args(self)
+    }
+    
+    fn key(&self) -> Option<String> {
+        Some(self.key.clone())
+    }
+}
+
+impl PipelineCommand for DecrCommand {
+    fn name(&self) -> &str {
+        self.command_name()
+    }
+    
+    fn args(&self) -> Vec<RespValue> {
+        <Self as Command>::args(self)
+    }
+    
+    fn key(&self) -> Option<String> {
+        Some(self.key.clone())
+    }
+}
+
+impl PipelineCommand for IncrByCommand {
+    fn name(&self) -> &str {
+        self.command_name()
+    }
+    
+    fn args(&self) -> Vec<RespValue> {
+        <Self as Command>::args(self)
+    }
+    
+    fn key(&self) -> Option<String> {
+        Some(self.key.clone())
+    }
+}
+
+impl PipelineCommand for DecrByCommand {
+    fn name(&self) -> &str {
+        self.command_name()
+    }
+    
+    fn args(&self) -> Vec<RespValue> {
+        <Self as Command>::args(self)
+    }
+    
+    fn key(&self) -> Option<String> {
+        Some(self.key.clone())
+    }
+}
+
+impl PipelineCommand for ExistsCommand {
+    fn name(&self) -> &str {
+        self.command_name()
+    }
+    
+    fn args(&self) -> Vec<RespValue> {
+        <Self as Command>::args(self)
+    }
+    
+    fn key(&self) -> Option<String> {
+        self.keys.first().cloned()
+    }
+}
+
+impl PipelineCommand for ExpireCommand {
+    fn name(&self) -> &str {
+        self.command_name()
+    }
+    
+    fn args(&self) -> Vec<RespValue> {
+        <Self as Command>::args(self)
+    }
+    
+    fn key(&self) -> Option<String> {
+        Some(self.key.clone())
+    }
+}
+
+impl PipelineCommand for TtlCommand {
+    fn name(&self) -> &str {
+        self.command_name()
+    }
+    
+    fn args(&self) -> Vec<RespValue> {
+        <Self as Command>::args(self)
+    }
+    
+    fn key(&self) -> Option<String> {
+        Some(self.key.clone())
     }
 }

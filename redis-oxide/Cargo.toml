@@ -47,6 +47,13 @@ deadpool.workspace = true
 # Serialization
 serde.workspace = true
 
+# For async streams in Pub/Sub
+futures-util.workspace = true
+
+# For Lua script hashing
+sha1.workspace = true
+hex.workspace = true
+
 # Socket utilities
 socket2 = "0.5.7"
 

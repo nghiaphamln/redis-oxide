@@ -135,3 +135,34 @@ impl From<Bytes> for RespValue {
         Self::BulkString(b)
     }
 }
+
+impl TryFrom<RespValue> for String {
+    type Error = RedisError;
+
+    fn try_from(value: RespValue) -> Result<Self, Self::Error> {
+        value.as_string()
+    }
+}
+
+impl TryFrom<RespValue> for i64 {
+    type Error = RedisError;
+
+    fn try_from(value: RespValue) -> Result<Self, Self::Error> {
+        value.as_int()
+    }
+}
+
+impl TryFrom<RespValue> for bool {
+    type Error = RedisError;
+
+    fn try_from(value: RespValue) -> Result<Self, Self::Error> {
+        match value {
+            RespValue::Integer(1) => Ok(true),
+            RespValue::Integer(0) => Ok(false),
+            RespValue::SimpleString(s) if s == "OK" => Ok(true),
+            _ => Err(RedisError::Type(format!(
+                "Cannot convert {:?} to bool", value
+            ))),
+        }
+    }
+}

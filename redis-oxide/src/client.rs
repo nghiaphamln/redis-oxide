@@ -5,7 +5,8 @@
 use crate::cluster::{calculate_slot, ClusterTopology, RedirectHandler};
 use crate::commands::{
     Command, DecrByCommand, DecrCommand, DelCommand, ExistsCommand, ExpireCommand, GetCommand,
-    IncrByCommand, IncrCommand, SetCommand, TtlCommand,
+    HDelCommand, HExistsCommand, HGetAllCommand, HGetCommand, HLenCommand, HMGetCommand,
+    HMSetCommand, HSetCommand, IncrByCommand, IncrCommand, SetCommand, TtlCommand,
 };
 use crate::connection::{ConnectionManager, TopologyType};
 use crate::core::{
@@ -13,6 +14,9 @@ use crate::core::{
     error::{RedisError, RedisResult},
     value::RespValue,
 };
+use crate::pipeline::{Pipeline, PipelineExecutor, PipelineCommand};
+use crate::pubsub::{Publisher, PubSubConnection, Subscriber};
+use crate::transaction::{Transaction, TransactionExecutor, TransactionCommand};
 use crate::pool::Pool;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -360,9 +364,1638 @@ impl Client {
         self.execute_with_redirects(command).await
     }
 
+    // Hash operations
+
+    /// Get the value of a hash field
+    pub async fn hget(&self, key: impl Into<String>, field: impl Into<String>) -> RedisResult<Option<String>> {
+        let command = HGetCommand::new(key, field);
+        self.execute_with_redirects(command).await
+    }
+
+    /// Set the value of a hash field
+    pub async fn hset(&self, key: impl Into<String>, field: impl Into<String>, value: impl Into<String>) -> RedisResult<i64> {
+        let command = HSetCommand::new(key, field, value);
+        self.execute_with_redirects(command).await
+    }
+
+    /// Delete one or more hash fields
+    pub async fn hdel(&self, key: impl Into<String>, fields: Vec<String>) -> RedisResult<i64> {
+        let command = HDelCommand::new(key, fields);
+        self.execute_with_redirects(command).await
+    }
+
+    /// Get all fields and values in a hash
+    pub async fn hgetall(&self, key: impl Into<String>) -> RedisResult<std::collections::HashMap<String, String>> {
+        let command = HGetAllCommand::new(key);
+        self.execute_with_redirects(command).await
+    }
+
+    /// Get the values of multiple hash fields
+    pub async fn hmget(&self, key: impl Into<String>, fields: Vec<String>) -> RedisResult<Vec<Option<String>>> {
+        let command = HMGetCommand::new(key, fields);
+        self.execute_with_redirects(command).await
+    }
+
+    /// Set multiple hash fields to multiple values
+    pub async fn hmset(&self, key: impl Into<String>, fields: std::collections::HashMap<String, String>) -> RedisResult<String> {
+        let command = HMSetCommand::new(key, fields);
+        self.execute_with_redirects(command).await
+    }
+
+    /// Get the number of fields in a hash
+    pub async fn hlen(&self, key: impl Into<String>) -> RedisResult<i64> {
+        let command = HLenCommand::new(key);
+        self.execute_with_redirects(command).await
+    }
+
+    /// Determine if a hash field exists
+    pub async fn hexists(&self, key: impl Into<String>, field: impl Into<String>) -> RedisResult<bool> {
+        let command = HExistsCommand::new(key, field);
+        self.execute_with_redirects(command).await
+    }
+
+    /// Create a new pipeline for batching commands
+    ///
+    /// Pipeline allows you to send multiple commands to Redis in a single
+    /// network round-trip, which can significantly improve performance.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use redis_oxide::{Client, ConnectionConfig};
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let config = ConnectionConfig::new("redis://localhost:6379");
+    /// let client = Client::connect(config).await?;
+    ///
+    /// let mut pipeline = client.pipeline();
+    /// pipeline.set("key1", "value1");
+    /// pipeline.set("key2", "value2");
+    /// pipeline.get("key1");
+    ///
+    /// let results = pipeline.execute().await?;
+    /// println!("Pipeline results: {:?}", results);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn pipeline(&self) -> Pipeline {
+        let client_executor = ClientPipelineExecutor {
+            client: self.clone(),
+        };
+        Pipeline::new(Arc::new(tokio::sync::Mutex::new(client_executor)))
+    }
+
+    /// Create a new transaction for atomic command execution
+    ///
+    /// Transactions allow you to execute multiple commands atomically using
+    /// MULTI/EXEC. You can also use WATCH to monitor keys for changes.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use redis_oxide::{Client, ConnectionConfig};
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let config = ConnectionConfig::new("redis://localhost:6379");
+    /// let client = Client::connect(config).await?;
+    ///
+    /// let mut transaction = client.transaction().await?;
+    /// transaction.set("key1", "value1");
+    /// transaction.set("key2", "value2");
+    /// transaction.incr("counter");
+    ///
+    /// let results = transaction.exec().await?;
+    /// println!("Transaction results: {:?}", results);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn transaction(&self) -> RedisResult<Transaction> {
+        let client_executor = ClientTransactionExecutor {
+            client: self.clone(),
+        };
+        Ok(Transaction::new(Arc::new(tokio::sync::Mutex::new(client_executor))))
+    }
+
+    /// Publish a message to a Redis channel
+    ///
+    /// Returns the number of subscribers that received the message.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use redis_oxide::{Client, ConnectionConfig};
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let config = ConnectionConfig::new("redis://localhost:6379");
+    /// let client = Client::connect(config).await?;
+    ///
+    /// let subscribers = client.publish("news", "Breaking news!").await?;
+    /// println!("Message sent to {} subscribers", subscribers);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn publish(&self, channel: impl Into<String>, message: impl Into<String>) -> RedisResult<i64> {
+        let channel = channel.into();
+        let message = message.into();
+        
+        let args = vec![
+            RespValue::from(channel.as_str()),
+            RespValue::from(message.as_str()),
+        ];
+
+        match self.topology_type {
+            TopologyType::Standalone => {
+                if let Some(pool) = &self.standalone_pool {
+                    let result = pool.execute_command("PUBLISH".to_string(), args).await?;
+                    result.as_int()
+                } else {
+                    Err(RedisError::Connection("No standalone pool available".to_string()))
+                }
+            }
+            TopologyType::Cluster => {
+                // For cluster, use any available node for PUBLISH
+                let pools = self.cluster_pools.read().await;
+                if let Some((_, pool)) = pools.iter().next() {
+                    let result = pool.execute_command("PUBLISH".to_string(), args).await?;
+                    result.as_int()
+                } else {
+                    Err(RedisError::Cluster("No cluster nodes available".to_string()))
+                }
+            }
+        }
+    }
+
+    /// Create a new subscriber for receiving messages from Redis channels
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use redis_oxide::{Client, ConnectionConfig};
+    /// use futures::StreamExt;
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let config = ConnectionConfig::new("redis://localhost:6379");
+    /// let client = Client::connect(config).await?;
+    ///
+    /// let mut subscriber = client.subscriber().await?;
+    /// subscriber.subscribe(vec!["news".to_string()]).await?;
+    ///
+    /// while let Some(message) = subscriber.next_message().await? {
+    ///     println!("Received: {} on {}", message.payload, message.channel);
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn subscriber(&self) -> RedisResult<Subscriber> {
+        let client_connection = ClientPubSubConnection {
+            client: self.clone(),
+        };
+        Ok(Subscriber::new(Arc::new(tokio::sync::Mutex::new(client_connection))))
+    }
+
+    /// Create a new publisher for sending messages to Redis channels
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use redis_oxide::{Client, ConnectionConfig};
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let config = ConnectionConfig::new("redis://localhost:6379");
+    /// let client = Client::connect(config).await?;
+    ///
+    /// let publisher = client.publisher().await?;
+    /// let subscribers = publisher.publish("news", "Breaking news!").await?;
+    /// println!("Message sent to {} subscribers", subscribers);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn publisher(&self) -> RedisResult<Publisher> {
+        let client_connection = ClientPubSubConnection {
+            client: self.clone(),
+        };
+        Ok(Publisher::new(Arc::new(tokio::sync::Mutex::new(client_connection))))
+    }
+
+    // Lua scripting methods
+
+    /// Execute a Lua script using EVAL
+    ///
+    /// # Arguments
+    ///
+    /// * `script` - The Lua script source code
+    /// * `keys` - List of Redis keys that the script will access (KEYS array in Lua)
+    /// * `args` - List of arguments to pass to the script (ARGV array in Lua)
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use redis_oxide::{Client, ConnectionConfig};
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let config = ConnectionConfig::new("redis://localhost:6379");
+    /// let client = Client::connect(config).await?;
+    ///
+    /// let script = "return redis.call('GET', KEYS[1])";
+    /// let result: Option<String> = client.eval(
+    ///     script,
+    ///     vec!["mykey".to_string()],
+    ///     vec![]
+    /// ).await?;
+    /// println!("Result: {:?}", result);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn eval<T>(
+        &self,
+        script: &str,
+        keys: Vec<String>,
+        args: Vec<String>,
+    ) -> RedisResult<T>
+    where
+        T: std::convert::TryFrom<RespValue>,
+        T::Error: Into<RedisError>,
+    {
+        let mut cmd_args = vec![RespValue::from(script), RespValue::from(keys.len().to_string())];
+        
+        // Add keys
+        for key in keys {
+            cmd_args.push(RespValue::from(key));
+        }
+        
+        // Add arguments
+        for arg in args {
+            cmd_args.push(RespValue::from(arg));
+        }
+
+        let result = match self.topology_type {
+            TopologyType::Standalone => {
+                if let Some(pool) = &self.standalone_pool {
+                    pool.execute_command("EVAL".to_string(), cmd_args).await?
+                } else {
+                    return Err(RedisError::Connection("No standalone pool available".to_string()));
+                }
+            }
+            TopologyType::Cluster => {
+                // For cluster, use any available node for script execution
+                let pools = self.cluster_pools.read().await;
+                if let Some((_, pool)) = pools.iter().next() {
+                    pool.execute_command("EVAL".to_string(), cmd_args).await?
+                } else {
+                    return Err(RedisError::Cluster("No cluster nodes available".to_string()));
+                }
+            }
+        };
+
+        T::try_from(result).map_err(Into::into)
+    }
+
+    /// Execute a Lua script using EVALSHA (script must be cached)
+    ///
+    /// # Arguments
+    ///
+    /// * `sha` - The SHA1 hash of the script
+    /// * `keys` - List of Redis keys that the script will access (KEYS array in Lua)
+    /// * `args` - List of arguments to pass to the script (ARGV array in Lua)
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use redis_oxide::{Client, ConnectionConfig};
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let config = ConnectionConfig::new("redis://localhost:6379");
+    /// let client = Client::connect(config).await?;
+    ///
+    /// // First load the script
+    /// let script = "return redis.call('GET', KEYS[1])";
+    /// let sha = client.script_load(script).await?;
+    ///
+    /// // Then execute using SHA
+    /// let result: Option<String> = client.evalsha(
+    ///     &sha,
+    ///     vec!["mykey".to_string()],
+    ///     vec![]
+    /// ).await?;
+    /// println!("Result: {:?}", result);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn evalsha<T>(
+        &self,
+        sha: &str,
+        keys: Vec<String>,
+        args: Vec<String>,
+    ) -> RedisResult<T>
+    where
+        T: std::convert::TryFrom<RespValue>,
+        T::Error: Into<RedisError>,
+    {
+        let mut cmd_args = vec![RespValue::from(sha), RespValue::from(keys.len().to_string())];
+        
+        // Add keys
+        for key in keys {
+            cmd_args.push(RespValue::from(key));
+        }
+        
+        // Add arguments
+        for arg in args {
+            cmd_args.push(RespValue::from(arg));
+        }
+
+        let result = match self.topology_type {
+            TopologyType::Standalone => {
+                if let Some(pool) = &self.standalone_pool {
+                    pool.execute_command("EVALSHA".to_string(), cmd_args).await?
+                } else {
+                    return Err(RedisError::Connection("No standalone pool available".to_string()));
+                }
+            }
+            TopologyType::Cluster => {
+                // For cluster, use any available node for script execution
+                let pools = self.cluster_pools.read().await;
+                if let Some((_, pool)) = pools.iter().next() {
+                    pool.execute_command("EVALSHA".to_string(), cmd_args).await?
+                } else {
+                    return Err(RedisError::Cluster("No cluster nodes available".to_string()));
+                }
+            }
+        };
+
+        T::try_from(result).map_err(Into::into)
+    }
+
+    /// Load a Lua script into Redis cache
+    ///
+    /// Returns the SHA1 hash of the script that can be used with EVALSHA.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use redis_oxide::{Client, ConnectionConfig};
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let config = ConnectionConfig::new("redis://localhost:6379");
+    /// let client = Client::connect(config).await?;
+    ///
+    /// let script = "return 'Hello, World!'";
+    /// let sha = client.script_load(script).await?;
+    /// println!("Script loaded with SHA: {}", sha);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn script_load(&self, script: &str) -> RedisResult<String> {
+
+        let result = match self.topology_type {
+            TopologyType::Standalone => {
+                if let Some(pool) = &self.standalone_pool {
+                    pool.execute_command("SCRIPT".to_string(), vec![RespValue::from("LOAD"), RespValue::from(script)]).await?
+                } else {
+                    return Err(RedisError::Connection("No standalone pool available".to_string()));
+                }
+            }
+            TopologyType::Cluster => {
+                // For cluster, load script on all nodes
+                let pools = self.cluster_pools.read().await;
+                let mut sha = String::new();
+                
+                for (_, pool) in pools.iter() {
+                    let result = pool.execute_command("SCRIPT".to_string(), vec![RespValue::from("LOAD"), RespValue::from(script)]).await?;
+                    sha = result.as_string()?;
+                }
+                
+                if sha.is_empty() {
+                    return Err(RedisError::Cluster("No cluster nodes available".to_string()));
+                }
+                
+                return Ok(sha);
+            }
+        };
+
+        result.as_string()
+    }
+
+    /// Check if scripts exist in Redis cache
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use redis_oxide::{Client, ConnectionConfig};
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let config = ConnectionConfig::new("redis://localhost:6379");
+    /// let client = Client::connect(config).await?;
+    ///
+    /// let script = "return 'Hello'";
+    /// let sha = client.script_load(script).await?;
+    ///
+    /// let exists = client.script_exists(vec![sha]).await?;
+    /// println!("Script exists: {:?}", exists);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn script_exists(&self, shas: Vec<String>) -> RedisResult<Vec<bool>> {
+        let mut cmd_args = vec![RespValue::from("EXISTS")];
+        for sha in shas {
+            cmd_args.push(RespValue::from(sha));
+        }
+
+        let result = match self.topology_type {
+            TopologyType::Standalone => {
+                if let Some(pool) = &self.standalone_pool {
+                    pool.execute_command("SCRIPT".to_string(), cmd_args).await?
+                } else {
+                    return Err(RedisError::Connection("No standalone pool available".to_string()));
+                }
+            }
+            TopologyType::Cluster => {
+                // For cluster, check on any available node
+                let pools = self.cluster_pools.read().await;
+                if let Some((_, pool)) = pools.iter().next() {
+                    pool.execute_command("SCRIPT".to_string(), cmd_args).await?
+                } else {
+                    return Err(RedisError::Cluster("No cluster nodes available".to_string()));
+                }
+            }
+        };
+
+        match result {
+            RespValue::Array(items) => {
+                let mut exists = Vec::new();
+                for item in items {
+                    match item {
+                        RespValue::Integer(1) => exists.push(true),
+                        RespValue::Integer(0) => exists.push(false),
+                        _ => return Err(RedisError::Type(format!("Unexpected response in SCRIPT EXISTS: {:?}", item))),
+                    }
+                }
+                Ok(exists)
+            }
+            _ => Err(RedisError::Type(format!("Unexpected response type for SCRIPT EXISTS: {:?}", result))),
+        }
+    }
+
+    /// Flush all scripts from Redis cache
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use redis_oxide::{Client, ConnectionConfig};
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let config = ConnectionConfig::new("redis://localhost:6379");
+    /// let client = Client::connect(config).await?;
+    ///
+    /// client.script_flush().await?;
+    /// println!("All scripts flushed from cache");
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn script_flush(&self) -> RedisResult<()> {
+        let cmd_args = vec![RespValue::from("FLUSH")];
+
+        match self.topology_type {
+            TopologyType::Standalone => {
+                if let Some(pool) = &self.standalone_pool {
+                    let _result = pool.execute_command("SCRIPT".to_string(), cmd_args).await?;
+                    Ok(())
+                } else {
+                    Err(RedisError::Connection("No standalone pool available".to_string()))
+                }
+            }
+            TopologyType::Cluster => {
+                // For cluster, flush scripts on all nodes
+                let pools = self.cluster_pools.read().await;
+                for (_, pool) in pools.iter() {
+                    let _result = pool.execute_command("SCRIPT".to_string(), cmd_args.clone()).await?;
+                }
+                Ok(())
+            }
+        }
+    }
+
+    // Redis Streams methods
+
+    /// Add an entry to a stream using XADD
+    ///
+    /// # Arguments
+    ///
+    /// * `stream` - The name of the stream
+    /// * `id` - The entry ID ("*" for auto-generation)
+    /// * `fields` - The field-value pairs for the entry
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use redis_oxide::{Client, ConnectionConfig};
+    /// use std::collections::HashMap;
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let config = ConnectionConfig::new("redis://localhost:6379");
+    /// let client = Client::connect(config).await?;
+    ///
+    /// let mut fields = HashMap::new();
+    /// fields.insert("user_id".to_string(), "123".to_string());
+    /// fields.insert("action".to_string(), "login".to_string());
+    ///
+    /// let entry_id = client.xadd("events", "*", fields).await?;
+    /// println!("Added entry: {}", entry_id);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn xadd(
+        &self,
+        stream: impl Into<String>,
+        id: impl Into<String>,
+        fields: std::collections::HashMap<String, String>,
+    ) -> RedisResult<String> {
+        let stream = stream.into();
+        let id = id.into();
+        
+        let mut cmd_args = vec![
+            RespValue::from(stream.clone()),
+            RespValue::from(id),
+        ];
+        
+        // Add field-value pairs
+        for (field, value) in fields {
+            cmd_args.push(RespValue::from(field));
+            cmd_args.push(RespValue::from(value));
+        }
+
+        let result = match self.topology_type {
+            TopologyType::Standalone => {
+                if let Some(pool) = &self.standalone_pool {
+                    pool.execute_command("XADD".to_string(), cmd_args).await?
+                } else {
+                    return Err(RedisError::Connection("No standalone pool available".to_string()));
+                }
+            }
+            TopologyType::Cluster => {
+                // For cluster, use the stream name to determine the slot
+                let slot = calculate_slot(stream.as_bytes());
+                
+                // Try to get node from topology
+                let node_key = if let Some(ref topology) = self.cluster_topology {
+                    if let Some((host, port)) = topology.get_node_for_slot(slot).await {
+                        Some(format!("{}:{}", host, port))
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                };
+
+                if let Some(node_key) = node_key {
+                    if let Some(pool) = self.get_cluster_pool(&node_key).await {
+                        pool.execute_command("XADD".to_string(), cmd_args).await?
+                    } else {
+                        return Err(RedisError::Cluster(format!("Pool not found for node: {}", node_key)));
+                    }
+                } else {
+                    return Err(RedisError::Cluster(format!("No node found for slot: {}", slot)));
+                }
+            }
+        };
+
+        result.as_string()
+    }
+
+    /// Read entries from one or more streams using XREAD
+    ///
+    /// # Arguments
+    ///
+    /// * `streams` - Vector of (stream_name, last_id) pairs
+    /// * `count` - Maximum number of entries per stream (None for no limit)
+    /// * `block` - Block timeout (None for non-blocking)
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use redis_oxide::{Client, ConnectionConfig};
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let config = ConnectionConfig::new("redis://localhost:6379");
+    /// let client = Client::connect(config).await?;
+    ///
+    /// // Non-blocking read
+    /// let streams = vec![("events".to_string(), "$".to_string())];
+    /// let messages = client.xread(streams, Some(10), None).await?;
+    ///
+    /// for (stream, entries) in messages {
+    ///     for entry in entries {
+    ///         println!("Stream {}: {} -> {:?}", stream, entry.id, entry.fields);
+    ///     }
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn xread(
+        &self,
+        streams: Vec<(String, String)>,
+        count: Option<u64>,
+        block: Option<Duration>,
+    ) -> RedisResult<std::collections::HashMap<String, Vec<crate::streams::StreamEntry>>> {
+        let mut cmd_args = vec![];
+        
+        // Add COUNT option
+        if let Some(count) = count {
+            cmd_args.push(RespValue::from("COUNT"));
+            cmd_args.push(RespValue::from(count.to_string()));
+        }
+        
+        // Add BLOCK option
+        if let Some(block) = block {
+            cmd_args.push(RespValue::from("BLOCK"));
+            cmd_args.push(RespValue::from(block.as_millis().to_string()));
+        }
+        
+        // Add STREAMS keyword
+        cmd_args.push(RespValue::from("STREAMS"));
+        
+        // Add stream names
+        for (stream, _) in &streams {
+            cmd_args.push(RespValue::from(stream.clone()));
+        }
+        
+        // Add stream IDs
+        for (_, id) in &streams {
+            cmd_args.push(RespValue::from(id.clone()));
+        }
+
+        let result = match self.topology_type {
+            TopologyType::Standalone => {
+                if let Some(pool) = &self.standalone_pool {
+                    pool.execute_command("XREAD".to_string(), cmd_args).await?
+                } else {
+                    return Err(RedisError::Connection("No standalone pool available".to_string()));
+                }
+            }
+            TopologyType::Cluster => {
+                // For cluster, use any available node (XREAD can read from multiple streams)
+                let pools = self.cluster_pools.read().await;
+                if let Some((_, pool)) = pools.iter().next() {
+                    pool.execute_command("XREAD".to_string(), cmd_args).await?
+                } else {
+                    return Err(RedisError::Cluster("No cluster nodes available".to_string()));
+                }
+            }
+        };
+
+        crate::streams::parse_xread_response(result)
+    }
+
+    /// Read entries from a stream range using XRANGE
+    ///
+    /// # Arguments
+    ///
+    /// * `stream` - The name of the stream
+    /// * `start` - Start ID (inclusive, "-" for beginning)
+    /// * `end` - End ID (inclusive, "+" for end)
+    /// * `count` - Maximum number of entries to return
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use redis_oxide::{Client, ConnectionConfig};
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let config = ConnectionConfig::new("redis://localhost:6379");
+    /// let client = Client::connect(config).await?;
+    ///
+    /// // Get all entries
+    /// let entries = client.xrange("events", "-", "+", None).await?;
+    /// for entry in entries {
+    ///     println!("Entry {}: {:?}", entry.id, entry.fields);
+    /// }
+    ///
+    /// // Get last 10 entries
+    /// let recent = client.xrange("events", "-", "+", Some(10)).await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn xrange(
+        &self,
+        stream: impl Into<String>,
+        start: impl Into<String>,
+        end: impl Into<String>,
+        count: Option<u64>,
+    ) -> RedisResult<Vec<crate::streams::StreamEntry>> {
+        let stream = stream.into();
+        let mut cmd_args = vec![
+            RespValue::from(stream.clone()),
+            RespValue::from(start.into()),
+            RespValue::from(end.into()),
+        ];
+        
+        if let Some(count) = count {
+            cmd_args.push(RespValue::from("COUNT"));
+            cmd_args.push(RespValue::from(count.to_string()));
+        }
+
+        let result = match self.topology_type {
+            TopologyType::Standalone => {
+                if let Some(pool) = &self.standalone_pool {
+                    pool.execute_command("XRANGE".to_string(), cmd_args).await?
+                } else {
+                    return Err(RedisError::Connection("No standalone pool available".to_string()));
+                }
+            }
+            TopologyType::Cluster => {
+                // For cluster, use the stream name to determine the slot
+                let slot = calculate_slot(stream.as_bytes());
+                // Try to get node from topology
+                let node_key = if let Some(ref topology) = self.cluster_topology {
+                    if let Some((host, port)) = topology.get_node_for_slot(slot).await {
+                        Some(format!("{}:{}", host, port))
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                };
+
+                if let Some(node_key) = node_key {
+                    if let Some(pool) = self.get_cluster_pool(&node_key).await {
+                        pool.execute_command("XRANGE".to_string(), cmd_args).await?
+                    } else {
+                        return Err(RedisError::Cluster(format!("Pool not found for node: {}", node_key)));
+                    }
+                } else {
+                    return Err(RedisError::Cluster(format!("No node found for slot: {}", slot)));
+                }
+            }
+        };
+
+        crate::streams::parse_stream_entries(result)
+    }
+
+    /// Get the length of a stream using XLEN
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use redis_oxide::{Client, ConnectionConfig};
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let config = ConnectionConfig::new("redis://localhost:6379");
+    /// let client = Client::connect(config).await?;
+    ///
+    /// let length = client.xlen("events").await?;
+    /// println!("Stream has {} entries", length);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn xlen(&self, stream: impl Into<String>) -> RedisResult<u64> {
+        let stream = stream.into();
+        let cmd_args = vec![RespValue::from(stream.clone())];
+
+        let result = match self.topology_type {
+            TopologyType::Standalone => {
+                if let Some(pool) = &self.standalone_pool {
+                    pool.execute_command("XLEN".to_string(), cmd_args).await?
+                } else {
+                    return Err(RedisError::Connection("No standalone pool available".to_string()));
+                }
+            }
+            TopologyType::Cluster => {
+                // For cluster, use the stream name to determine the slot
+                let slot = calculate_slot(stream.as_bytes());
+                // Try to get node from topology
+                let node_key = if let Some(ref topology) = self.cluster_topology {
+                    if let Some((host, port)) = topology.get_node_for_slot(slot).await {
+                        Some(format!("{}:{}", host, port))
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                };
+
+                if let Some(node_key) = node_key {
+                    if let Some(pool) = self.get_cluster_pool(&node_key).await {
+                        pool.execute_command("XLEN".to_string(), cmd_args).await?
+                    } else {
+                        return Err(RedisError::Cluster(format!("Pool not found for node: {}", node_key)));
+                    }
+                } else {
+                    return Err(RedisError::Cluster(format!("No node found for slot: {}", slot)));
+                }
+            }
+        };
+
+        Ok(result.as_int()? as u64)
+    }
+
+    /// Create a consumer group using XGROUP CREATE
+    ///
+    /// # Arguments
+    ///
+    /// * `stream` - The name of the stream
+    /// * `group` - The name of the consumer group
+    /// * `id` - The starting ID for the group ("$" for latest, "0" for beginning)
+    /// * `mkstream` - Create the stream if it doesn't exist
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use redis_oxide::{Client, ConnectionConfig};
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let config = ConnectionConfig::new("redis://localhost:6379");
+    /// let client = Client::connect(config).await?;
+    ///
+    /// // Create a consumer group starting from the latest messages
+    /// client.xgroup_create("events", "processors", "$", true).await?;
+    /// println!("Consumer group created");
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn xgroup_create(
+        &self,
+        stream: impl Into<String>,
+        group: impl Into<String>,
+        id: impl Into<String>,
+        mkstream: bool,
+    ) -> RedisResult<()> {
+        let stream = stream.into();
+        let mut cmd_args = vec![
+            RespValue::from("CREATE"),
+            RespValue::from(stream.clone()),
+            RespValue::from(group.into()),
+            RespValue::from(id.into()),
+        ];
+        
+        if mkstream {
+            cmd_args.push(RespValue::from("MKSTREAM"));
+        }
+
+        let result = match self.topology_type {
+            TopologyType::Standalone => {
+                if let Some(pool) = &self.standalone_pool {
+                    pool.execute_command("XGROUP".to_string(), cmd_args).await?
+                } else {
+                    return Err(RedisError::Connection("No standalone pool available".to_string()));
+                }
+            }
+            TopologyType::Cluster => {
+                // For cluster, use the stream name to determine the slot
+                let slot = calculate_slot(stream.as_bytes());
+                // Try to get node from topology
+                let node_key = if let Some(ref topology) = self.cluster_topology {
+                    if let Some((host, port)) = topology.get_node_for_slot(slot).await {
+                        Some(format!("{}:{}", host, port))
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                };
+
+                if let Some(node_key) = node_key {
+                    if let Some(pool) = self.get_cluster_pool(&node_key).await {
+                        pool.execute_command("XGROUP".to_string(), cmd_args).await?
+                    } else {
+                        return Err(RedisError::Cluster(format!("Pool not found for node: {}", node_key)));
+                    }
+                } else {
+                    return Err(RedisError::Cluster(format!("No node found for slot: {}", slot)));
+                }
+            }
+        };
+
+        // Expect "OK" response
+        match result.as_string()?.as_str() {
+            "OK" => Ok(()),
+            other => Err(RedisError::Protocol(format!("Unexpected XGROUP CREATE response: {}", other))),
+        }
+    }
+
+    /// Read from a consumer group using XREADGROUP
+    ///
+    /// # Arguments
+    ///
+    /// * `group` - The consumer group name
+    /// * `consumer` - The consumer name
+    /// * `streams` - Vector of (stream_name, id) pairs (">" for new messages)
+    /// * `count` - Maximum number of entries per stream
+    /// * `block` - Block timeout
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use redis_oxide::{Client, ConnectionConfig};
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let config = ConnectionConfig::new("redis://localhost:6379");
+    /// let client = Client::connect(config).await?;
+    ///
+    /// // Read new messages from the group
+    /// let streams = vec![("events".to_string(), ">".to_string())];
+    /// let messages = client.xreadgroup(
+    ///     "processors",
+    ///     "worker-1",
+    ///     streams,
+    ///     Some(1),
+    ///     Some(std::time::Duration::from_secs(1))
+    /// ).await?;
+    ///
+    /// for (stream, entries) in messages {
+    ///     for entry in entries {
+    ///         println!("Processing {}: {:?}", entry.id, entry.fields);
+    ///         // Acknowledge the message after processing
+    ///         client.xack(&stream, "processors", vec![entry.id]).await?;
+    ///     }
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn xreadgroup(
+        &self,
+        group: impl Into<String>,
+        consumer: impl Into<String>,
+        streams: Vec<(String, String)>,
+        count: Option<u64>,
+        block: Option<Duration>,
+    ) -> RedisResult<std::collections::HashMap<String, Vec<crate::streams::StreamEntry>>> {
+        let mut cmd_args = vec![
+            RespValue::from("GROUP"),
+            RespValue::from(group.into()),
+            RespValue::from(consumer.into()),
+        ];
+        
+        // Add COUNT option
+        if let Some(count) = count {
+            cmd_args.push(RespValue::from("COUNT"));
+            cmd_args.push(RespValue::from(count.to_string()));
+        }
+        
+        // Add BLOCK option
+        if let Some(block) = block {
+            cmd_args.push(RespValue::from("BLOCK"));
+            cmd_args.push(RespValue::from(block.as_millis().to_string()));
+        }
+        
+        // Add STREAMS keyword
+        cmd_args.push(RespValue::from("STREAMS"));
+        
+        // Add stream names
+        for (stream, _) in &streams {
+            cmd_args.push(RespValue::from(stream.clone()));
+        }
+        
+        // Add stream IDs
+        for (_, id) in &streams {
+            cmd_args.push(RespValue::from(id.clone()));
+        }
+
+        let result = match self.topology_type {
+            TopologyType::Standalone => {
+                if let Some(pool) = &self.standalone_pool {
+                    pool.execute_command("XREADGROUP".to_string(), cmd_args).await?
+                } else {
+                    return Err(RedisError::Connection("No standalone pool available".to_string()));
+                }
+            }
+            TopologyType::Cluster => {
+                // For cluster, use any available node
+                let pools = self.cluster_pools.read().await;
+                if let Some((_, pool)) = pools.iter().next() {
+                    pool.execute_command("XREADGROUP".to_string(), cmd_args).await?
+                } else {
+                    return Err(RedisError::Cluster("No cluster nodes available".to_string()));
+                }
+            }
+        };
+
+        crate::streams::parse_xread_response(result)
+    }
+
+    /// Acknowledge messages using XACK
+    ///
+    /// # Arguments
+    ///
+    /// * `stream` - The stream name
+    /// * `group` - The consumer group name
+    /// * `ids` - Vector of message IDs to acknowledge
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use redis_oxide::{Client, ConnectionConfig};
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let config = ConnectionConfig::new("redis://localhost:6379");
+    /// let client = Client::connect(config).await?;
+    ///
+    /// // Acknowledge processed messages
+    /// let acked = client.xack("events", "processors", vec![
+    ///     "1234567890123-0".to_string(),
+    ///     "1234567890124-0".to_string(),
+    /// ]).await?;
+    /// println!("Acknowledged {} messages", acked);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn xack(
+        &self,
+        stream: impl Into<String>,
+        group: impl Into<String>,
+        ids: Vec<String>,
+    ) -> RedisResult<u64> {
+        let stream = stream.into();
+        let mut cmd_args = vec![
+            RespValue::from(stream.clone()),
+            RespValue::from(group.into()),
+        ];
+        
+        for id in ids {
+            cmd_args.push(RespValue::from(id));
+        }
+
+        let result = match self.topology_type {
+            TopologyType::Standalone => {
+                if let Some(pool) = &self.standalone_pool {
+                    pool.execute_command("XACK".to_string(), cmd_args).await?
+                } else {
+                    return Err(RedisError::Connection("No standalone pool available".to_string()));
+                }
+            }
+            TopologyType::Cluster => {
+                // For cluster, use the stream name to determine the slot
+                let slot = calculate_slot(stream.as_bytes());
+                // Try to get node from topology
+                let node_key = if let Some(ref topology) = self.cluster_topology {
+                    if let Some((host, port)) = topology.get_node_for_slot(slot).await {
+                        Some(format!("{}:{}", host, port))
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                };
+
+                if let Some(node_key) = node_key {
+                    if let Some(pool) = self.get_cluster_pool(&node_key).await {
+                        pool.execute_command("XACK".to_string(), cmd_args).await?
+                    } else {
+                        return Err(RedisError::Cluster(format!("Pool not found for node: {}", node_key)));
+                    }
+                } else {
+                    return Err(RedisError::Cluster(format!("No node found for slot: {}", slot)));
+                }
+            }
+        };
+
+        Ok(result.as_int()? as u64)
+    }
+
     /// Get the topology type
     pub fn topology_type(&self) -> TopologyType {
         self.topology_type
+    }
+}
+
+/// Pipeline executor implementation for Client
+struct ClientPipelineExecutor {
+    client: Client,
+}
+
+#[async_trait::async_trait]
+impl PipelineExecutor for ClientPipelineExecutor {
+    async fn execute_pipeline(&mut self, commands: Vec<Box<dyn PipelineCommand>>) -> RedisResult<Vec<RespValue>> {
+        if commands.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        // For pipeline execution, we need to send all commands in one batch
+        // We'll use the first command to determine the target node (for cluster mode)
+        let first_command = &commands[0];
+        let first_key = first_command.key();
+
+        match self.client.topology_type {
+            TopologyType::Standalone => {
+                // For standalone, execute all commands on the single connection
+                if let Some(pool) = &self.client.standalone_pool {
+                    self.execute_pipeline_on_pool(pool, commands).await
+                } else {
+                    Err(RedisError::Connection("No standalone pool available".to_string()))
+                }
+            }
+            TopologyType::Cluster => {
+                // For cluster mode, we need to group commands by their target slots
+                // For simplicity in this initial implementation, we'll execute on the node
+                // determined by the first command's key
+                if let Some(key) = first_key {
+                    let slot = calculate_slot(key.as_bytes());
+                    let node_addr = self.get_node_for_slot(slot).await?;
+                    let pool = self.get_or_create_pool(&node_addr).await?;
+                    self.execute_pipeline_on_pool(&pool, commands).await
+                } else {
+                    // If no key, use any available node
+                    let pools = self.client.cluster_pools.read().await;
+                    if let Some((_, pool)) = pools.iter().next() {
+                        self.execute_pipeline_on_pool(pool, commands).await
+                    } else {
+                        Err(RedisError::Cluster("No cluster nodes available".to_string()))
+                    }
+                }
+            }
+        }
+    }
+}
+
+impl ClientPipelineExecutor {
+    /// Execute pipeline commands on a specific pool
+    async fn execute_pipeline_on_pool(
+        &self,
+        pool: &Arc<Pool>,
+        commands: Vec<Box<dyn PipelineCommand>>,
+    ) -> RedisResult<Vec<RespValue>> {
+        // Build the pipeline command array
+        let mut pipeline_args = Vec::new();
+        
+        for command in commands {
+            let mut cmd_args = vec![RespValue::from(command.name())];
+            cmd_args.extend(command.args());
+            pipeline_args.push(RespValue::Array(cmd_args));
+        }
+
+        // Execute all commands in the pipeline
+        let mut results = Vec::new();
+        for cmd_array in pipeline_args {
+            if let RespValue::Array(args) = cmd_array {
+                if let Some(RespValue::BulkString(cmd_name)) = args.first() {
+                    let command = String::from_utf8_lossy(cmd_name).to_string();
+                    let cmd_args = args.into_iter().skip(1).collect();
+                    
+                    // For now, execute commands sequentially
+                    // TODO: Implement true pipelining at the protocol level
+                    let result = pool.execute_command(command, cmd_args).await?;
+                    results.push(result);
+                } else if let Some(RespValue::SimpleString(cmd_name)) = args.first() {
+                    let command = cmd_name.clone();
+                    let cmd_args = args.into_iter().skip(1).collect();
+                    
+                    let result = pool.execute_command(command, cmd_args).await?;
+                    results.push(result);
+                }
+            }
+        }
+
+        Ok(results)
+    }
+
+    /// Get the node address for a given slot (cluster mode)
+    async fn get_node_for_slot(&self, slot: u16) -> RedisResult<String> {
+        if let Some(topology) = &self.client.cluster_topology {
+            if let Some((host, port)) = topology.get_node_for_slot(slot).await {
+                Ok(format!("{}:{}", host, port))
+            } else {
+                Err(RedisError::Cluster(format!("No node found for slot {}", slot)))
+            }
+        } else {
+            Err(RedisError::Cluster("No cluster topology available".to_string()))
+        }
+    }
+
+    /// Get or create a pool for the given node address
+    async fn get_or_create_pool(&self, node_addr: &str) -> RedisResult<Arc<Pool>> {
+        let pools = self.client.cluster_pools.read().await;
+        if let Some(pool) = pools.get(node_addr) {
+            Ok(pool.clone())
+        } else {
+            drop(pools);
+            
+            // Create new pool for this node
+            let mut pools = self.client.cluster_pools.write().await;
+            
+            // Double-check after acquiring write lock
+            if let Some(pool) = pools.get(node_addr) {
+                return Ok(pool.clone());
+            }
+
+            // Parse node address
+            let parts: Vec<&str> = node_addr.split(':').collect();
+            if parts.len() != 2 {
+                return Err(RedisError::Config(format!("Invalid node address: {}", node_addr)));
+            }
+
+            let host = parts[0];
+            let port: u16 = parts[1].parse()
+                .map_err(|_| RedisError::Config(format!("Invalid port in address: {}", node_addr)))?;
+
+            // Create config for this node
+            let node_config = self.client.config.clone();
+
+            let pool = Arc::new(Pool::new(node_config, host.to_string(), port).await?);
+            pools.insert(node_addr.to_string(), pool.clone());
+            
+            Ok(pool)
+        }
+    }
+}
+
+/// Transaction executor implementation for Client
+struct ClientTransactionExecutor {
+    client: Client,
+}
+
+#[async_trait::async_trait]
+impl TransactionExecutor for ClientTransactionExecutor {
+    async fn multi(&mut self) -> RedisResult<()> {
+        // Execute MULTI command
+        match self.client.topology_type {
+            TopologyType::Standalone => {
+                if let Some(pool) = &self.client.standalone_pool {
+                    let _result = pool.execute_command("MULTI".to_string(), vec![]).await?;
+                    Ok(())
+                } else {
+                    Err(RedisError::Connection("No standalone pool available".to_string()))
+                }
+            }
+            TopologyType::Cluster => {
+                // For cluster, use any available node for transaction
+                let pools = self.client.cluster_pools.read().await;
+                if let Some((_, pool)) = pools.iter().next() {
+                    let _result = pool.execute_command("MULTI".to_string(), vec![]).await?;
+                    Ok(())
+                } else {
+                    Err(RedisError::Cluster("No cluster nodes available".to_string()))
+                }
+            }
+        }
+    }
+
+    async fn queue_command(&mut self, command: Box<dyn TransactionCommand>) -> RedisResult<()> {
+        // Execute the command (it will be queued by Redis after MULTI)
+        let cmd_name = command.name().to_string();
+        let cmd_args = command.args();
+        
+        match self.client.topology_type {
+            TopologyType::Standalone => {
+                if let Some(pool) = &self.client.standalone_pool {
+                    let _result = pool.execute_command(cmd_name, cmd_args).await?;
+                    Ok(())
+                } else {
+                    Err(RedisError::Connection("No standalone pool available".to_string()))
+                }
+            }
+            TopologyType::Cluster => {
+                // For cluster, use the node determined by the command's key
+                if let Some(key) = command.key() {
+                    let slot = calculate_slot(key.as_bytes());
+                    let node_addr = self.get_node_for_slot(slot).await?;
+                    let pool = self.get_or_create_pool(&node_addr).await?;
+                    let _result = pool.execute_command(cmd_name, cmd_args).await?;
+                    Ok(())
+                } else {
+                    // If no key, use any available node
+                    let pools = self.client.cluster_pools.read().await;
+                    if let Some((_, pool)) = pools.iter().next() {
+                        let _result = pool.execute_command(cmd_name, cmd_args).await?;
+                        Ok(())
+                    } else {
+                        Err(RedisError::Cluster("No cluster nodes available".to_string()))
+                    }
+                }
+            }
+        }
+    }
+
+    async fn exec(&mut self) -> RedisResult<Vec<RespValue>> {
+        // Execute EXEC command
+        match self.client.topology_type {
+            TopologyType::Standalone => {
+                if let Some(pool) = &self.client.standalone_pool {
+                    let result = pool.execute_command("EXEC".to_string(), vec![]).await?;
+                    match result {
+                        RespValue::Array(results) => Ok(results),
+                        RespValue::Null => Ok(vec![]), // Transaction was discarded (watched key changed)
+                        _ => Err(RedisError::Type(format!("Unexpected EXEC response: {:?}", result))),
+                    }
+                } else {
+                    Err(RedisError::Connection("No standalone pool available".to_string()))
+                }
+            }
+            TopologyType::Cluster => {
+                let pools = self.client.cluster_pools.read().await;
+                if let Some((_, pool)) = pools.iter().next() {
+                    let result = pool.execute_command("EXEC".to_string(), vec![]).await?;
+                    match result {
+                        RespValue::Array(results) => Ok(results),
+                        RespValue::Null => Ok(vec![]), // Transaction was discarded (watched key changed)
+                        _ => Err(RedisError::Type(format!("Unexpected EXEC response: {:?}", result))),
+                    }
+                } else {
+                    Err(RedisError::Cluster("No cluster nodes available".to_string()))
+                }
+            }
+        }
+    }
+
+    async fn discard(&mut self) -> RedisResult<()> {
+        // Execute DISCARD command
+        match self.client.topology_type {
+            TopologyType::Standalone => {
+                if let Some(pool) = &self.client.standalone_pool {
+                    let _result = pool.execute_command("DISCARD".to_string(), vec![]).await?;
+                    Ok(())
+                } else {
+                    Err(RedisError::Connection("No standalone pool available".to_string()))
+                }
+            }
+            TopologyType::Cluster => {
+                let pools = self.client.cluster_pools.read().await;
+                if let Some((_, pool)) = pools.iter().next() {
+                    let _result = pool.execute_command("DISCARD".to_string(), vec![]).await?;
+                    Ok(())
+                } else {
+                    Err(RedisError::Cluster("No cluster nodes available".to_string()))
+                }
+            }
+        }
+    }
+
+    async fn watch(&mut self, keys: Vec<String>) -> RedisResult<()> {
+        // Execute WATCH command
+        let mut args = vec![];
+        for key in keys {
+            args.push(RespValue::from(key));
+        }
+
+        match self.client.topology_type {
+            TopologyType::Standalone => {
+                if let Some(pool) = &self.client.standalone_pool {
+                    let _result = pool.execute_command("WATCH".to_string(), args).await?;
+                    Ok(())
+                } else {
+                    Err(RedisError::Connection("No standalone pool available".to_string()))
+                }
+            }
+            TopologyType::Cluster => {
+                let pools = self.client.cluster_pools.read().await;
+                if let Some((_, pool)) = pools.iter().next() {
+                    let _result = pool.execute_command("WATCH".to_string(), args).await?;
+                    Ok(())
+                } else {
+                    Err(RedisError::Cluster("No cluster nodes available".to_string()))
+                }
+            }
+        }
+    }
+
+    async fn unwatch(&mut self) -> RedisResult<()> {
+        // Execute UNWATCH command
+        match self.client.topology_type {
+            TopologyType::Standalone => {
+                if let Some(pool) = &self.client.standalone_pool {
+                    let _result = pool.execute_command("UNWATCH".to_string(), vec![]).await?;
+                    Ok(())
+                } else {
+                    Err(RedisError::Connection("No standalone pool available".to_string()))
+                }
+            }
+            TopologyType::Cluster => {
+                let pools = self.client.cluster_pools.read().await;
+                if let Some((_, pool)) = pools.iter().next() {
+                    let _result = pool.execute_command("UNWATCH".to_string(), vec![]).await?;
+                    Ok(())
+                } else {
+                    Err(RedisError::Cluster("No cluster nodes available".to_string()))
+                }
+            }
+        }
+    }
+}
+
+impl ClientTransactionExecutor {
+    /// Get the node address for a given slot (cluster mode)
+    async fn get_node_for_slot(&self, slot: u16) -> RedisResult<String> {
+        if let Some(topology) = &self.client.cluster_topology {
+            if let Some((host, port)) = topology.get_node_for_slot(slot).await {
+                Ok(format!("{}:{}", host, port))
+            } else {
+                Err(RedisError::Cluster(format!("No node found for slot {}", slot)))
+            }
+        } else {
+            Err(RedisError::Cluster("No cluster topology available".to_string()))
+        }
+    }
+
+    /// Get or create a pool for the given node address
+    async fn get_or_create_pool(&self, node_addr: &str) -> RedisResult<Arc<Pool>> {
+        let pools = self.client.cluster_pools.read().await;
+        if let Some(pool) = pools.get(node_addr) {
+            Ok(pool.clone())
+        } else {
+            drop(pools);
+            
+            // Create new pool for this node
+            let mut pools = self.client.cluster_pools.write().await;
+            
+            // Double-check after acquiring write lock
+            if let Some(pool) = pools.get(node_addr) {
+                return Ok(pool.clone());
+            }
+
+            // Parse node address
+            let parts: Vec<&str> = node_addr.split(':').collect();
+            if parts.len() != 2 {
+                return Err(RedisError::Config(format!("Invalid node address: {}", node_addr)));
+            }
+
+            let host = parts[0];
+            let port: u16 = parts[1].parse()
+                .map_err(|_| RedisError::Config(format!("Invalid port in address: {}", node_addr)))?;
+
+            // Create config for this node
+            let node_config = self.client.config.clone();
+
+            let pool = Arc::new(Pool::new(node_config, host.to_string(), port).await?);
+            pools.insert(node_addr.to_string(), pool.clone());
+            
+            Ok(pool)
+        }
+    }
+}
+
+/// Pub/Sub connection implementation for Client
+struct ClientPubSubConnection {
+    client: Client,
+}
+
+#[async_trait::async_trait]
+impl PubSubConnection for ClientPubSubConnection {
+    async fn subscribe(&mut self, channels: Vec<String>) -> RedisResult<()> {
+        let mut args = vec![];
+        for channel in channels {
+            args.push(RespValue::from(channel));
+        }
+
+        match self.client.topology_type {
+            TopologyType::Standalone => {
+                if let Some(pool) = &self.client.standalone_pool {
+                    let _result = pool.execute_command("SUBSCRIBE".to_string(), args).await?;
+                    Ok(())
+                } else {
+                    Err(RedisError::Connection("No standalone pool available".to_string()))
+                }
+            }
+            TopologyType::Cluster => {
+                let pools = self.client.cluster_pools.read().await;
+                if let Some((_, pool)) = pools.iter().next() {
+                    let _result = pool.execute_command("SUBSCRIBE".to_string(), args).await?;
+                    Ok(())
+                } else {
+                    Err(RedisError::Cluster("No cluster nodes available".to_string()))
+                }
+            }
+        }
+    }
+
+    async fn unsubscribe(&mut self, channels: Vec<String>) -> RedisResult<()> {
+        let mut args = vec![];
+        for channel in channels {
+            args.push(RespValue::from(channel));
+        }
+
+        match self.client.topology_type {
+            TopologyType::Standalone => {
+                if let Some(pool) = &self.client.standalone_pool {
+                    let _result = pool.execute_command("UNSUBSCRIBE".to_string(), args).await?;
+                    Ok(())
+                } else {
+                    Err(RedisError::Connection("No standalone pool available".to_string()))
+                }
+            }
+            TopologyType::Cluster => {
+                let pools = self.client.cluster_pools.read().await;
+                if let Some((_, pool)) = pools.iter().next() {
+                    let _result = pool.execute_command("UNSUBSCRIBE".to_string(), args).await?;
+                    Ok(())
+                } else {
+                    Err(RedisError::Cluster("No cluster nodes available".to_string()))
+                }
+            }
+        }
+    }
+
+    async fn psubscribe(&mut self, patterns: Vec<String>) -> RedisResult<()> {
+        let mut args = vec![];
+        for pattern in patterns {
+            args.push(RespValue::from(pattern));
+        }
+
+        match self.client.topology_type {
+            TopologyType::Standalone => {
+                if let Some(pool) = &self.client.standalone_pool {
+                    let _result = pool.execute_command("PSUBSCRIBE".to_string(), args).await?;
+                    Ok(())
+                } else {
+                    Err(RedisError::Connection("No standalone pool available".to_string()))
+                }
+            }
+            TopologyType::Cluster => {
+                let pools = self.client.cluster_pools.read().await;
+                if let Some((_, pool)) = pools.iter().next() {
+                    let _result = pool.execute_command("PSUBSCRIBE".to_string(), args).await?;
+                    Ok(())
+                } else {
+                    Err(RedisError::Cluster("No cluster nodes available".to_string()))
+                }
+            }
+        }
+    }
+
+    async fn punsubscribe(&mut self, patterns: Vec<String>) -> RedisResult<()> {
+        let mut args = vec![];
+        for pattern in patterns {
+            args.push(RespValue::from(pattern));
+        }
+
+        match self.client.topology_type {
+            TopologyType::Standalone => {
+                if let Some(pool) = &self.client.standalone_pool {
+                    let _result = pool.execute_command("PUNSUBSCRIBE".to_string(), args).await?;
+                    Ok(())
+                } else {
+                    Err(RedisError::Connection("No standalone pool available".to_string()))
+                }
+            }
+            TopologyType::Cluster => {
+                let pools = self.client.cluster_pools.read().await;
+                if let Some((_, pool)) = pools.iter().next() {
+                    let _result = pool.execute_command("PUNSUBSCRIBE".to_string(), args).await?;
+                    Ok(())
+                } else {
+                    Err(RedisError::Cluster("No cluster nodes available".to_string()))
+                }
+            }
+        }
+    }
+
+    async fn listen(&mut self, message_tx: tokio::sync::mpsc::UnboundedSender<crate::pubsub::PubSubMessage>) -> RedisResult<()> {
+        // This is a simplified implementation
+        // In a real implementation, this would maintain a persistent connection
+        // and continuously listen for pub/sub messages
+        
+        // For now, we'll just return Ok to satisfy the trait
+        // A full implementation would require a dedicated connection for pub/sub
+        // that stays open and continuously reads messages
+        
+        // TODO: Implement proper pub/sub message listening
+        // This would involve:
+        // 1. Creating a dedicated connection for pub/sub
+        // 2. Continuously reading RESP messages
+        // 3. Parsing pub/sub messages and sending them through message_tx
+        
+        drop(message_tx); // Avoid unused variable warning
+        Ok(())
+    }
+
+    async fn publish(&mut self, channel: String, message: String) -> RedisResult<i64> {
+        let args = vec![
+            RespValue::from(channel),
+            RespValue::from(message),
+        ];
+
+        match self.client.topology_type {
+            TopologyType::Standalone => {
+                if let Some(pool) = &self.client.standalone_pool {
+                    let result = pool.execute_command("PUBLISH".to_string(), args).await?;
+                    result.as_int()
+                } else {
+                    Err(RedisError::Connection("No standalone pool available".to_string()))
+                }
+            }
+            TopologyType::Cluster => {
+                let pools = self.client.cluster_pools.read().await;
+                if let Some((_, pool)) = pools.iter().next() {
+                    let result = pool.execute_command("PUBLISH".to_string(), args).await?;
+                    result.as_int()
+                } else {
+                    Err(RedisError::Cluster("No cluster nodes available".to_string()))
+                }
+            }
+        }
     }
 }
 

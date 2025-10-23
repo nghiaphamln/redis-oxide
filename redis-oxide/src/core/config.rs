@@ -2,6 +2,21 @@
 
 use std::time::Duration;
 
+/// Protocol version preference
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ProtocolVersion {
+    /// RESP2 (Redis Serialization Protocol version 2) - Default
+    Resp2,
+    /// RESP3 (Redis Serialization Protocol version 3) - Redis 6.0+
+    Resp3,
+}
+
+impl Default for ProtocolVersion {
+    fn default() -> Self {
+        Self::Resp2
+    }
+}
+
 /// Strategy for connection pooling
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PoolStrategy {
@@ -76,6 +91,12 @@ pub struct ConnectionConfig {
     /// Maximum number of retries for cluster redirects
     pub max_redirects: usize,
 
+    /// Preferred protocol version
+    pub protocol_version: ProtocolVersion,
+
+    /// Sentinel configuration for high availability
+    pub sentinel: Option<crate::sentinel::SentinelConfig>,
+
     /// Reconnection settings
     pub reconnect: ReconnectConfig,
 }
@@ -123,6 +144,8 @@ impl Default for ConnectionConfig {
             topology_mode: TopologyMode::Auto,
             pool: PoolConfig::default(),
             max_redirects: 3,
+            protocol_version: ProtocolVersion::default(),
+            sentinel: None,
             reconnect: ReconnectConfig::default(),
         }
     }
@@ -183,6 +206,13 @@ impl ConnectionConfig {
     #[must_use]
     pub const fn with_max_redirects(mut self, max: usize) -> Self {
         self.max_redirects = max;
+        self
+    }
+
+    /// Set the preferred protocol version
+    #[must_use]
+    pub const fn with_protocol_version(mut self, version: ProtocolVersion) -> Self {
+        self.protocol_version = version;
         self
     }
 
