@@ -8,7 +8,6 @@ This document explains how to work with and contribute to the documentation for 
 
 - **README.md**: Comprehensive user guide with examples and features
 - **API Documentation**: Generated from doc comments in source code
-- **CHANGELOG.md**: Version history and changes
 - **CONTRIBUTING.md**: Guidelines for contributors
 
 ### 2. Source Code Documentation
@@ -162,8 +161,7 @@ include = [
     "Cargo.toml",
     "../README.md",
     "../LICENSE-MIT",
-    "../LICENSE-APACHE",
-    "../CHANGELOG.md"
+    "../LICENSE-APACHE"
 ]
 
 [package.metadata.docs.rs]
@@ -186,7 +184,6 @@ Before publishing or submitting PR:
 - [ ] All public APIs have doc comments
 - [ ] Examples compile and work (`cargo test --doc`)
 - [ ] README.md is up to date
-- [ ] CHANGELOG.md includes new changes
 - [ ] No clippy warnings about missing docs
 - [ ] Examples in `examples/` directory work
 - [ ] Cross-references between docs are correct

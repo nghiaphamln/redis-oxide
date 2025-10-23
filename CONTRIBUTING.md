@@ -12,7 +12,7 @@ Thank you for your interest in contributing to redis-mux! This document provides
 ### Clone and Build
 
 ```bash
-git clone https://github.com/yourusername/redis-oxide.git
+git clone https://github.com/nghiaphamln/redis-oxide.git
 cd redis-oxide
 cargo build
 ```
@@ -75,7 +75,6 @@ cargo build --release
 
 - Update README.md if adding new features
 - Add examples in `examples/` for significant new functionality
-- Update CHANGELOG.md following Keep a Changelog format
 
 ## Questions?
 

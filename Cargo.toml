@@ -3,13 +3,13 @@ members = ["redis-oxide"]
 resolver = "2"
 
 [workspace.package]
-version = "0.1.1"
+version = "0.2.0"
 edition = "2021"
 rust-version = "1.82"
-authors = ["Your Name <your.email@example.com>"]
+authors = ["Nghia Pham <nghiaphamln@gmail.com>"]
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/yourusername/redis-oxide"
-homepage = "https://github.com/yourusername/redis-oxide"
+repository = "https://github.com/nghiaphamln/redis-oxide"
+homepage = "https://github.com/nghiaphamln/redis-oxide"
 documentation = "https://docs.rs/redis-oxide"
 keywords = ["redis", "async", "cluster", "cache"]
 categories = ["database", "asynchronous"]
