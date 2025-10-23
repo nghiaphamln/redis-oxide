@@ -185,6 +185,7 @@
 //! config.pool = pool_config;
 //! ```
 
+#![allow(unknown_lints)]
 #![allow(clippy::unnecessary_literal_bound)]
 #![deny(warnings)]
 #![deny(clippy::all)]
