@@ -7,11 +7,15 @@
 use redis_oxide::{Client, ConnectionConfig, StreamEntry};
 use std::collections::HashMap;
 use std::time::Duration;
-use testcontainers::{clients::Cli, images::redis::Redis, Container};
+use testcontainers::{core::WaitFor, runners::AsyncRunner, ContainerAsync, GenericImage};
 
-async fn setup_client(docker: &Cli) -> Result<Client, redis_oxide::RedisError> {
-    let container = docker.run(Redis::default());
-    let host_port = container.get_host_port_ipv4(6379);
+async fn setup_client() -> Result<Client, redis_oxide::RedisError> {
+    let redis_image = GenericImage::new("redis", "7-alpine")
+        .with_exposed_port(testcontainers::core::ContainerPort::Tcp(6379))
+        .with_wait_for(WaitFor::message_on_stdout("Ready to accept connections"));
+
+    let container = redis_image.start().await.unwrap();
+    let host_port = container.get_host_port_ipv4(6379).await.unwrap();
     let redis_url = format!("redis://localhost:{}", host_port);
     let config = ConnectionConfig::new(&redis_url);
     Client::connect(config).await
@@ -19,8 +23,7 @@ async fn setup_client(docker: &Cli) -> Result<Client, redis_oxide::RedisError> {
 
 #[tokio::test]
 async fn test_basic_stream_operations() -> Result<(), Box<dyn std::error::Error>> {
-    let docker = Cli::default();
-    let client = setup_client(&docker).await?;
+    let client = setup_client().await?;
 
     let stream_name = "test_stream";
 
@@ -51,8 +54,7 @@ async fn test_basic_stream_operations() -> Result<(), Box<dyn std::error::Error>
 
 #[tokio::test]
 async fn test_xrange_operations() -> Result<(), Box<dyn std::error::Error>> {
-    let docker = Cli::default();
-    let client = setup_client(&docker).await?;
+    let client = setup_client().await?;
 
     let stream_name = "range_stream";
 
@@ -88,8 +90,7 @@ async fn test_xrange_operations() -> Result<(), Box<dyn std::error::Error>> {
 
 #[tokio::test]
 async fn test_xread_operations() -> Result<(), Box<dyn std::error::Error>> {
-    let docker = Cli::default();
-    let client = setup_client(&docker).await?;
+    let client = setup_client().await?;
 
     let stream_name = "read_stream";
 
@@ -131,8 +132,7 @@ async fn test_xread_operations() -> Result<(), Box<dyn std::error::Error>> {
 
 #[tokio::test]
 async fn test_consumer_groups() -> Result<(), Box<dyn std::error::Error>> {
-    let docker = Cli::default();
-    let client = setup_client(&docker).await?;
+    let client = setup_client().await?;
 
     let stream_name = "consumer_stream";
     let group_name = "test_group";
@@ -175,8 +175,7 @@ async fn test_consumer_groups() -> Result<(), Box<dyn std::error::Error>> {
 
 #[tokio::test]
 async fn test_consumer_group_with_new_messages() -> Result<(), Box<dyn std::error::Error>> {
-    let docker = Cli::default();
-    let client = setup_client(&docker).await?;
+    let client = setup_client().await?;
 
     let stream_name = "new_messages_stream";
     let group_name = "processors";
@@ -224,8 +223,7 @@ async fn test_consumer_group_with_new_messages() -> Result<(), Box<dyn std::erro
 
 #[tokio::test]
 async fn test_blocking_xread() -> Result<(), Box<dyn std::error::Error>> {
-    let docker = Cli::default();
-    let client = setup_client(&docker).await?;
+    let client = setup_client().await?;
 
     let stream_name = "blocking_stream";
 
@@ -259,8 +257,7 @@ async fn test_blocking_xread() -> Result<(), Box<dyn std::error::Error>> {
 
 #[tokio::test]
 async fn test_multiple_streams() -> Result<(), Box<dyn std::error::Error>> {
-    let docker = Cli::default();
-    let client = setup_client(&docker).await?;
+    let client = setup_client().await?;
 
     let stream1 = "stream_1";
     let stream2 = "stream_2";
@@ -306,8 +303,7 @@ async fn test_multiple_streams() -> Result<(), Box<dyn std::error::Error>> {
 
 #[tokio::test]
 async fn test_stream_entry_parsing() -> Result<(), Box<dyn std::error::Error>> {
-    let docker = Cli::default();
-    let client = setup_client(&docker).await?;
+    let client = setup_client().await?;
 
     let stream_name = "parsing_stream";
 
@@ -358,8 +354,7 @@ async fn test_stream_entry_parsing() -> Result<(), Box<dyn std::error::Error>> {
 
 #[tokio::test]
 async fn test_stream_error_conditions() -> Result<(), Box<dyn std::error::Error>> {
-    let docker = Cli::default();
-    let client = setup_client(&docker).await?;
+    let client = setup_client().await?;
 
     // Test XLEN on non-existent stream
     let length = client.xlen("nonexistent_stream").await?;
@@ -394,13 +389,16 @@ async fn test_stream_error_conditions() -> Result<(), Box<dyn std::error::Error>
 
 #[tokio::test]
 async fn test_stream_with_specific_ids() -> Result<(), Box<dyn std::error::Error>> {
-    let docker = Cli::default();
-    let client = setup_client(&docker).await?;
+    let client = setup_client().await?;
 
     let stream_name = "specific_id_stream";
 
     // Add entry with specific timestamp-based ID
-    let timestamp = chrono::Utc::now().timestamp_millis() as u64;
+    use std::time::{SystemTime, UNIX_EPOCH};
+    let timestamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_millis() as u64;
     let specific_id = format!("{}-0", timestamp);
 
     let mut fields = HashMap::new();
@@ -425,8 +423,7 @@ async fn test_stream_with_specific_ids() -> Result<(), Box<dyn std::error::Error
 
 #[tokio::test]
 async fn test_concurrent_stream_operations() -> Result<(), Box<dyn std::error::Error>> {
-    let docker = Cli::default();
-    let client = setup_client(&docker).await?;
+    let client = setup_client().await?;
 
     let stream_name = "concurrent_stream";
     let num_tasks = 10;
