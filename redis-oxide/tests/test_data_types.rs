@@ -15,7 +15,7 @@ async fn setup_client(
     config_modifier: Option<fn(&mut ConnectionConfig)>,
 ) -> Result<Client, redis_oxide::RedisError> {
     let redis_image = GenericImage::new("redis", "7-alpine")
-        .with_exposed_port(6379)
+        .with_exposed_port(testcontainers::core::ContainerPort::Tcp(6379))
         .with_wait_for(WaitFor::message_on_stdout("Ready to accept connections"));
 
     let container = redis_image.start().await.unwrap();
@@ -85,8 +85,7 @@ async fn test_string_operations_comprehensive() -> Result<(), Box<dyn std::error
 
 #[tokio::test]
 async fn test_hash_operations_comprehensive() -> Result<(), Box<dyn std::error::Error>> {
-    let docker = Cli::default();
-    let client = setup_client(&docker, None).await?;
+    let client = setup_client(None).await?;
 
     let hash_key = "hash:test";
 
@@ -151,8 +150,7 @@ async fn test_hash_operations_comprehensive() -> Result<(), Box<dyn std::error::
 
 #[tokio::test]
 async fn test_list_operations_comprehensive() -> Result<(), Box<dyn std::error::Error>> {
-    let docker = Cli::default();
-    let client = setup_client(&docker, None).await?;
+    let client = setup_client(None).await?;
 
     let list_key = "list:test";
 
@@ -200,8 +198,7 @@ async fn test_list_operations_comprehensive() -> Result<(), Box<dyn std::error::
 
 #[tokio::test]
 async fn test_set_operations_comprehensive() -> Result<(), Box<dyn std::error::Error>> {
-    let docker = Cli::default();
-    let client = setup_client(&docker, None).await?;
+    let client = setup_client(None).await?;
 
     let set_key = "set:test";
 
@@ -261,8 +258,7 @@ async fn test_set_operations_comprehensive() -> Result<(), Box<dyn std::error::E
 
 #[tokio::test]
 async fn test_sorted_set_operations_comprehensive() -> Result<(), Box<dyn std::error::Error>> {
-    let docker = Cli::default();
-    let client = setup_client(&docker, None).await?;
+    let client = setup_client(None).await?;
 
     let zset_key = "zset:test";
 
@@ -307,20 +303,15 @@ async fn test_sorted_set_operations_comprehensive() -> Result<(), Box<dyn std::e
 
 #[tokio::test]
 async fn test_operations_with_connection_pool() -> Result<(), Box<dyn std::error::Error>> {
-    let docker = Cli::default();
-
     // Test with connection pool strategy
-    let client = setup_client(
-        &docker,
-        Some(|config| {
-            config.pool = PoolConfig {
-                strategy: PoolStrategy::Pool,
-                max_size: 10,
-                min_idle: 2,
-                connection_timeout: Duration::from_secs(5),
-            };
-        }),
-    )
+    let client = setup_client(Some(|config| {
+        config.pool = PoolConfig {
+            strategy: PoolStrategy::Pool,
+            max_size: 10,
+            min_idle: 2,
+            connection_timeout: Duration::from_secs(5),
+        };
+    }))
     .await?;
 
     // Run basic operations to ensure pool works
@@ -353,20 +344,15 @@ async fn test_operations_with_connection_pool() -> Result<(), Box<dyn std::error
 
 #[tokio::test]
 async fn test_operations_with_multiplexed_connection() -> Result<(), Box<dyn std::error::Error>> {
-    let docker = Cli::default();
-
     // Test with multiplexed strategy (default)
-    let client = setup_client(
-        &docker,
-        Some(|config| {
-            config.pool = PoolConfig {
-                strategy: PoolStrategy::Multiplexed,
-                max_size: 1, // Only one connection
-                min_idle: 1,
-                connection_timeout: Duration::from_secs(5),
-            };
-        }),
-    )
+    let client = setup_client(Some(|config| {
+        config.pool = PoolConfig {
+            strategy: PoolStrategy::Multiplexed,
+            max_size: 1, // Only one connection
+            min_idle: 1,
+            connection_timeout: Duration::from_secs(5),
+        };
+    }))
     .await?;
 
     // Test that multiplexed connection can handle concurrent operations
@@ -394,8 +380,7 @@ async fn test_operations_with_multiplexed_connection() -> Result<(), Box<dyn std
 
 #[tokio::test]
 async fn test_error_handling() -> Result<(), Box<dyn std::error::Error>> {
-    let docker = Cli::default();
-    let client = setup_client(&docker, None).await?;
+    let client = setup_client(None).await?;
 
     // Test operations on wrong data types
     client.set("string_key", "string_value").await?;
@@ -416,8 +401,7 @@ async fn test_error_handling() -> Result<(), Box<dyn std::error::Error>> {
 
 #[tokio::test]
 async fn test_expiration_and_ttl() -> Result<(), Box<dyn std::error::Error>> {
-    let docker = Cli::default();
-    let client = setup_client(&docker, None).await?;
+    let client = setup_client(None).await?;
 
     // Set key with expiration
     client

@@ -5,11 +5,15 @@
 
 use redis_oxide::{Client, ConnectionConfig, TransactionResult};
 use std::collections::HashMap;
-use testcontainers::{clients::Cli, images::redis::Redis, Container};
+use testcontainers::{core::WaitFor, runners::AsyncRunner, ContainerAsync, GenericImage};
 
-async fn setup_client(docker: &Cli) -> Result<Client, redis_oxide::RedisError> {
-    let container = docker.run(Redis::default());
-    let host_port = container.get_host_port_ipv4(6379);
+async fn setup_client() -> Result<Client, redis_oxide::RedisError> {
+    let redis_image = GenericImage::new("redis", "7-alpine")
+        .with_exposed_port(testcontainers::core::ContainerPort::Tcp(6379))
+        .with_wait_for(WaitFor::message_on_stdout("Ready to accept connections"));
+
+    let container = redis_image.start().await.unwrap();
+    let host_port = container.get_host_port_ipv4(6379).await.unwrap();
     let redis_url = format!("redis://localhost:{}", host_port);
     let config = ConnectionConfig::new(&redis_url);
     Client::connect(config).await
@@ -17,8 +21,7 @@ async fn setup_client(docker: &Cli) -> Result<Client, redis_oxide::RedisError> {
 
 #[tokio::test]
 async fn test_basic_pipeline() -> Result<(), Box<dyn std::error::Error>> {
-    let docker = Cli::default();
-    let client = setup_client(&docker).await?;
+    let client = setup_client().await?;
 
     // Create a pipeline with multiple commands
     let mut pipeline = client.pipeline();
@@ -57,8 +60,7 @@ async fn test_basic_pipeline() -> Result<(), Box<dyn std::error::Error>> {
 
 #[tokio::test]
 async fn test_pipeline_with_hash_operations() -> Result<(), Box<dyn std::error::Error>> {
-    let docker = Cli::default();
-    let client = setup_client(&docker).await?;
+    let client = setup_client().await?;
 
     let mut pipeline = client.pipeline();
     pipeline.hset("pipe:hash", "field1", "value1");
@@ -89,8 +91,7 @@ async fn test_pipeline_with_hash_operations() -> Result<(), Box<dyn std::error::
 
 #[tokio::test]
 async fn test_basic_transaction() -> Result<(), Box<dyn std::error::Error>> {
-    let docker = Cli::default();
-    let client = setup_client(&docker).await?;
+    let client = setup_client().await?;
 
     // Set initial values
     client.set("tx:account1", "100").await?;
@@ -105,20 +106,14 @@ async fn test_basic_transaction() -> Result<(), Box<dyn std::error::Error>> {
 
     let results = transaction.exec().await?;
 
-    match results {
-        TransactionResult::Success(values) => {
-            assert_eq!(values.len(), 4);
-            // GET results
-            assert_eq!(values[0].as_string()?, "100");
-            assert_eq!(values[1].as_string()?, "50");
-            // SET results
-            assert_eq!(values[2].as_bool()?, true);
-            assert_eq!(values[3].as_bool()?, true);
-        }
-        TransactionResult::Aborted => {
-            panic!("Transaction should not be aborted");
-        }
-    }
+    // Transaction.exec() returns Vec<RespValue> directly, not a TransactionResult enum
+    assert_eq!(results.len(), 4);
+    // GET results
+    assert_eq!(results[0].as_string()?, "100");
+    assert_eq!(results[1].as_string()?, "50");
+    // SET results
+    assert_eq!(results[2].as_bool()?, true);
+    assert_eq!(results[3].as_bool()?, true);
 
     // Verify final values
     let account1: Option<String> = client.get("tx:account1").await?;
@@ -131,8 +126,7 @@ async fn test_basic_transaction() -> Result<(), Box<dyn std::error::Error>> {
 
 #[tokio::test]
 async fn test_transaction_with_watch() -> Result<(), Box<dyn std::error::Error>> {
-    let docker = Cli::default();
-    let client = setup_client(&docker).await?;
+    let client = setup_client().await?;
 
     // Set initial value
     client.set("tx:watched_key", "initial").await?;
@@ -153,14 +147,11 @@ async fn test_transaction_with_watch() -> Result<(), Box<dyn std::error::Error>>
     // Execute transaction - should be aborted due to watched key modification
     let results = transaction.exec().await?;
 
-    match results {
-        TransactionResult::Success(_) => {
-            panic!("Transaction should be aborted due to watched key modification");
-        }
-        TransactionResult::Aborted => {
-            // This is expected
-        }
+    // If transaction is aborted, Redis returns an empty array
+    if !results.is_empty() {
+        panic!("Transaction should be aborted due to watched key modification");
     }
+    // An empty result vector indicates the transaction was aborted
 
     // Verify the key was not modified by the transaction
     let value: Option<String> = client.get("tx:watched_key").await?;
@@ -174,8 +165,7 @@ async fn test_transaction_with_watch() -> Result<(), Box<dyn std::error::Error>>
 
 #[tokio::test]
 async fn test_transaction_discard() -> Result<(), Box<dyn std::error::Error>> {
-    let docker = Cli::default();
-    let client = setup_client(&docker).await?;
+    let client = setup_client().await?;
 
     // Set initial value
     client.set("tx:discard_key", "initial").await?;
@@ -201,8 +191,7 @@ async fn test_transaction_discard() -> Result<(), Box<dyn std::error::Error>> {
 #[tokio::test]
 async fn test_complex_pipeline_with_different_data_types() -> Result<(), Box<dyn std::error::Error>>
 {
-    let docker = Cli::default();
-    let client = setup_client(&docker).await?;
+    let client = setup_client().await?;
 
     let mut pipeline = client.pipeline();
 
@@ -261,8 +250,7 @@ async fn test_complex_pipeline_with_different_data_types() -> Result<(), Box<dyn
 
 #[tokio::test]
 async fn test_pipeline_error_handling() -> Result<(), Box<dyn std::error::Error>> {
-    let docker = Cli::default();
-    let client = setup_client(&docker).await?;
+    let client = setup_client().await?;
 
     // Set up a string key
     client.set("error:string_key", "string_value").await?;
@@ -290,8 +278,7 @@ async fn test_pipeline_error_handling() -> Result<(), Box<dyn std::error::Error>
 
 #[tokio::test]
 async fn test_nested_transactions_not_allowed() -> Result<(), Box<dyn std::error::Error>> {
-    let docker = Cli::default();
-    let client = setup_client(&docker).await?;
+    let client = setup_client().await?;
 
     // Create first transaction
     let mut transaction1 = client.transaction().await?;
@@ -305,15 +292,11 @@ async fn test_nested_transactions_not_allowed() -> Result<(), Box<dyn std::error
     let results1 = transaction1.exec().await?;
     let results2 = transaction2.exec().await?;
 
-    match (results1, results2) {
-        (TransactionResult::Success(r1), TransactionResult::Success(r2)) => {
-            assert_eq!(r1.len(), 1);
-            assert_eq!(r2.len(), 1);
-            assert_eq!(r1[0].as_bool()?, true);
-            assert_eq!(r2[0].as_bool()?, true);
-        }
-        _ => panic!("Both transactions should succeed"),
-    }
+    // Both transactions should succeed and return their results
+    assert_eq!(results1.len(), 1);
+    assert_eq!(results2.len(), 1);
+    assert_eq!(results1[0].as_bool()?, true);
+    assert_eq!(results2[0].as_bool()?, true);
 
     // Verify both keys were set
     let value1: Option<String> = client.get("nested:key1").await?;
@@ -326,8 +309,7 @@ async fn test_nested_transactions_not_allowed() -> Result<(), Box<dyn std::error
 
 #[tokio::test]
 async fn test_large_pipeline() -> Result<(), Box<dyn std::error::Error>> {
-    let docker = Cli::default();
-    let client = setup_client(&docker).await?;
+    let client = setup_client().await?;
 
     let mut pipeline = client.pipeline();
     let num_operations = 100;
@@ -364,8 +346,7 @@ async fn test_large_pipeline() -> Result<(), Box<dyn std::error::Error>> {
 
 #[tokio::test]
 async fn test_concurrent_pipelines() -> Result<(), Box<dyn std::error::Error>> {
-    let docker = Cli::default();
-    let client = setup_client(&docker).await?;
+    let client = setup_client().await?;
 
     let num_concurrent = 10;
     let mut handles = Vec::new();
@@ -410,8 +391,7 @@ async fn test_concurrent_pipelines() -> Result<(), Box<dyn std::error::Error>> {
 
 #[tokio::test]
 async fn test_transaction_with_conditional_logic() -> Result<(), Box<dyn std::error::Error>> {
-    let docker = Cli::default();
-    let client = setup_client(&docker).await?;
+    let client = setup_client().await?;
 
     // Set up initial state
     client.set("conditional:balance", "100").await?;
@@ -433,18 +413,11 @@ async fn test_transaction_with_conditional_logic() -> Result<(), Box<dyn std::er
 
     let results = transaction.exec().await?;
 
-    match results {
-        TransactionResult::Success(values) => {
-            assert_eq!(values.len(), 4);
-            assert_eq!(values[0].as_string()?, "100"); // Original balance
-            assert_eq!(values[1].as_string()?, "10"); // Min balance
-            assert_eq!(values[2].as_bool()?, true); // SET balance
-            assert_eq!(values[3].as_bool()?, true); // SET last_transaction
-        }
-        TransactionResult::Aborted => {
-            panic!("Transaction should not be aborted");
-        }
-    }
+    assert_eq!(results.len(), 4);
+    assert_eq!(results[0].as_string()?, "100"); // Original balance
+    assert_eq!(results[1].as_string()?, "10"); // Min balance
+    assert_eq!(results[2].as_bool()?, true); // SET balance
+    assert_eq!(results[3].as_bool()?, true); // SET last_transaction
 
     // Verify final state
     let final_balance: Option<String> = client.get("conditional:balance").await?;

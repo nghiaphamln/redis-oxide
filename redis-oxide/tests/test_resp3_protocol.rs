@@ -4,11 +4,15 @@
 
 use redis_oxide::{Client, ConnectionConfig, ProtocolVersion, Resp3Value};
 use std::collections::{HashMap, HashSet};
-use testcontainers::{clients::Cli, images::redis::Redis, Container};
+use testcontainers::{core::WaitFor, runners::AsyncRunner, ContainerAsync, GenericImage};
 
-async fn setup_client_resp3(docker: &Cli) -> Result<Client, redis_oxide::RedisError> {
-    let container = docker.run(Redis::default());
-    let host_port = container.get_host_port_ipv4(6379);
+async fn setup_client_resp3() -> Result<Client, redis_oxide::RedisError> {
+    let redis_image = GenericImage::new("redis", "7-alpine")
+        .with_exposed_port(testcontainers::core::ContainerPort::Tcp(6379))
+        .with_wait_for(WaitFor::message_on_stdout("Ready to accept connections"));
+
+    let container = redis_image.start().await.unwrap();
+    let host_port = container.get_host_port_ipv4(6379).await.unwrap();
     let redis_url = format!("redis://localhost:{}", host_port);
 
     let config = ConnectionConfig::new(&redis_url).with_protocol_version(ProtocolVersion::Resp3);
@@ -16,9 +20,13 @@ async fn setup_client_resp3(docker: &Cli) -> Result<Client, redis_oxide::RedisEr
     Client::connect(config).await
 }
 
-async fn setup_client_resp2(docker: &Cli) -> Result<Client, redis_oxide::RedisError> {
-    let container = docker.run(Redis::default());
-    let host_port = container.get_host_port_ipv4(6379);
+async fn setup_client_resp2() -> Result<Client, redis_oxide::RedisError> {
+    let redis_image = GenericImage::new("redis", "7-alpine")
+        .with_exposed_port(testcontainers::core::ContainerPort::Tcp(6379))
+        .with_wait_for(WaitFor::message_on_stdout("Ready to accept connections"));
+
+    let container = redis_image.start().await.unwrap();
+    let host_port = container.get_host_port_ipv4(6379).await.unwrap();
     let redis_url = format!("redis://localhost:{}", host_port);
 
     let config = ConnectionConfig::new(&redis_url).with_protocol_version(ProtocolVersion::Resp2);
@@ -361,8 +369,6 @@ async fn test_resp3_error_types() -> Result<(), Box<dyn std::error::Error>> {
 
 #[tokio::test]
 async fn test_protocol_version_configuration() -> Result<(), Box<dyn std::error::Error>> {
-    let docker = Cli::default();
-
     // Test RESP2 configuration (default)
     let config_resp2 = ConnectionConfig::new("redis://localhost:6379")
         .with_protocol_version(ProtocolVersion::Resp2);
