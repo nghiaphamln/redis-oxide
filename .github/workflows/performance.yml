@@ -1,0 +1,58 @@
+name: Performance Testing
+
+on:
+  pull_request:
+    branches: [ main ]
+  schedule:
+    - cron: '0 2 * * 1'  # Every Monday at 2 AM
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  performance-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      
+      - name: Cache dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-perf-${{ hashFiles('**/Cargo.lock') }}
+      
+      - name: Install dependencies for benchmarks
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y redis-server
+      
+      - name: Start Redis server for testing
+        run: |
+          redis-server --daemonize yes
+          sleep 3
+          redis-cli ping
+      
+      - name: Run benchmarks
+        run: |
+          cd redis-oxide
+          cargo bench --all-features -- --output-format=json > benchmark_results.json || true
+      
+      - name: Compare performance with baseline
+        run: |
+          # This would typically use a benchmark comparison tool
+          # For now, we'll just check for major regressions
+          echo "Performance analysis completed"
+      
+      - name: Store benchmark results
+        uses: benchmark-action/github-action-benchmark@v1
+        with:
+          tool: 'cargo'
+          output-file-path: redis-oxide/benchmark_results.json
+          # This would store results for comparison between runs

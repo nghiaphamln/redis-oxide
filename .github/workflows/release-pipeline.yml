@@ -1,0 +1,174 @@
+name: Release Pipeline
+
+on:
+  workflow_dispatch:
+    inputs:
+      version_bump:
+        description: 'Version bump type (major, minor, patch)'
+        required: true
+        default: 'patch'
+        type: choice
+        options:
+          - major
+          - minor
+          - patch
+      draft:
+        description: 'Create as draft?'
+        required: false
+        default: true
+        type: boolean
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  prepare-release:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.new_version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      
+      - name: Setup Git
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+      
+      # Version bump using cargo-edit
+      - name: Install cargo-edit
+        run: cargo install cargo-edit
+      
+      - name: Get current version
+        id: current_version
+        run: |
+          VERSION=$(cargo metadata --format-version=1 --no-deps | jq -r '.packages[0].version')
+          echo "current_version=$VERSION" >> $GITHUB_OUTPUT
+      
+      # Create new version based on input
+      - name: Bump version
+        id: version
+        run: |
+          case "${{ inputs.version_bump }}" in
+            major)
+              NEW_VERSION=$(echo "${{ steps.current_version.outputs.current_version }}" | awk -F. '{print $1+1".0.0"}')
+              ;;
+            minor)
+              NEW_VERSION=$(echo "${{ steps.current_version.outputs.current_version }}" | awk -F. '{print $1"."$2+1".0"}')
+              ;;
+            patch)
+              NEW_VERSION=$(echo "${{ steps.current_version.outputs.current_version }}" | awk -F. '{print $1"."$2"."$3+1}')
+              ;;
+          esac
+          echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "Bumping to version: $NEW_VERSION"
+      
+      - name: Update version in workspace
+        run: |
+          cd redis-oxide
+          cargo set-version ${{ steps.version.outputs.new_version }}
+      
+      - name: Commit version changes
+        run: |
+          git add .
+          git commit -m "chore: bump version to ${{ steps.version.outputs.new_version }}"
+          git push origin main
+      
+      # Create tag
+      - name: Create tag
+        run: |
+          git tag v${{ steps.version.outputs.new_version }}
+          git push origin v${{ steps.version.outputs.new_version }}
+
+  build-and-test:
+    needs: prepare-release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: v${{ needs.prepare-release.outputs.version }}
+      
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      
+      - name: Cache dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: release-${{ needs.prepare-release.outputs.version }}-${{ hashFiles('**/Cargo.lock') }}
+      
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+      
+      - name: Run clippy
+        run: cargo clippy --all-targets --all-features -- -D warnings
+      
+      - name: Run tests
+        run: cargo test --all-features --verbose
+
+  publish-package:
+    needs: [prepare-release, build-and-test]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: v${{ needs.prepare-release.outputs.version }}
+      
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      
+      - name: Publish to crates.io
+        run: cargo publish
+        working-directory: ./redis-oxide
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+      
+      - name: Sleep to allow index update
+        run: sleep 30
+
+  create-release:
+    needs: [prepare-release, publish-package]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: v${{ needs.prepare-release.outputs.version }}
+      
+      - name: Generate release notes
+        id: release_notes
+        run: |
+          # Get changes since last tag
+          LAST_TAG=$(git describe --tags --abbrev=0 $(git rev-list --tags --skip=1 --max-count=1) 2>/dev/null || echo "")
+          if [ -n "$LAST_TAG" ]; then
+            CHANGES=$(git log $LAST_TAG..HEAD --pretty=format:"- %s (%an)" --no-merges)
+          else
+            CHANGES="First release"
+          fi
+          
+          echo "changes<<EOF" >> $GITHUB_OUTPUT
+          echo "$CHANGES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+      
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ needs.prepare-release.outputs.version }}
+          name: Release v${{ needs.prepare-release.outputs.version }}
+          body: |
+            ## Release v${{ needs.prepare-release.outputs.version }}
+            
+            ${{ steps.release_notes.outputs.changes }}
+            
+            ## What's Changed
+            * Automated release from CI/CD pipeline
+          draft: ${{ inputs.draft }}
+          prerelease: false
