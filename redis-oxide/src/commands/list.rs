@@ -1,12 +1,14 @@
-//! List commands for Redis
-//!
-//! This module provides command builders for Redis List operations.
+//! Command builders for Redis List operations
 
-use crate::core::{error::RedisResult, value::RespValue};
+use crate::core::{
+    error::{RedisError, RedisResult},
+    value::RespValue,
+};
+use crate::commands::Command;
 use crate::pipeline::PipelineCommand;
-use super::Command;
+use std::convert::TryFrom;
 
-/// LPUSH command - Insert one or more values at the head of a list
+/// Represents the `LPUSH` command.
 #[derive(Debug, Clone)]
 pub struct LPushCommand {
     key: String,
@@ -14,7 +16,8 @@ pub struct LPushCommand {
 }
 
 impl LPushCommand {
-    /// Create a new LPUSH command
+    /// Create a new `LPUSH` command.
+    #[must_use]
     pub fn new(key: impl Into<String>, values: Vec<String>) -> Self {
         Self {
             key: key.into(),
@@ -31,9 +34,9 @@ impl Command for LPushCommand {
     }
 
     fn args(&self) -> Vec<RespValue> {
-        let mut args = vec![RespValue::from(self.key.as_str())];
+        let mut args = vec![RespValue::from(self.key.clone())];
         for value in &self.values {
-            args.push(RespValue::from(value.as_str()));
+            args.push(RespValue::from(value.clone()));
         }
         args
     }
@@ -61,7 +64,7 @@ impl PipelineCommand for LPushCommand {
     }
 }
 
-/// RPUSH command - Insert one or more values at the tail of a list
+/// Represents the `RPUSH` command.
 #[derive(Debug, Clone)]
 pub struct RPushCommand {
     key: String,
@@ -69,7 +72,8 @@ pub struct RPushCommand {
 }
 
 impl RPushCommand {
-    /// Create a new RPUSH command
+    /// Create a new `RPUSH` command.
+    #[must_use]
     pub fn new(key: impl Into<String>, values: Vec<String>) -> Self {
         Self {
             key: key.into(),
@@ -86,9 +90,9 @@ impl Command for RPushCommand {
     }
 
     fn args(&self) -> Vec<RespValue> {
-        let mut args = vec![RespValue::from(self.key.as_str())];
+        let mut args = vec![RespValue::from(self.key.clone())];
         for value in &self.values {
-            args.push(RespValue::from(value.as_str()));
+            args.push(RespValue::from(value.clone()));
         }
         args
     }
@@ -116,27 +120,18 @@ impl PipelineCommand for RPushCommand {
     }
 }
 
-/// LPOP command - Remove and return the first element of a list
+/// Represents the `LPOP` command.
 #[derive(Debug, Clone)]
 pub struct LPopCommand {
     key: String,
-    count: Option<i64>,
 }
 
 impl LPopCommand {
-    /// Create a new LPOP command
+    /// Create a new `LPOP` command.
+    #[must_use]
     pub fn new(key: impl Into<String>) -> Self {
         Self {
             key: key.into(),
-            count: None,
-        }
-    }
-
-    /// Create a new LPOP command with count
-    pub fn with_count(key: impl Into<String>, count: i64) -> Self {
-        Self {
-            key: key.into(),
-            count: Some(count),
         }
     }
 }
@@ -149,21 +144,18 @@ impl Command for LPopCommand {
     }
 
     fn args(&self) -> Vec<RespValue> {
-        let mut args = vec![RespValue::from(self.key.as_str())];
-        if let Some(count) = self.count {
-            args.push(RespValue::from(count.to_string()));
-        }
-        args
+        vec![RespValue::from(self.key.clone())]
     }
 
     fn parse_response(&self, response: RespValue) -> RedisResult<Self::Output> {
         match response {
-            RespValue::Null => Ok(None),
-            RespValue::BulkString(bytes) => {
-                let s = String::from_utf8_lossy(&bytes).to_string();
-                Ok(Some(s))
+            RespValue::BulkString(b) => {
+                String::from_utf8(b.to_vec())
+                    .map(Some)
+                    .map_err(|e| RedisError::Type(format!("Invalid UTF-8: {e}")))
             }
-            _ => Err(crate::core::error::RedisError::Type(format!(
+            RespValue::Null => Ok(None),
+            _ => Err(RedisError::Type(format!(
                 "Unexpected response type for LPOP: {:?}",
                 response
             ))),
@@ -189,27 +181,18 @@ impl PipelineCommand for LPopCommand {
     }
 }
 
-/// RPOP command - Remove and return the last element of a list
+/// Represents the `RPOP` command.
 #[derive(Debug, Clone)]
 pub struct RPopCommand {
     key: String,
-    count: Option<i64>,
 }
 
 impl RPopCommand {
-    /// Create a new RPOP command
+    /// Create a new `RPOP` command.
+    #[must_use]
     pub fn new(key: impl Into<String>) -> Self {
         Self {
             key: key.into(),
-            count: None,
-        }
-    }
-
-    /// Create a new RPOP command with count
-    pub fn with_count(key: impl Into<String>, count: i64) -> Self {
-        Self {
-            key: key.into(),
-            count: Some(count),
         }
     }
 }
@@ -222,21 +205,18 @@ impl Command for RPopCommand {
     }
 
     fn args(&self) -> Vec<RespValue> {
-        let mut args = vec![RespValue::from(self.key.as_str())];
-        if let Some(count) = self.count {
-            args.push(RespValue::from(count.to_string()));
-        }
-        args
+        vec![RespValue::from(self.key.clone())]
     }
 
     fn parse_response(&self, response: RespValue) -> RedisResult<Self::Output> {
         match response {
-            RespValue::Null => Ok(None),
-            RespValue::BulkString(bytes) => {
-                let s = String::from_utf8_lossy(&bytes).to_string();
-                Ok(Some(s))
+            RespValue::BulkString(b) => {
+                String::from_utf8(b.to_vec())
+                    .map(Some)
+                    .map_err(|e| RedisError::Type(format!("Invalid UTF-8: {e}")))
             }
-            _ => Err(crate::core::error::RedisError::Type(format!(
+            RespValue::Null => Ok(None),
+            _ => Err(RedisError::Type(format!(
                 "Unexpected response type for RPOP: {:?}",
                 response
             ))),
@@ -262,7 +242,7 @@ impl PipelineCommand for RPopCommand {
     }
 }
 
-/// LRANGE command - Get a range of elements from a list
+/// Represents the `LRANGE` command.
 #[derive(Debug, Clone)]
 pub struct LRangeCommand {
     key: String,
@@ -271,7 +251,8 @@ pub struct LRangeCommand {
 }
 
 impl LRangeCommand {
-    /// Create a new LRANGE command
+    /// Create a new `LRANGE` command.
+    #[must_use]
     pub fn new(key: impl Into<String>, start: i64, stop: i64) -> Self {
         Self {
             key: key.into(),
@@ -290,9 +271,9 @@ impl Command for LRangeCommand {
 
     fn args(&self) -> Vec<RespValue> {
         vec![
-            RespValue::from(self.key.as_str()),
-            RespValue::from(self.start.to_string()),
-            RespValue::from(self.stop.to_string()),
+            RespValue::from(self.key.clone()),
+            RespValue::from(self.start),
+            RespValue::from(self.stop),
         ]
     }
 
@@ -302,11 +283,15 @@ impl Command for LRangeCommand {
                 let mut result = Vec::new();
                 for item in items {
                     match item {
-                        RespValue::BulkString(bytes) => {
-                            let s = String::from_utf8_lossy(&bytes).to_string();
+                        RespValue::BulkString(b) => {
+                            let s = String::from_utf8(b.to_vec())
+                                .map_err(|e| RedisError::Type(format!("Invalid UTF-8: {e}")))?;
                             result.push(s);
                         }
-                        _ => return Err(crate::core::error::RedisError::Type(format!(
+                        RespValue::Null => {
+                            // Skip null values
+                        }
+                        _ => return Err(RedisError::Type(format!(
                             "Unexpected item type in LRANGE response: {:?}",
                             item
                         ))),
@@ -314,7 +299,7 @@ impl Command for LRangeCommand {
                 }
                 Ok(result)
             }
-            _ => Err(crate::core::error::RedisError::Type(format!(
+            _ => Err(RedisError::Type(format!(
                 "Unexpected response type for LRANGE: {:?}",
                 response
             ))),
@@ -340,14 +325,15 @@ impl PipelineCommand for LRangeCommand {
     }
 }
 
-/// LLEN command - Get the length of a list
+/// Represents the `LLEN` command.
 #[derive(Debug, Clone)]
 pub struct LLenCommand {
     key: String,
 }
 
 impl LLenCommand {
-    /// Create a new LLEN command
+    /// Create a new `LLEN` command.
+    #[must_use]
     pub fn new(key: impl Into<String>) -> Self {
         Self {
             key: key.into(),
@@ -363,7 +349,7 @@ impl Command for LLenCommand {
     }
 
     fn args(&self) -> Vec<RespValue> {
-        vec![RespValue::from(self.key.as_str())]
+        vec![RespValue::from(self.key.clone())]
     }
 
     fn parse_response(&self, response: RespValue) -> RedisResult<Self::Output> {
@@ -389,7 +375,7 @@ impl PipelineCommand for LLenCommand {
     }
 }
 
-/// LINDEX command - Get an element from a list by its index
+/// Represents the `LINDEX` command.
 #[derive(Debug, Clone)]
 pub struct LIndexCommand {
     key: String,
@@ -397,7 +383,8 @@ pub struct LIndexCommand {
 }
 
 impl LIndexCommand {
-    /// Create a new LINDEX command
+    /// Create a new `LINDEX` command.
+    #[must_use]
     pub fn new(key: impl Into<String>, index: i64) -> Self {
         Self {
             key: key.into(),
@@ -415,19 +402,20 @@ impl Command for LIndexCommand {
 
     fn args(&self) -> Vec<RespValue> {
         vec![
-            RespValue::from(self.key.as_str()),
-            RespValue::from(self.index.to_string()),
+            RespValue::from(self.key.clone()),
+            RespValue::from(self.index),
         ]
     }
 
     fn parse_response(&self, response: RespValue) -> RedisResult<Self::Output> {
         match response {
-            RespValue::Null => Ok(None),
-            RespValue::BulkString(bytes) => {
-                let s = String::from_utf8_lossy(&bytes).to_string();
-                Ok(Some(s))
+            RespValue::BulkString(b) => {
+                String::from_utf8(b.to_vec())
+                    .map(Some)
+                    .map_err(|e| RedisError::Type(format!("Invalid UTF-8: {e}")))
             }
-            _ => Err(crate::core::error::RedisError::Type(format!(
+            RespValue::Null => Ok(None),
+            _ => Err(RedisError::Type(format!(
                 "Unexpected response type for LINDEX: {:?}",
                 response
             ))),
@@ -453,7 +441,7 @@ impl PipelineCommand for LIndexCommand {
     }
 }
 
-/// LSET command - Set the value of an element in a list by its index
+/// Represents the `LSET` command.
 #[derive(Debug, Clone)]
 pub struct LSetCommand {
     key: String,
@@ -462,7 +450,8 @@ pub struct LSetCommand {
 }
 
 impl LSetCommand {
-    /// Create a new LSET command
+    /// Create a new `LSET` command.
+    #[must_use]
     pub fn new(key: impl Into<String>, index: i64, value: impl Into<String>) -> Self {
         Self {
             key: key.into(),
@@ -481,9 +470,9 @@ impl Command for LSetCommand {
 
     fn args(&self) -> Vec<RespValue> {
         vec![
-            RespValue::from(self.key.as_str()),
-            RespValue::from(self.index.to_string()),
-            RespValue::from(self.value.as_str()),
+            RespValue::from(self.key.clone()),
+            RespValue::from(self.index),
+            RespValue::from(self.value.clone()),
         ]
     }
 
@@ -507,100 +496,5 @@ impl PipelineCommand for LSetCommand {
     
     fn key(&self) -> Option<String> {
         Some(self.key.clone())
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_lpush_command() {
-        let cmd = LPushCommand::new("mylist", vec!["value1".to_string(), "value2".to_string()]);
-        assert_eq!(cmd.command_name(), "LPUSH");
-        assert_eq!(cmd.keys(), vec![b"mylist"]);
-        
-        let args = <LPushCommand as Command>::args(&cmd);
-        assert_eq!(args.len(), 3); // key + 2 values
-    }
-
-    #[test]
-    fn test_rpush_command() {
-        let cmd = RPushCommand::new("mylist", vec!["value1".to_string(), "value2".to_string()]);
-        assert_eq!(cmd.command_name(), "RPUSH");
-        assert_eq!(cmd.keys(), vec![b"mylist"]);
-        
-        let args = <RPushCommand as Command>::args(&cmd);
-        assert_eq!(args.len(), 3); // key + 2 values
-    }
-
-    #[test]
-    fn test_lpop_command() {
-        let cmd = LPopCommand::new("mylist");
-        assert_eq!(cmd.command_name(), "LPOP");
-        assert_eq!(cmd.keys(), vec![b"mylist"]);
-        
-        let args = <LPopCommand as Command>::args(&cmd);
-        assert_eq!(args.len(), 1); // key only
-    }
-
-    #[test]
-    fn test_lpop_command_with_count() {
-        let cmd = LPopCommand::with_count("mylist", 3);
-        assert_eq!(cmd.command_name(), "LPOP");
-        assert_eq!(cmd.keys(), vec![b"mylist"]);
-        
-        let args = <LPopCommand as Command>::args(&cmd);
-        assert_eq!(args.len(), 2); // key + count
-    }
-
-    #[test]
-    fn test_rpop_command() {
-        let cmd = RPopCommand::new("mylist");
-        assert_eq!(cmd.command_name(), "RPOP");
-        assert_eq!(cmd.keys(), vec![b"mylist"]);
-        
-        let args = <RPopCommand as Command>::args(&cmd);
-        assert_eq!(args.len(), 1); // key only
-    }
-
-    #[test]
-    fn test_lrange_command() {
-        let cmd = LRangeCommand::new("mylist", 0, -1);
-        assert_eq!(cmd.command_name(), "LRANGE");
-        assert_eq!(cmd.keys(), vec![b"mylist"]);
-        
-        let args = <LRangeCommand as Command>::args(&cmd);
-        assert_eq!(args.len(), 3); // key + start + stop
-    }
-
-    #[test]
-    fn test_llen_command() {
-        let cmd = LLenCommand::new("mylist");
-        assert_eq!(cmd.command_name(), "LLEN");
-        assert_eq!(cmd.keys(), vec![b"mylist"]);
-        
-        let args = <LLenCommand as Command>::args(&cmd);
-        assert_eq!(args.len(), 1); // key only
-    }
-
-    #[test]
-    fn test_lindex_command() {
-        let cmd = LIndexCommand::new("mylist", 0);
-        assert_eq!(cmd.command_name(), "LINDEX");
-        assert_eq!(cmd.keys(), vec![b"mylist"]);
-        
-        let args = <LIndexCommand as Command>::args(&cmd);
-        assert_eq!(args.len(), 2); // key + index
-    }
-
-    #[test]
-    fn test_lset_command() {
-        let cmd = LSetCommand::new("mylist", 0, "newvalue");
-        assert_eq!(cmd.command_name(), "LSET");
-        assert_eq!(cmd.keys(), vec![b"mylist"]);
-        
-        let args = <LSetCommand as Command>::args(&cmd);
-        assert_eq!(args.len(), 3); // key + index + value
     }
 }

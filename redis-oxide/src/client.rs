@@ -7,6 +7,12 @@ use crate::commands::{
     Command, DecrByCommand, DecrCommand, DelCommand, ExistsCommand, ExpireCommand, GetCommand,
     HDelCommand, HExistsCommand, HGetAllCommand, HGetCommand, HLenCommand, HMGetCommand,
     HMSetCommand, HSetCommand, IncrByCommand, IncrCommand, SetCommand, TtlCommand,
+    // List commands
+    LIndexCommand, LLenCommand, LPopCommand, LPushCommand, LRangeCommand, LSetCommand, RPopCommand, RPushCommand,
+    // Set commands
+    SAddCommand, SCardCommand, SIsMemberCommand, SMembersCommand, SPopCommand, SRandMemberCommand, SRemCommand,
+    // Sorted Set commands
+    ZAddCommand, ZCardCommand, ZRankCommand, ZRangeCommand, ZRemCommand, ZRevRankCommand, ZScoreCommand,
 };
 use crate::connection::{ConnectionManager, TopologyType};
 use crate::core::{
@@ -411,6 +417,145 @@ impl Client {
     /// Determine if a hash field exists
     pub async fn hexists(&self, key: impl Into<String>, field: impl Into<String>) -> RedisResult<bool> {
         let command = HExistsCommand::new(key, field);
+        self.execute_with_redirects(command).await
+    }
+
+    // List operations
+
+    /// Push one or more values to the head of a list
+    pub async fn lpush(&self, key: impl Into<String>, values: Vec<String>) -> RedisResult<i64> {
+        let command = LPushCommand::new(key, values);
+        self.execute_with_redirects(command).await
+    }
+
+    /// Push one or more values to the tail of a list
+    pub async fn rpush(&self, key: impl Into<String>, values: Vec<String>) -> RedisResult<i64> {
+        let command = RPushCommand::new(key, values);
+        self.execute_with_redirects(command).await
+    }
+
+    /// Remove and return the first element of a list
+    pub async fn lpop(&self, key: impl Into<String>) -> RedisResult<Option<String>> {
+        let command = LPopCommand::new(key);
+        self.execute_with_redirects(command).await
+    }
+
+    /// Remove and return the last element of a list
+    pub async fn rpop(&self, key: impl Into<String>) -> RedisResult<Option<String>> {
+        let command = RPopCommand::new(key);
+        self.execute_with_redirects(command).await
+    }
+
+    /// Get a range of elements from a list
+    pub async fn lrange(&self, key: impl Into<String>, start: i64, stop: i64) -> RedisResult<Vec<String>> {
+        let command = LRangeCommand::new(key, start, stop);
+        self.execute_with_redirects(command).await
+    }
+
+    /// Get the length of a list
+    pub async fn llen(&self, key: impl Into<String>) -> RedisResult<i64> {
+        let command = LLenCommand::new(key);
+        self.execute_with_redirects(command).await
+    }
+
+    /// Get an element from a list by its index
+    pub async fn lindex(&self, key: impl Into<String>, index: i64) -> RedisResult<Option<String>> {
+        let command = LIndexCommand::new(key, index);
+        self.execute_with_redirects(command).await
+    }
+
+    /// Set the value of an element in a list by its index
+    pub async fn lset(&self, key: impl Into<String>, index: i64, value: impl Into<String>) -> RedisResult<()> {
+        let command = LSetCommand::new(key, index, value);
+        let _result: String = self.execute_with_redirects(command).await?;
+        Ok(())
+    }
+
+    // Set operations
+
+    /// Add one or more members to a set
+    pub async fn sadd(&self, key: impl Into<String>, members: Vec<String>) -> RedisResult<i64> {
+        let command = SAddCommand::new(key, members);
+        self.execute_with_redirects(command).await
+    }
+
+    /// Remove one or more members from a set
+    pub async fn srem(&self, key: impl Into<String>, members: Vec<String>) -> RedisResult<i64> {
+        let command = SRemCommand::new(key, members);
+        self.execute_with_redirects(command).await
+    }
+
+    /// Get all members of a set
+    pub async fn smembers(&self, key: impl Into<String>) -> RedisResult<std::collections::HashSet<String>> {
+        let command = SMembersCommand::new(key);
+        self.execute_with_redirects(command).await
+    }
+
+    /// Determine if a member is in a set
+    pub async fn sismember(&self, key: impl Into<String>, member: impl Into<String>) -> RedisResult<bool> {
+        let command = SIsMemberCommand::new(key, member);
+        self.execute_with_redirects(command).await
+    }
+
+    /// Get the number of members in a set
+    pub async fn scard(&self, key: impl Into<String>) -> RedisResult<i64> {
+        let command = SCardCommand::new(key);
+        self.execute_with_redirects(command).await
+    }
+
+    /// Remove and return a random member from a set
+    pub async fn spop(&self, key: impl Into<String>) -> RedisResult<Option<String>> {
+        let command = SPopCommand::new(key);
+        self.execute_with_redirects(command).await
+    }
+
+    /// Get a random member from a set
+    pub async fn srandmember(&self, key: impl Into<String>) -> RedisResult<Option<String>> {
+        let command = SRandMemberCommand::new(key);
+        self.execute_with_redirects(command).await
+    }
+
+    // Sorted Set operations
+
+    /// Add one or more members to a sorted set
+    pub async fn zadd(&self, key: impl Into<String>, members: std::collections::HashMap<String, f64>) -> RedisResult<i64> {
+        let command = ZAddCommand::new(key, members);
+        self.execute_with_redirects(command).await
+    }
+
+    /// Remove one or more members from a sorted set
+    pub async fn zrem(&self, key: impl Into<String>, members: Vec<String>) -> RedisResult<i64> {
+        let command = ZRemCommand::new(key, members);
+        self.execute_with_redirects(command).await
+    }
+
+    /// Get a range of members from a sorted set by index
+    pub async fn zrange(&self, key: impl Into<String>, start: i64, stop: i64) -> RedisResult<Vec<String>> {
+        let command = ZRangeCommand::new(key, start, stop);
+        self.execute_with_redirects(command).await
+    }
+
+    /// Get the score of a member in a sorted set
+    pub async fn zscore(&self, key: impl Into<String>, member: impl Into<String>) -> RedisResult<Option<f64>> {
+        let command = ZScoreCommand::new(key, member);
+        self.execute_with_redirects(command).await
+    }
+
+    /// Get the number of members in a sorted set
+    pub async fn zcard(&self, key: impl Into<String>) -> RedisResult<i64> {
+        let command = ZCardCommand::new(key);
+        self.execute_with_redirects(command).await
+    }
+
+    /// Get the rank of a member in a sorted set (lowest to highest)
+    pub async fn zrank(&self, key: impl Into<String>, member: impl Into<String>) -> RedisResult<Option<i64>> {
+        let command = ZRankCommand::new(key, member);
+        self.execute_with_redirects(command).await
+    }
+
+    /// Get the rank of a member in a sorted set (highest to lowest)
+    pub async fn zrevrank(&self, key: impl Into<String>, member: impl Into<String>) -> RedisResult<Option<i64>> {
+        let command = ZRevRankCommand::new(key, member);
         self.execute_with_redirects(command).await
     }
 

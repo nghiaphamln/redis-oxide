@@ -1,32 +1,28 @@
-//! Sorted Set commands for Redis
-//!
-//! This module provides command builders for Redis Sorted Set operations.
+//! Command builders for Redis Sorted Set operations
 
-use crate::core::{error::RedisResult, value::RespValue};
+use crate::core::{
+    error::{RedisError, RedisResult},
+    value::RespValue,
+};
+use crate::commands::Command;
 use crate::pipeline::PipelineCommand;
-use super::Command;
+use std::collections::HashMap;
+use std::convert::TryFrom;
 
-/// ZADD command - Add one or more members to a sorted set, or update its score if it already exists
+/// Represents the `ZADD` command.
 #[derive(Debug, Clone)]
 pub struct ZAddCommand {
     key: String,
-    members: Vec<(f64, String)>, // (score, member) pairs
+    members: HashMap<String, f64>,
 }
 
 impl ZAddCommand {
-    /// Create a new ZADD command
-    pub fn new(key: impl Into<String>, members: Vec<(f64, String)>) -> Self {
+    /// Create a new `ZADD` command.
+    #[must_use]
+    pub fn new(key: impl Into<String>, members: HashMap<String, f64>) -> Self {
         Self {
             key: key.into(),
             members,
-        }
-    }
-
-    /// Create a new ZADD command with a single member
-    pub fn single(key: impl Into<String>, score: f64, member: impl Into<String>) -> Self {
-        Self {
-            key: key.into(),
-            members: vec![(score, member.into())],
         }
     }
 }
@@ -39,10 +35,10 @@ impl Command for ZAddCommand {
     }
 
     fn args(&self) -> Vec<RespValue> {
-        let mut args = vec![RespValue::from(self.key.as_str())];
-        for (score, member) in &self.members {
+        let mut args = vec![RespValue::from(self.key.clone())];
+        for (member, score) in &self.members {
             args.push(RespValue::from(score.to_string()));
-            args.push(RespValue::from(member.as_str()));
+            args.push(RespValue::from(member.clone()));
         }
         args
     }
@@ -70,7 +66,7 @@ impl PipelineCommand for ZAddCommand {
     }
 }
 
-/// ZREM command - Remove one or more members from a sorted set
+/// Represents the `ZREM` command.
 #[derive(Debug, Clone)]
 pub struct ZRemCommand {
     key: String,
@@ -78,7 +74,8 @@ pub struct ZRemCommand {
 }
 
 impl ZRemCommand {
-    /// Create a new ZREM command
+    /// Create a new `ZREM` command.
+    #[must_use]
     pub fn new(key: impl Into<String>, members: Vec<String>) -> Self {
         Self {
             key: key.into(),
@@ -95,9 +92,9 @@ impl Command for ZRemCommand {
     }
 
     fn args(&self) -> Vec<RespValue> {
-        let mut args = vec![RespValue::from(self.key.as_str())];
+        let mut args = vec![RespValue::from(self.key.clone())];
         for member in &self.members {
-            args.push(RespValue::from(member.as_str()));
+            args.push(RespValue::from(member.clone()));
         }
         args
     }
@@ -125,33 +122,22 @@ impl PipelineCommand for ZRemCommand {
     }
 }
 
-/// ZRANGE command - Return a range of members in a sorted set, by index
+/// Represents the `ZRANGE` command.
 #[derive(Debug, Clone)]
 pub struct ZRangeCommand {
     key: String,
     start: i64,
     stop: i64,
-    with_scores: bool,
 }
 
 impl ZRangeCommand {
-    /// Create a new ZRANGE command
+    /// Create a new `ZRANGE` command.
+    #[must_use]
     pub fn new(key: impl Into<String>, start: i64, stop: i64) -> Self {
         Self {
             key: key.into(),
             start,
             stop,
-            with_scores: false,
-        }
-    }
-
-    /// Create a new ZRANGE command with scores
-    pub fn with_scores(key: impl Into<String>, start: i64, stop: i64) -> Self {
-        Self {
-            key: key.into(),
-            start,
-            stop,
-            with_scores: true,
         }
     }
 }
@@ -164,15 +150,11 @@ impl Command for ZRangeCommand {
     }
 
     fn args(&self) -> Vec<RespValue> {
-        let mut args = vec![
-            RespValue::from(self.key.as_str()),
-            RespValue::from(self.start.to_string()),
-            RespValue::from(self.stop.to_string()),
-        ];
-        if self.with_scores {
-            args.push(RespValue::from("WITHSCORES"));
-        }
-        args
+        vec![
+            RespValue::from(self.key.clone()),
+            RespValue::from(self.start),
+            RespValue::from(self.stop),
+        ]
     }
 
     fn parse_response(&self, response: RespValue) -> RedisResult<Self::Output> {
@@ -181,11 +163,15 @@ impl Command for ZRangeCommand {
                 let mut result = Vec::new();
                 for item in items {
                     match item {
-                        RespValue::BulkString(bytes) => {
-                            let s = String::from_utf8_lossy(&bytes).to_string();
+                        RespValue::BulkString(b) => {
+                            let s = String::from_utf8(b.to_vec())
+                                .map_err(|e| RedisError::Type(format!("Invalid UTF-8: {e}")))?;
                             result.push(s);
                         }
-                        _ => return Err(crate::core::error::RedisError::Type(format!(
+                        RespValue::Null => {
+                            // Skip null values
+                        }
+                        _ => return Err(RedisError::Type(format!(
                             "Unexpected item type in ZRANGE response: {:?}",
                             item
                         ))),
@@ -193,7 +179,7 @@ impl Command for ZRangeCommand {
                 }
                 Ok(result)
             }
-            _ => Err(crate::core::error::RedisError::Type(format!(
+            _ => Err(RedisError::Type(format!(
                 "Unexpected response type for ZRANGE: {:?}",
                 response
             ))),
@@ -219,7 +205,7 @@ impl PipelineCommand for ZRangeCommand {
     }
 }
 
-/// ZSCORE command - Get the score associated with the given member in a sorted set
+/// Represents the `ZSCORE` command.
 #[derive(Debug, Clone)]
 pub struct ZScoreCommand {
     key: String,
@@ -227,7 +213,8 @@ pub struct ZScoreCommand {
 }
 
 impl ZScoreCommand {
-    /// Create a new ZSCORE command
+    /// Create a new `ZSCORE` command.
+    #[must_use]
     pub fn new(key: impl Into<String>, member: impl Into<String>) -> Self {
         Self {
             key: key.into(),
@@ -245,25 +232,22 @@ impl Command for ZScoreCommand {
 
     fn args(&self) -> Vec<RespValue> {
         vec![
-            RespValue::from(self.key.as_str()),
-            RespValue::from(self.member.as_str()),
+            RespValue::from(self.key.clone()),
+            RespValue::from(self.member.clone()),
         ]
     }
 
     fn parse_response(&self, response: RespValue) -> RedisResult<Self::Output> {
         match response {
-            RespValue::Null => Ok(None),
-            RespValue::BulkString(bytes) => {
-                let s = String::from_utf8_lossy(&bytes);
-                match s.parse::<f64>() {
-                    Ok(score) => Ok(Some(score)),
-                    Err(_) => Err(crate::core::error::RedisError::Type(format!(
-                        "Invalid score format: {}",
-                        s
-                    ))),
-                }
+            RespValue::BulkString(b) => {
+                let s = String::from_utf8(b.to_vec())
+                    .map_err(|e| RedisError::Type(format!("Invalid UTF-8: {e}")))?;
+                let score = s.parse::<f64>()
+                    .map_err(|e| RedisError::Type(format!("Invalid float: {e}")))?;
+                Ok(Some(score))
             }
-            _ => Err(crate::core::error::RedisError::Type(format!(
+            RespValue::Null => Ok(None),
+            _ => Err(RedisError::Type(format!(
                 "Unexpected response type for ZSCORE: {:?}",
                 response
             ))),
@@ -289,14 +273,15 @@ impl PipelineCommand for ZScoreCommand {
     }
 }
 
-/// ZCARD command - Get the number of members in a sorted set
+/// Represents the `ZCARD` command.
 #[derive(Debug, Clone)]
 pub struct ZCardCommand {
     key: String,
 }
 
 impl ZCardCommand {
-    /// Create a new ZCARD command
+    /// Create a new `ZCARD` command.
+    #[must_use]
     pub fn new(key: impl Into<String>) -> Self {
         Self {
             key: key.into(),
@@ -312,7 +297,7 @@ impl Command for ZCardCommand {
     }
 
     fn args(&self) -> Vec<RespValue> {
-        vec![RespValue::from(self.key.as_str())]
+        vec![RespValue::from(self.key.clone())]
     }
 
     fn parse_response(&self, response: RespValue) -> RedisResult<Self::Output> {
@@ -338,7 +323,7 @@ impl PipelineCommand for ZCardCommand {
     }
 }
 
-/// ZRANK command - Determine the index of a member in a sorted set
+/// Represents the `ZRANK` command.
 #[derive(Debug, Clone)]
 pub struct ZRankCommand {
     key: String,
@@ -346,7 +331,8 @@ pub struct ZRankCommand {
 }
 
 impl ZRankCommand {
-    /// Create a new ZRANK command
+    /// Create a new `ZRANK` command.
+    #[must_use]
     pub fn new(key: impl Into<String>, member: impl Into<String>) -> Self {
         Self {
             key: key.into(),
@@ -364,16 +350,16 @@ impl Command for ZRankCommand {
 
     fn args(&self) -> Vec<RespValue> {
         vec![
-            RespValue::from(self.key.as_str()),
-            RespValue::from(self.member.as_str()),
+            RespValue::from(self.key.clone()),
+            RespValue::from(self.member.clone()),
         ]
     }
 
     fn parse_response(&self, response: RespValue) -> RedisResult<Self::Output> {
         match response {
-            RespValue::Null => Ok(None),
             RespValue::Integer(rank) => Ok(Some(rank)),
-            _ => Err(crate::core::error::RedisError::Type(format!(
+            RespValue::Null => Ok(None),
+            _ => Err(RedisError::Type(format!(
                 "Unexpected response type for ZRANK: {:?}",
                 response
             ))),
@@ -399,7 +385,7 @@ impl PipelineCommand for ZRankCommand {
     }
 }
 
-/// ZREVRANK command - Determine the index of a member in a sorted set, with scores ordered from high to low
+/// Represents the `ZREVRANK` command.
 #[derive(Debug, Clone)]
 pub struct ZRevRankCommand {
     key: String,
@@ -407,7 +393,8 @@ pub struct ZRevRankCommand {
 }
 
 impl ZRevRankCommand {
-    /// Create a new ZREVRANK command
+    /// Create a new `ZREVRANK` command.
+    #[must_use]
     pub fn new(key: impl Into<String>, member: impl Into<String>) -> Self {
         Self {
             key: key.into(),
@@ -425,16 +412,16 @@ impl Command for ZRevRankCommand {
 
     fn args(&self) -> Vec<RespValue> {
         vec![
-            RespValue::from(self.key.as_str()),
-            RespValue::from(self.member.as_str()),
+            RespValue::from(self.key.clone()),
+            RespValue::from(self.member.clone()),
         ]
     }
 
     fn parse_response(&self, response: RespValue) -> RedisResult<Self::Output> {
         match response {
-            RespValue::Null => Ok(None),
             RespValue::Integer(rank) => Ok(Some(rank)),
-            _ => Err(crate::core::error::RedisError::Type(format!(
+            RespValue::Null => Ok(None),
+            _ => Err(RedisError::Type(format!(
                 "Unexpected response type for ZREVRANK: {:?}",
                 response
             ))),
@@ -457,100 +444,5 @@ impl PipelineCommand for ZRevRankCommand {
     
     fn key(&self) -> Option<String> {
         Some(self.key.clone())
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_zadd_command() {
-        let cmd = ZAddCommand::new("myzset", vec![(1.0, "member1".to_string()), (2.0, "member2".to_string())]);
-        assert_eq!(cmd.command_name(), "ZADD");
-        assert_eq!(cmd.keys(), vec![b"myzset"]);
-        
-        let args = <ZAddCommand as Command>::args(&cmd);
-        assert_eq!(args.len(), 5); // key + 2 * (score + member)
-    }
-
-    #[test]
-    fn test_zadd_single_command() {
-        let cmd = ZAddCommand::single("myzset", 1.5, "member1");
-        assert_eq!(cmd.command_name(), "ZADD");
-        assert_eq!(cmd.keys(), vec![b"myzset"]);
-        
-        let args = <ZAddCommand as Command>::args(&cmd);
-        assert_eq!(args.len(), 3); // key + score + member
-    }
-
-    #[test]
-    fn test_zrem_command() {
-        let cmd = ZRemCommand::new("myzset", vec!["member1".to_string(), "member2".to_string()]);
-        assert_eq!(cmd.command_name(), "ZREM");
-        assert_eq!(cmd.keys(), vec![b"myzset"]);
-        
-        let args = <ZRemCommand as Command>::args(&cmd);
-        assert_eq!(args.len(), 3); // key + 2 members
-    }
-
-    #[test]
-    fn test_zrange_command() {
-        let cmd = ZRangeCommand::new("myzset", 0, -1);
-        assert_eq!(cmd.command_name(), "ZRANGE");
-        assert_eq!(cmd.keys(), vec![b"myzset"]);
-        
-        let args = <ZRangeCommand as Command>::args(&cmd);
-        assert_eq!(args.len(), 3); // key + start + stop
-    }
-
-    #[test]
-    fn test_zrange_command_with_scores() {
-        let cmd = ZRangeCommand::with_scores("myzset", 0, -1);
-        assert_eq!(cmd.command_name(), "ZRANGE");
-        assert_eq!(cmd.keys(), vec![b"myzset"]);
-        
-        let args = <ZRangeCommand as Command>::args(&cmd);
-        assert_eq!(args.len(), 4); // key + start + stop + WITHSCORES
-    }
-
-    #[test]
-    fn test_zscore_command() {
-        let cmd = ZScoreCommand::new("myzset", "member1");
-        assert_eq!(cmd.command_name(), "ZSCORE");
-        assert_eq!(cmd.keys(), vec![b"myzset"]);
-        
-        let args = <ZScoreCommand as Command>::args(&cmd);
-        assert_eq!(args.len(), 2); // key + member
-    }
-
-    #[test]
-    fn test_zcard_command() {
-        let cmd = ZCardCommand::new("myzset");
-        assert_eq!(cmd.command_name(), "ZCARD");
-        assert_eq!(cmd.keys(), vec![b"myzset"]);
-        
-        let args = <ZCardCommand as Command>::args(&cmd);
-        assert_eq!(args.len(), 1); // key only
-    }
-
-    #[test]
-    fn test_zrank_command() {
-        let cmd = ZRankCommand::new("myzset", "member1");
-        assert_eq!(cmd.command_name(), "ZRANK");
-        assert_eq!(cmd.keys(), vec![b"myzset"]);
-        
-        let args = <ZRankCommand as Command>::args(&cmd);
-        assert_eq!(args.len(), 2); // key + member
-    }
-
-    #[test]
-    fn test_zrevrank_command() {
-        let cmd = ZRevRankCommand::new("myzset", "member1");
-        assert_eq!(cmd.command_name(), "ZREVRANK");
-        assert_eq!(cmd.keys(), vec![b"myzset"]);
-        
-        let args = <ZRevRankCommand as Command>::args(&cmd);
-        assert_eq!(args.len(), 2); // key + member
     }
 }

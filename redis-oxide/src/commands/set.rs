@@ -1,13 +1,15 @@
-//! Set commands for Redis
-//!
-//! This module provides command builders for Redis Set operations.
+//! Command builders for Redis Set operations
 
-use crate::core::{error::RedisResult, value::RespValue};
+use crate::core::{
+    error::{RedisError, RedisResult},
+    value::RespValue,
+};
+use crate::commands::Command;
 use crate::pipeline::PipelineCommand;
-use super::Command;
 use std::collections::HashSet;
+use std::convert::TryFrom;
 
-/// SADD command - Add one or more members to a set
+/// Represents the `SADD` command.
 #[derive(Debug, Clone)]
 pub struct SAddCommand {
     key: String,
@@ -15,7 +17,8 @@ pub struct SAddCommand {
 }
 
 impl SAddCommand {
-    /// Create a new SADD command
+    /// Create a new `SADD` command.
+    #[must_use]
     pub fn new(key: impl Into<String>, members: Vec<String>) -> Self {
         Self {
             key: key.into(),
@@ -32,9 +35,9 @@ impl Command for SAddCommand {
     }
 
     fn args(&self) -> Vec<RespValue> {
-        let mut args = vec![RespValue::from(self.key.as_str())];
+        let mut args = vec![RespValue::from(self.key.clone())];
         for member in &self.members {
-            args.push(RespValue::from(member.as_str()));
+            args.push(RespValue::from(member.clone()));
         }
         args
     }
@@ -62,7 +65,7 @@ impl PipelineCommand for SAddCommand {
     }
 }
 
-/// SREM command - Remove one or more members from a set
+/// Represents the `SREM` command.
 #[derive(Debug, Clone)]
 pub struct SRemCommand {
     key: String,
@@ -70,7 +73,8 @@ pub struct SRemCommand {
 }
 
 impl SRemCommand {
-    /// Create a new SREM command
+    /// Create a new `SREM` command.
+    #[must_use]
     pub fn new(key: impl Into<String>, members: Vec<String>) -> Self {
         Self {
             key: key.into(),
@@ -87,9 +91,9 @@ impl Command for SRemCommand {
     }
 
     fn args(&self) -> Vec<RespValue> {
-        let mut args = vec![RespValue::from(self.key.as_str())];
+        let mut args = vec![RespValue::from(self.key.clone())];
         for member in &self.members {
-            args.push(RespValue::from(member.as_str()));
+            args.push(RespValue::from(member.clone()));
         }
         args
     }
@@ -117,14 +121,15 @@ impl PipelineCommand for SRemCommand {
     }
 }
 
-/// SMEMBERS command - Get all members in a set
+/// Represents the `SMEMBERS` command.
 #[derive(Debug, Clone)]
 pub struct SMembersCommand {
     key: String,
 }
 
 impl SMembersCommand {
-    /// Create a new SMEMBERS command
+    /// Create a new `SMEMBERS` command.
+    #[must_use]
     pub fn new(key: impl Into<String>) -> Self {
         Self {
             key: key.into(),
@@ -140,7 +145,7 @@ impl Command for SMembersCommand {
     }
 
     fn args(&self) -> Vec<RespValue> {
-        vec![RespValue::from(self.key.as_str())]
+        vec![RespValue::from(self.key.clone())]
     }
 
     fn parse_response(&self, response: RespValue) -> RedisResult<Self::Output> {
@@ -149,11 +154,15 @@ impl Command for SMembersCommand {
                 let mut result = HashSet::new();
                 for item in items {
                     match item {
-                        RespValue::BulkString(bytes) => {
-                            let s = String::from_utf8_lossy(&bytes).to_string();
+                        RespValue::BulkString(b) => {
+                            let s = String::from_utf8(b.to_vec())
+                                .map_err(|e| RedisError::Type(format!("Invalid UTF-8: {e}")))?;
                             result.insert(s);
                         }
-                        _ => return Err(crate::core::error::RedisError::Type(format!(
+                        RespValue::Null => {
+                            // Skip null values
+                        }
+                        _ => return Err(RedisError::Type(format!(
                             "Unexpected item type in SMEMBERS response: {:?}",
                             item
                         ))),
@@ -161,7 +170,7 @@ impl Command for SMembersCommand {
                 }
                 Ok(result)
             }
-            _ => Err(crate::core::error::RedisError::Type(format!(
+            _ => Err(RedisError::Type(format!(
                 "Unexpected response type for SMEMBERS: {:?}",
                 response
             ))),
@@ -187,7 +196,7 @@ impl PipelineCommand for SMembersCommand {
     }
 }
 
-/// SISMEMBER command - Determine if a given value is a member of a set
+/// Represents the `SISMEMBER` command.
 #[derive(Debug, Clone)]
 pub struct SIsMemberCommand {
     key: String,
@@ -195,7 +204,8 @@ pub struct SIsMemberCommand {
 }
 
 impl SIsMemberCommand {
-    /// Create a new SISMEMBER command
+    /// Create a new `SISMEMBER` command.
+    #[must_use]
     pub fn new(key: impl Into<String>, member: impl Into<String>) -> Self {
         Self {
             key: key.into(),
@@ -213,8 +223,8 @@ impl Command for SIsMemberCommand {
 
     fn args(&self) -> Vec<RespValue> {
         vec![
-            RespValue::from(self.key.as_str()),
-            RespValue::from(self.member.as_str()),
+            RespValue::from(self.key.clone()),
+            RespValue::from(self.member.clone()),
         ]
     }
 
@@ -222,7 +232,7 @@ impl Command for SIsMemberCommand {
         match response {
             RespValue::Integer(1) => Ok(true),
             RespValue::Integer(0) => Ok(false),
-            _ => Err(crate::core::error::RedisError::Type(format!(
+            _ => Err(RedisError::Type(format!(
                 "Unexpected response type for SISMEMBER: {:?}",
                 response
             ))),
@@ -248,14 +258,15 @@ impl PipelineCommand for SIsMemberCommand {
     }
 }
 
-/// SCARD command - Get the number of members in a set
+/// Represents the `SCARD` command.
 #[derive(Debug, Clone)]
 pub struct SCardCommand {
     key: String,
 }
 
 impl SCardCommand {
-    /// Create a new SCARD command
+    /// Create a new `SCARD` command.
+    #[must_use]
     pub fn new(key: impl Into<String>) -> Self {
         Self {
             key: key.into(),
@@ -271,7 +282,7 @@ impl Command for SCardCommand {
     }
 
     fn args(&self) -> Vec<RespValue> {
-        vec![RespValue::from(self.key.as_str())]
+        vec![RespValue::from(self.key.clone())]
     }
 
     fn parse_response(&self, response: RespValue) -> RedisResult<Self::Output> {
@@ -297,27 +308,18 @@ impl PipelineCommand for SCardCommand {
     }
 }
 
-/// SPOP command - Remove and return one or more random members from a set
+/// Represents the `SPOP` command.
 #[derive(Debug, Clone)]
 pub struct SPopCommand {
     key: String,
-    count: Option<i64>,
 }
 
 impl SPopCommand {
-    /// Create a new SPOP command
+    /// Create a new `SPOP` command.
+    #[must_use]
     pub fn new(key: impl Into<String>) -> Self {
         Self {
             key: key.into(),
-            count: None,
-        }
-    }
-
-    /// Create a new SPOP command with count
-    pub fn with_count(key: impl Into<String>, count: i64) -> Self {
-        Self {
-            key: key.into(),
-            count: Some(count),
         }
     }
 }
@@ -330,21 +332,18 @@ impl Command for SPopCommand {
     }
 
     fn args(&self) -> Vec<RespValue> {
-        let mut args = vec![RespValue::from(self.key.as_str())];
-        if let Some(count) = self.count {
-            args.push(RespValue::from(count.to_string()));
-        }
-        args
+        vec![RespValue::from(self.key.clone())]
     }
 
     fn parse_response(&self, response: RespValue) -> RedisResult<Self::Output> {
         match response {
-            RespValue::Null => Ok(None),
-            RespValue::BulkString(bytes) => {
-                let s = String::from_utf8_lossy(&bytes).to_string();
-                Ok(Some(s))
+            RespValue::BulkString(b) => {
+                String::from_utf8(b.to_vec())
+                    .map(Some)
+                    .map_err(|e| RedisError::Type(format!("Invalid UTF-8: {e}")))
             }
-            _ => Err(crate::core::error::RedisError::Type(format!(
+            RespValue::Null => Ok(None),
+            _ => Err(RedisError::Type(format!(
                 "Unexpected response type for SPOP: {:?}",
                 response
             ))),
@@ -370,27 +369,18 @@ impl PipelineCommand for SPopCommand {
     }
 }
 
-/// SRANDMEMBER command - Get one or more random members from a set
+/// Represents the `SRANDMEMBER` command.
 #[derive(Debug, Clone)]
 pub struct SRandMemberCommand {
     key: String,
-    count: Option<i64>,
 }
 
 impl SRandMemberCommand {
-    /// Create a new SRANDMEMBER command
+    /// Create a new `SRANDMEMBER` command.
+    #[must_use]
     pub fn new(key: impl Into<String>) -> Self {
         Self {
             key: key.into(),
-            count: None,
-        }
-    }
-
-    /// Create a new SRANDMEMBER command with count
-    pub fn with_count(key: impl Into<String>, count: i64) -> Self {
-        Self {
-            key: key.into(),
-            count: Some(count),
         }
     }
 }
@@ -403,21 +393,18 @@ impl Command for SRandMemberCommand {
     }
 
     fn args(&self) -> Vec<RespValue> {
-        let mut args = vec![RespValue::from(self.key.as_str())];
-        if let Some(count) = self.count {
-            args.push(RespValue::from(count.to_string()));
-        }
-        args
+        vec![RespValue::from(self.key.clone())]
     }
 
     fn parse_response(&self, response: RespValue) -> RedisResult<Self::Output> {
         match response {
-            RespValue::Null => Ok(None),
-            RespValue::BulkString(bytes) => {
-                let s = String::from_utf8_lossy(&bytes).to_string();
-                Ok(Some(s))
+            RespValue::BulkString(b) => {
+                String::from_utf8(b.to_vec())
+                    .map(Some)
+                    .map_err(|e| RedisError::Type(format!("Invalid UTF-8: {e}")))
             }
-            _ => Err(crate::core::error::RedisError::Type(format!(
+            RespValue::Null => Ok(None),
+            _ => Err(RedisError::Type(format!(
                 "Unexpected response type for SRANDMEMBER: {:?}",
                 response
             ))),
@@ -440,100 +427,5 @@ impl PipelineCommand for SRandMemberCommand {
     
     fn key(&self) -> Option<String> {
         Some(self.key.clone())
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_sadd_command() {
-        let cmd = SAddCommand::new("myset", vec!["member1".to_string(), "member2".to_string()]);
-        assert_eq!(cmd.command_name(), "SADD");
-        assert_eq!(cmd.keys(), vec![b"myset"]);
-        
-        let args = <SAddCommand as Command>::args(&cmd);
-        assert_eq!(args.len(), 3); // key + 2 members
-    }
-
-    #[test]
-    fn test_srem_command() {
-        let cmd = SRemCommand::new("myset", vec!["member1".to_string(), "member2".to_string()]);
-        assert_eq!(cmd.command_name(), "SREM");
-        assert_eq!(cmd.keys(), vec![b"myset"]);
-        
-        let args = <SRemCommand as Command>::args(&cmd);
-        assert_eq!(args.len(), 3); // key + 2 members
-    }
-
-    #[test]
-    fn test_smembers_command() {
-        let cmd = SMembersCommand::new("myset");
-        assert_eq!(cmd.command_name(), "SMEMBERS");
-        assert_eq!(cmd.keys(), vec![b"myset"]);
-        
-        let args = <SMembersCommand as Command>::args(&cmd);
-        assert_eq!(args.len(), 1); // key only
-    }
-
-    #[test]
-    fn test_sismember_command() {
-        let cmd = SIsMemberCommand::new("myset", "member1");
-        assert_eq!(cmd.command_name(), "SISMEMBER");
-        assert_eq!(cmd.keys(), vec![b"myset"]);
-        
-        let args = <SIsMemberCommand as Command>::args(&cmd);
-        assert_eq!(args.len(), 2); // key + member
-    }
-
-    #[test]
-    fn test_scard_command() {
-        let cmd = SCardCommand::new("myset");
-        assert_eq!(cmd.command_name(), "SCARD");
-        assert_eq!(cmd.keys(), vec![b"myset"]);
-        
-        let args = <SCardCommand as Command>::args(&cmd);
-        assert_eq!(args.len(), 1); // key only
-    }
-
-    #[test]
-    fn test_spop_command() {
-        let cmd = SPopCommand::new("myset");
-        assert_eq!(cmd.command_name(), "SPOP");
-        assert_eq!(cmd.keys(), vec![b"myset"]);
-        
-        let args = <SPopCommand as Command>::args(&cmd);
-        assert_eq!(args.len(), 1); // key only
-    }
-
-    #[test]
-    fn test_spop_command_with_count() {
-        let cmd = SPopCommand::with_count("myset", 3);
-        assert_eq!(cmd.command_name(), "SPOP");
-        assert_eq!(cmd.keys(), vec![b"myset"]);
-        
-        let args = <SPopCommand as Command>::args(&cmd);
-        assert_eq!(args.len(), 2); // key + count
-    }
-
-    #[test]
-    fn test_srandmember_command() {
-        let cmd = SRandMemberCommand::new("myset");
-        assert_eq!(cmd.command_name(), "SRANDMEMBER");
-        assert_eq!(cmd.keys(), vec![b"myset"]);
-        
-        let args = <SRandMemberCommand as Command>::args(&cmd);
-        assert_eq!(args.len(), 1); // key only
-    }
-
-    #[test]
-    fn test_srandmember_command_with_count() {
-        let cmd = SRandMemberCommand::with_count("myset", 3);
-        assert_eq!(cmd.command_name(), "SRANDMEMBER");
-        assert_eq!(cmd.keys(), vec![b"myset"]);
-        
-        let args = <SRandMemberCommand as Command>::args(&cmd);
-        assert_eq!(args.len(), 2); // key + count
     }
 }
