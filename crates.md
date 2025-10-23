@@ -14,95 +14,13 @@ This document provides a comprehensive overview of the `redis-oxide` crate, its 
 - **Error Handling**: Comprehensive error handling with a clear and concise API.
 - **High Performance**: Optimized for high performance and low overhead.
 
-## Project Structure
-
-```
-redis-mux/
-├── Cargo.toml                          # Workspace manifest
-├── README.md                           # Main documentation
-├── CHANGELOG.md                        # Change log
-├── CONTRIBUTING.md                     # Contribution guidelines
-├── LICENSE-MIT / LICENSE-APACHE       # Dual licensing
-│
-├── redis-oxide-core/                   # Core library
-│   ├── Cargo.toml
-│   └── src/
-│       ├── lib.rs                      # Module exports
-│       ├── error.rs                    # RedisError with MOVED parsing
-│       ├── config.rs                   # ConnectionConfig, PoolConfig
-│       ├── types.rs                    # RedisValue, NodeInfo, SlotRange
-│       └── value.rs                    # RespValue types
-│
-├── redis-oxide/                        # Main library
-│   ├── Cargo.toml
-│   ├── benches/
-│   │   └── protocol_bench.rs           # Protocol benchmarks
-│   ├── tests/
-│   │   └── integration_tests.rs        # Integration tests
-│   └── src/
-│       ├── lib.rs                      # Public API
-│       ├── protocol.rs                 # RESP2 encoder/decoder
-│       ├── connection.rs               # Connection management
-│       ├── cluster.rs                  # Cluster support
-│       ├── pool.rs                     # Connection pooling
-│       ├── client.rs                   # High-level Client API
-│       └── commands/
-│           └── mod.rs                  # Command builders
-│
-├── examples/                           # Usage examples
-│   ├── basic_usage.rs                  # Basic operations
-│   ├── cluster_usage.rs                # Cluster operations
-│   └── pool_strategies.rs              # Pool comparison
-│
-└── .github/
-    └── workflows/
-        └── ci.yml                      # CI/CD pipeline
-```
-
-## Main Components
-
-### Core Types (`redis-oxide-core`)
-
-- **Error Handling**: `RedisError` with variants for all error cases, including `MOVED` and `ASK` redirection parsing.
-- **Configuration**: `ConnectionConfig`, `PoolConfig`, and `TopologyMode` for configuring the client.
-- **Value Types**: `RespValue`, `RedisValue`, `NodeInfo`, and `SlotRange` for representing Redis data and cluster topology.
-
-### Protocol Layer (`protocol.rs`)
-
-- **RespEncoder**: Encodes `RespValue` to bytes.
-- **RespDecoder**: Decodes RESP from a buffer.
-
-### Connection Management (`connection.rs`)
-
-- **RedisConnection**: Manages a TCP connection to a Redis server.
-- **ConnectionManager**: Detects the Redis topology (standalone or cluster) and creates connections.
-
-### Cluster Support (`cluster.rs`)
-
-- **Slot Calculation**: Calculates the cluster slot for a given key.
-- **ClusterTopology**: Manages the slot-to-node mapping.
-- **RedirectHandler**: Handles `MOVED` and `ASK` redirections.
-
-### Connection Pooling (`pool.rs`)
-
-- **MultiplexedPool**: A single connection shared via an mpsc channel.
-- **ConnectionPool**: A traditional connection pool with a configurable number of connections.
-
-### Command Builders (`commands/`)
-
-- **Type-Safe Commands**: A set of type-safe command builders for common Redis commands.
-
-### Client API (`client.rs`)
-
-- **Client**: The main entry point for interacting with Redis.
-
 ## Getting Started
 
 Add `redis-oxide` to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-redis-oxide = "0.1.0"
+redis-oxide = "0.2.0"
 ```
 
 ## Basic Usage
@@ -115,16 +33,128 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config = ConnectionConfig::new("redis://127.0.0.1:6379")?;
     let client = Client::connect(config).await?;
 
+    // Set a key
     client.set("key", "value").await?;
-    let value: String = client.get("key").await?;
 
+    // Get a key
+    let value: String = client.get("key").await?;
     println!("Got value: {}", value);
+
+    // Delete a key
+    client.del("key").await?;
+
+    Ok(())
+}
+```
+
+## Type-Safe Commands
+
+`redis-oxide` provides a set of type-safe command builders for common Redis commands.
+
+### SET
+
+The `SET` command can be used to set a key with a value and optional expiration.
+
+```rust
+use redis_oxide::{Client, ConnectionConfig, SetOptions};
+use std::time::Duration;
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let config = ConnectionConfig::new("redis://127.0.0.1:6379")?;
+    let client = Client::connect(config).await?;
+
+    // Set a key with a 10-second expiration
+    let options = SetOptions::new().ex(Duration::from_secs(10));
+    client.set_with_options("key", "value", options).await?;
+
+    Ok(())
+}
+```
+
+### GET
+
+The `GET` command can be used to get the value of a key.
+
+```rust
+use redis_oxide::{Client, ConnectionConfig};
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let config = ConnectionConfig::new("redis://127.0.0.1:6379")?;
+    let client = Client::connect(config).await?;
+
+    let value: Option<String> = client.get("key").await?;
+
+    match value {
+        Some(v) => println!("Got value: {}", v),
+        None => println!("Key not found"),
+    }
+
+    Ok(())
+}
+```
+
+### DEL
+
+The `DEL` command can be used to delete one or more keys.
+
+```rust
+use redis_oxide::{Client, ConnectionConfig};
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let config = ConnectionConfig::new("redis://127.0.0.1:6379")?;
+    let client = Client::connect(config).await?;
+
+    client.del("key1").await?;
+    client.del_slice(&["key2", "key3"]).await?;
+
+    Ok(())
+}
+```
+
+### EXPIRE
+
+The `EXPIRE` command can be used to set a timeout on a key.
+
+```rust
+use redis_oxide::{Client, ConnectionConfig};
+use std::time::Duration;
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let config = ConnectionConfig::new("redis://127.0.0.1:6379")?;
+    let client = Client::connect(config).await?;
+
+    client.expire("key", Duration::from_secs(10)).await?;
+
+    Ok(())
+}
+```
+
+### INCR
+
+The `INCR` command can be used to increment the integer value of a key by one.
+
+```rust
+use redis_oxide::{Client, ConnectionConfig};
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let config = ConnectionConfig::new("redis://127.0.0.1:6379")?;
+    let client = Client::connect(config).await?;
+
+    let value: i64 = client.incr("counter").await?;
+    println!("Counter: {}", value);
 
     Ok(())
 }
 ```
 
 ## Cluster Usage
+
+`redis-oxide` provides automatic cluster slot management and redirection handling.
 
 ```rust
 use redis_oxide::{Client, ConnectionConfig, TopologyMode};
@@ -155,6 +185,28 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 - **Multiplexed**: A single connection is shared for all requests. This is the default and is suitable for most use cases.
 - **Pool**: A traditional connection pool with a configurable number of connections.
+
+### Multiplexed
+
+```rust
+use redis_oxide::{Client, ConnectionConfig, PoolConfig, PoolStrategy};
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let config = ConnectionConfig::builder()
+        .add_endpoint("redis://127.0.0.1:6379")
+        .pool_config(PoolConfig::new(PoolStrategy::Multiplexed))
+        .build()?;
+
+    let client = Client::connect(config).await?;
+
+    // ...
+
+    Ok(())
+}
+```
+
+### Pool
 
 ```rust
 use redis_oxide::{Client, ConnectionConfig, PoolConfig, PoolStrategy};
@@ -215,5 +267,5 @@ Contributions are welcome! Please see the [contributing guide](CONTRIBUTING.md) 
 
 This project is licensed under either of the following, at your option:
 
-- Apache License, Version 2.0, ([LICENSE-APACHE](LICENSE-APACHE) or http://www.apache.org/licenses/LICENSE-2.0)
-- MIT license ([LICENSE-MIT](LICENSE-MIT) or http://opensource.org/licenses/MIT)
+- Apache License, Version 2.0, ([LICENSE-APACHE](https://github.com/nghiaphamln/redis-oxide/blob/main/LICENSE-APACHE) or http://www.apache.org/licenses/LICENSE-2.0)
+- MIT license ([LICENSE-MIT](https://github.com/nghiaphamln/redis-oxide/blob/main/LICENSE-MIT) or http://opensource.org/licenses/MIT)

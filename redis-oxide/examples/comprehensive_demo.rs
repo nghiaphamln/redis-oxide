@@ -286,7 +286,10 @@ async fn demo_transaction_operations(client: &Client) -> Result<(), Box<dyn std:
 
     // Execute transaction
     let transaction_result = transaction.exec().await?;
-    println!("Transaction succeeded with {} results", transaction_result.len());
+    println!(
+        "Transaction succeeded with {} results",
+        transaction_result.len()
+    );
     for (i, result) in transaction_result.iter().enumerate() {
         println!("  Result {}: {:?}", i, result);
     }
