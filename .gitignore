@@ -23,3 +23,5 @@ tarpaulin-report.html
 # Documentation
 book/
 
+redis-oxide-copy/
+redis-oxide/target-local/
