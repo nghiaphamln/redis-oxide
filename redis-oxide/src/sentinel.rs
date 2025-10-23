@@ -45,7 +45,7 @@
 //!
 //! // Client automatically handles master failover
 //! loop {
-//!     match client.ping().await {
+//!     match client.get("key").await {
 //!         Ok(_) => {
 //!             println!("Connected to master");
 //!             break;
