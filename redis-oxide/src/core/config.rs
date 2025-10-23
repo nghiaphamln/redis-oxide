@@ -3,18 +3,13 @@
 use std::time::Duration;
 
 /// Protocol version preference
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum ProtocolVersion {
     /// RESP2 (Redis Serialization Protocol version 2) - Default
+    #[default]
     Resp2,
     /// RESP3 (Redis Serialization Protocol version 3) - Redis 6.0+
     Resp3,
-}
-
-impl Default for ProtocolVersion {
-    fn default() -> Self {
-        Self::Resp2
-    }
 }
 
 /// Strategy for connection pooling
