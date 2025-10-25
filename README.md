@@ -2,8 +2,7 @@
 
 [![Crates.io](https://img.shields.io/crates/v/redis-oxide.svg)](https://crates.io/crates/redis-oxide)
 [![Docs.rs](https://docs.rs/redis-oxide/badge.svg)](https://docs.rs/redis-oxide)
-[![Build Status](https://github.com/nghiaphamln/redis-oxide/workflows/ci/badge.svg)](https://github.com/nghiaphamln/redis-oxide/actions)
-[![License: MIT OR Apache-2.0](https://img.shields.io/crates/l/redis-oxide.svg)](https://github.com/nghiaphamln/redis-oxide#license)
+[![License: MIT](https://img.shields.io/crates/l/redis-oxide.svg)](https://github.com/nghiaphamln/redis-oxide#license)
 
 A high-performance, async Redis client for Rust. Features automatic cluster detection, MOVED/ASK redirect handling, and flexible connection strategies.
 
@@ -45,7 +44,7 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-redis-oxide = "0.2.0"
+redis-oxide = "0.2.2"
 tokio = { version = "1.0", features = ["full"] }
 ```
 

@@ -3,7 +3,7 @@
 ## Overview
 Redis Oxide is a high-performance async Redis client for Rust, inspired by StackExchange.Redis for .NET. This roadmap outlines planned improvements and features for future releases.
 
-## Current State (v0.2.0)
+## Current State (v0.2.2)
 - ✅ Basic Redis operations support
 - ✅ Cluster mode with automatic topology detection
 - ✅ Connection pooling strategies (Multiplexed & Connection Pool)

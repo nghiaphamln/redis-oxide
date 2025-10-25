@@ -42,7 +42,7 @@
 //!
 //! ```toml
 //! [dependencies]
-//! redis-oxide = "0.2.0"
+//! redis-oxide = "0.2.2"
 //! tokio = { version = "1.0", features = ["full"] }
 //! ```
 //!

@@ -3,11 +3,11 @@ members = ["redis-oxide"]
 resolver = "2"
 
 [workspace.package]
-version = "0.2.1"
+version = "0.2.2"
 edition = "2021"
 rust-version = "1.82.0"
 authors = ["Nghia Pham <nghiaphamln3@gmail.com>"]
-license = "MIT OR Apache-2.0"
+license = "MIT"
 repository = "https://github.com/nghiaphamln/redis-oxide"
 homepage = "https://github.com/nghiaphamln/redis-oxide"
 documentation = "https://docs.rs/redis-oxide"
