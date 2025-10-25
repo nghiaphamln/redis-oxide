@@ -5,7 +5,7 @@
 [![Build Status](https://github.com/nghiaphamln/redis-oxide/workflows/ci/badge.svg)](https://github.com/nghiaphamln/redis-oxide/actions)
 [![License: MIT OR Apache-2.0](https://img.shields.io/crates/l/redis-oxide.svg)](https://github.com/nghiaphamln/redis-oxide#license)
 
-A high-performance, async Redis client for Rust, inspired by StackExchange.Redis for .NET. Features automatic cluster detection, MOVED/ASK redirect handling, and flexible connection strategies.
+A high-performance, async Redis client for Rust. Features automatic cluster detection, MOVED/ASK redirect handling, and flexible connection strategies.
 
 ## 🚀 Features
 
@@ -18,6 +18,26 @@ A high-performance, async Redis client for Rust, inspired by StackExchange.Redis
 - **Comprehensive error handling**: Detailed and clear error types
 - **High test coverage**: Extensive unit and integration tests
 - **Cross-platform support**: Works on Linux, macOS, and Windows
+- **Pub/Sub Support**: Built-in publish/subscribe messaging
+- **Streams Support**: Full Redis Streams functionality for event sourcing
+- **Lua Scripting**: Execute Lua scripts with automatic EVALSHA caching
+- **Sentinel Support**: High availability with Redis Sentinel
+- **Transaction Support**: MULTI/EXEC transaction handling
+- **Pipeline Support**: Batch multiple commands for improved performance
+- **RESP2/RESP3 Protocol Support**: Full support for both protocol versions
+- **Connection Pooling**: Configurable connection pooling strategies
+- **Multiplexed Connections**: Single connection shared across tasks
+- **Hash Operations**: Complete set of hash data type operations
+- **List Operations**: Complete set of list data type operations
+- **Set Operations**: Complete set of set data type operations
+- **Sorted Set Operations**: Complete set of sorted set data type operations
+- **String Operations**: Complete set of string data type operations
+- **HyperLogLog Operations**: Support for probabilistic data structures
+- **Geo Operations**: Support for geospatial data types
+- **Performance Optimizations**: Memory pooling and protocol optimizations
+- **Monitoring & Metrics**: Built-in observability features
+- **Configurable Timeouts**: Connect, operation, and redirect timeout controls
+- **Authentication Support**: Password and access control support
 
 ## 📦 Installation
 
@@ -99,6 +119,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // SET NX (only if key doesn't exist)
     let set: bool = client.set_nx("key", "value").await?;
+    assert!(set);
+
+    // SET XX (only if key exists)
+    let set: bool = client.set_xx("key", "value").await?;
 
     // DELETE
     let deleted: i64 = client.del(vec!["key1".to_string(), "key2".to_string()]).await?;
@@ -119,6 +143,223 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // INCRBY/DECRBY
     let new_value: i64 = client.incr_by("counter", 10).await?;
     let new_value: i64 = client.decr_by("counter", 5).await?;
+
+    // MGET (multiple get)
+    let values: Vec<Option<String>> = client.mget(vec!["key1".to_string(), "key2".to_string()]).await?;
+
+    // MSET (multiple set)
+    use std::collections::HashMap;
+    let mut pairs = HashMap::new();
+    pairs.insert("key1".to_string(), "value1".to_string());
+    pairs.insert("key2".to_string(), "value2".to_string());
+    client.mset(pairs).await?;
+
+    Ok(())
+}
+```
+
+### Hash Operations
+
+```rust
+use redis_oxide::{Client, ConnectionConfig};
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let config = ConnectionConfig::new("redis://localhost:6379");
+    let client = Client::connect(config).await?;
+
+    // HSET
+    client.hset("myhash", "field1", "value1").await?;
+    client.hset("myhash", "field2", "value2").await?;
+
+    // HGET
+    if let Some(value) = client.hget("myhash", "field1").await? {
+        println!("field1: {}", value);
+    }
+
+    // HGETALL
+    let all_fields = client.hgetall("myhash").await?;
+    println!("All hash fields: {:?}", all_fields);
+
+    // HMGET (multiple get)
+    let values = client.hmget("myhash", vec!["field1".to_string(), "field2".to_string()]).await?;
+    println!("Multiple fields: {:?}", values);
+
+    // HMSET (multiple set)
+    use std::collections::HashMap;
+    let mut fields = HashMap::new();
+    fields.insert("field3".to_string(), "value3".to_string());
+    fields.insert("field4".to_string(), "value4".to_string());
+    client.hmset("myhash", fields).await?;
+
+    // HDEL
+    let deleted: i64 = client.hdel("myhash", vec!["field1".to_string(), "field2".to_string()]).await?;
+
+    // HEXISTS
+    let exists: bool = client.hexists("myhash", "field1").await?;
+
+    // HLEN
+    let len: i64 = client.hlen("myhash").await?;
+
+    Ok(())
+}
+```
+
+### List Operations
+
+```rust
+use redis_oxide::{Client, ConnectionConfig};
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let config = ConnectionConfig::new("redis://localhost:6379");
+    let client = Client::connect(config).await?;
+
+    // LPUSH
+    client.lpush("mylist", vec!["item1".to_string(), "item2".to_string()]).await?;
+
+    // RPUSH
+    client.rpush("mylist", vec!["item3".to_string(), "item4".to_string()]).await?;
+
+    // LRANGE
+    let items = client.lrange("mylist", 0, -1).await?;
+    println!("List items: {:?}", items);
+
+    // LLEN
+    let len: i64 = client.llen("mylist").await?;
+
+    // LINDEX
+    if let Some(item) = client.lindex("mylist", 0).await? {
+        println!("First item: {}", item);
+    }
+
+    // LPOP
+    if let Some(item) = client.lpop("mylist").await? {
+        println!("Popped item: {}", item);
+    }
+
+    Ok(())
+}
+```
+
+### Set Operations
+
+```rust
+use redis_oxide::{Client, ConnectionConfig};
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let config = ConnectionConfig::new("redis://localhost:6379");
+    let client = Client::connect(config).await?;
+
+    // SADD
+    client.sadd("myset", vec!["member1".to_string(), "member2".to_string()]).await?;
+
+    // SMEMBERS
+    let members = client.smembers("myset").await?;
+    println!("Set members: {:?}", members);
+
+    // SISMEMBER
+    let is_member: bool = client.sismember("myset", "member1").await?;
+
+    // SREM
+    let removed: i64 = client.srem("myset", vec!["member1".to_string()]).await?;
+
+    // SCARD
+    let count: i64 = client.scard("myset").await?;
+
+    Ok(())
+}
+```
+
+### Sorted Set Operations
+
+```rust
+use redis_oxide::{Client, ConnectionConfig};
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let config = ConnectionConfig::new("redis://localhost:6379");
+    let client = Client::connect(config).await?;
+    use std::collections::HashMap;
+
+    // ZADD
+    let mut members = HashMap::new();
+    members.insert("member1".to_string(), 10.0);
+    members.insert("member2".to_string(), 20.0);
+    client.zadd("mysortedset", members).await?;
+
+    // ZRANGE
+    let members = client.zrange("mysortedset", 0, -1, true).await?;
+    println!("Sorted set members: {:?}", members);
+
+    // ZRANGE with scores
+    let members_with_scores = client.zrange_with_scores("mysortedset", 0, -1).await?;
+    println!("Members with scores: {:?}", members_with_scores);
+
+    // ZSCORE
+    if let Some(score) = client.zscore("mysortedset", "member1").await? {
+        println!("Member1 score: {}", score);
+    }
+
+    // ZCARD
+    let count: i64 = client.zcard("mysortedset").await?;
+
+    Ok(())
+}
+```
+
+### HyperLogLog Operations
+
+```rust
+use redis_oxide::{Client, ConnectionConfig};
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let config = ConnectionConfig::new("redis://localhost:6379");
+    let client = Client::connect(config).await?;
+
+    // PFADD - Add elements to HyperLogLog
+    let updated: bool = client.pfadd("hll_key", vec!["element1".to_string(), "element2".to_string()]).await?;
+    println!("HyperLogLog updated: {}", updated);
+
+    // PFCOUNT - Count unique elements
+    let count: i64 = client.pfcount(vec!["hll_key".to_string()]).await?;
+    println!("Estimated unique count: {}", count);
+
+    // PFMERGE - Merge multiple HyperLogLogs
+    client.pfadd("hll_key2", vec!["element3".to_string(), "element4".to_string()]).await?;
+    client.pfmerge("hll_merged", vec!["hll_key".to_string(), "hll_key2".to_string()]).await?;
+
+    Ok(())
+}
+```
+
+### Geo Operations
+
+```rust
+use redis_oxide::{Client, ConnectionConfig};
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let config = ConnectionConfig::new("redis://localhost:6379");
+    let client = Client::connect(config).await?;
+    use std::collections::HashMap;
+
+    // GEOADD - Add geospatial items
+    let mut locations = HashMap::new();
+    locations.insert("Palermo".to_string(), (13.361389, 38.115556));
+    locations.insert("Catania".to_string(), (15.087269, 37.502669));
+    client.geoadd("Sicily", locations).await?;
+
+    // GEODIST - Calculate distance between locations
+    if let Some(distance) = client.geodist("Sicily", "Palermo", "Catania", "km").await? {
+        println!("Distance: {} km", distance);
+    }
+
+    // GEOPOS - Get geospatial position
+    let positions = client.geopos("Sicily", vec!["Palermo".to_string(), "Catania".to_string()]).await?;
+    println!("Positions: {:?}", positions);
 
     Ok(())
 }
@@ -220,7 +461,70 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
-### Hash Operations
+### Pub/Sub Messaging
+
+```rust
+use redis_oxide::{Client, ConnectionConfig};
+use futures::StreamExt;
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let config = ConnectionConfig::new("redis://localhost:6379");
+    let client = Client::connect(config).await?;
+
+    // Publisher example
+    let publisher = client.publisher().await?;
+
+    let subscribers = publisher.publish("news", "Breaking news!").await?;
+    println!("Message sent to {} subscribers", subscribers);
+
+    // Subscriber example
+    let mut subscriber = client.subscriber().await?;
+    subscriber.subscribe(vec!["news".to_string(), "updates".to_string()]).await?;
+
+    // Listen for messages
+    while let Some(message) = subscriber.next_message().await? {
+        println!("Received: {} on channel {}", message.payload, message.channel);
+    }
+
+    Ok(())
+}
+```
+
+### Redis Streams
+
+```rust
+use redis_oxide::{Client, ConnectionConfig, StreamRange, ReadOptions};
+use std::collections::HashMap;
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let config = ConnectionConfig::new("redis://localhost:6379");
+    let client = Client::connect(config).await?;
+
+    // Create and add entries to a stream
+    let mut fields = HashMap::new();
+    fields.insert("user_id".to_string(), "123".to_string());
+    fields.insert("action".to_string(), "login".to_string());
+
+    let entry_id = client.xadd("events", "*", fields).await?;
+    println!("Added entry: {}", entry_id);
+
+    // Read from stream with range
+    let entries = client.xrange("events", "-", "+", Some(10)).await?;
+    for entry in entries {
+        println!("Entry {}: {:?}", entry.id, entry.fields);
+    }
+
+    // Read from stream with options
+    let options = ReadOptions::new().with_count(5).with_block(std::time::Duration::from_millis(100));
+    let entries = client.xread(vec![("events".to_string(), "0-0".to_string())], options).await?;
+
+    Ok(())
+}
+```
+
+### Consumer Groups (Redis Streams)
 
 ```rust
 use redis_oxide::{Client, ConnectionConfig};
@@ -230,22 +534,127 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config = ConnectionConfig::new("redis://localhost:6379");
     let client = Client::connect(config).await?;
 
-    // HSET
-    client.hset("myhash", "field1", "value1").await?;
-    client.hset("myhash", "field2", "value2").await?;
+    // Create a consumer group
+    client.xgroup_create("events", "processors", "$", true).await?;
 
-    // HGET
-    if let Some(value) = client.hget("myhash", "field1").await? {
-        println!("field1: {}", value);
+    // Read from the group
+    let messages = client.xreadgroup(
+        "processors",
+        "worker-1",
+        vec![("events".to_string(), ">".to_string())],
+        Some(1),
+        Some(std::time::Duration::from_secs(1))
+    ).await?;
+
+    for (stream, entries) in messages {
+        for entry in entries {
+            println!("Processing {}: {:?}", entry.id, entry.fields);
+            // Process the message...
+            
+            // Acknowledge the message
+            client.xack("events", "processors", vec![entry.id]).await?;
+        }
     }
 
-    // HGETALL
-    let all_fields = client.hgetall("myhash").await?;
-    println!("All hash fields: {:?}", all_fields);
+    Ok(())
+}
+```
 
-    // HMGET
-    let values = client.hmget("myhash", vec!["field1".to_string(), "field2".to_string()]).await?;
-    println!("Multiple fields: {:?}", values);
+### Lua Scripting
+
+```rust
+use redis_oxide::{Client, ConnectionConfig, Script};
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let config = ConnectionConfig::new("redis://localhost:6379");
+    let client = Client::connect(config).await?;
+
+    // Execute a simple Lua script
+    let script = "return redis.call('GET', KEYS[1])";
+    let result: Option<String> = client.eval(script, vec!["mykey".to_string()], vec![]).await?;
+    println!("Result: {:?}", result);
+
+    // Script with arguments
+    let script = r#"
+        local current = redis.call('GET', KEYS[1]) or 0
+        local increment = tonumber(ARGV[1])
+        local new_value = tonumber(current) + increment
+        redis.call('SET', KEYS[1], new_value)
+        return new_value
+    "#;
+
+    let result: i64 = client.eval(
+        script,
+        vec!["counter".to_string()],
+        vec!["5".to_string()]
+    ).await?;
+    println!("New counter value: {}", result);
+
+    // Using Script with automatic EVALSHA caching
+    let script = Script::new(r#"
+        local key = KEYS[1]
+        local value = ARGV[1]
+        redis.call('SET', key, value)
+        return redis.call('GET', key)
+    "#);
+
+    let result: String = script.execute(
+        &client,
+        vec!["mykey".to_string()],
+        vec!["myvalue".to_string()]
+    ).await?;
+    println!("Result: {}", result);
+
+    Ok(())
+}
+```
+
+### Sentinel Support
+
+```rust
+use redis_oxide::{Client, ConnectionConfig, SentinelConfig};
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let sentinel_config = SentinelConfig::new("mymaster")
+        .add_sentinel("127.0.0.1:26379")
+        .add_sentinel("127.0.0.1:26380")
+        .add_sentinel("127.0.0.1:26381")
+        .with_password("sentinel_password");
+
+    let config = ConnectionConfig::new_with_sentinel(sentinel_config);
+    let client = Client::connect(config).await?;
+
+    // Client automatically connects to current master
+    client.set("key", "value").await?;
+
+    Ok(())
+}
+```
+
+### RESP2/RESP3 Protocol Support
+
+```rust
+use redis_oxide::{Client, ConnectionConfig, ProtocolVersion};
+use std::collections::HashMap;
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let config_resp2 = ConnectionConfig::new("redis://localhost:6379")
+        .with_protocol_version(ProtocolVersion::Resp2);
+    let client_resp2 = Client::connect(config_resp2).await?;
+
+    // RESP3 (Redis 6.0+)
+    let config_resp3 = ConnectionConfig::new("redis://localhost:6379")
+        .with_protocol_version(ProtocolVersion::Resp3);
+    let client_resp3 = Client::connect(config_resp3).await?;
+
+    // RESP3 allows more complex data types
+    let mut map = HashMap::new();
+    map.insert("field1".to_string(), "value1".to_string());
+    map.insert("field2".to_string(), "value2".to_string());
+    client_resp3.hset_multiple("myhash", map).await?;
 
     Ok(())
 }
@@ -256,7 +665,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 ### Connection Configuration
 
 ```rust
-use redis_oxide::{ConnectionConfig, TopologyMode};
+use redis_oxide::{ConnectionConfig, TopologyMode, ProtocolVersion};
 use std::time::Duration;
 
 let config = ConnectionConfig::new("redis://localhost:6379")
@@ -265,6 +674,7 @@ let config = ConnectionConfig::new("redis://localhost:6379")
     .with_connect_timeout(Duration::from_secs(5))
     .with_operation_timeout(Duration::from_secs(30))
     .with_topology_mode(TopologyMode::Auto) // Auto, Standalone, or Cluster
+    .with_protocol_version(ProtocolVersion::Resp3)  // Use RESP3 protocol
     .with_max_redirects(3);            // Max retries for cluster redirects
 ```
 

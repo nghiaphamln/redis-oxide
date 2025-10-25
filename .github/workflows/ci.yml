@@ -56,14 +56,15 @@ jobs:
       run: cargo test --doc --all-features
 
   msrv:
-    name: Check MSRV (1.82)
+    name: Check MSRV (1.82.0)
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
     - name: Install Rust
       uses: dtolnay/rust-toolchain@master
       with:
-        toolchain: 1.82  # MSRV (Minimum Supported Rust Version)
+        toolchain: 1.82.0  # MSRV (Minimum Supported Rust Version)
+        components: rust-src
     - name: Build
       run: cargo build --all-targets --all-features
     - name: Test
