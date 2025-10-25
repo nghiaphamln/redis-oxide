@@ -4,18 +4,28 @@
 //! It automatically detects whether you're connecting to a standalone Redis server
 //! or a Redis Cluster, and handles MOVED/ASK redirects transparently.
 //!
-//! # Features
+//! # 🚀 Features
 //!
-//! - 🚀 **Automatic topology detection**: Auto-recognizes Standalone Redis or Redis Cluster
-//! - 🔄 **MOVED/ASK redirect handling**: Automatically handles slot migrations in cluster mode
-//! - 🏊 **Flexible connection strategies**: Supports both Multiplexed connections and Connection Pools
-//! - 🛡️ **Type-safe command builders**: Safe API with builder pattern
-//! - ⚡ **Async/await**: Fully asynchronous with Tokio runtime
-//! - 🔌 **Automatic reconnection**: Reconnects with exponential backoff
-//! - 📊 **Comprehensive error handling**: Detailed and clear error types
-//! - ✅ **High test coverage**: Extensive unit and integration tests
+//! - **Automatic topology detection**: Auto-recognizes Standalone Redis or Redis Cluster
+//! - **MOVED/ASK redirect handling**: Automatically handles slot migrations in cluster mode
+//! - **Flexible connection strategies**: Supports both Multiplexed connections and Connection Pools
+//! - **Type-safe command builders**: Safe API with builder pattern
+//! - **Async/await**: Fully asynchronous with Tokio runtime
+//! - **Automatic reconnection**: Reconnects with exponential backoff
+//! - **Comprehensive error handling**: Detailed and clear error types
+//! - **High test coverage**: Extensive unit and integration tests
+//! - **Cross-platform support**: Works on Linux, macOS, and Windows
 //!
-//! # Quick Start
+//! # 📦 Installation
+//!
+//! Add this to your `Cargo.toml`:
+//!
+//! ```toml
+//! [dependencies]
+//! redis-oxide = "0.2.0"
+//! ```
+//!
+//! # 🛠️ Quick Start
 //!
 //! ## Basic Connection (Standalone)
 //!
@@ -61,33 +71,7 @@
 //! }
 //! ```
 //!
-//! ## Handling MOVED Redirects
-//!
-//! When encountering a MOVED error (e.g., `MOVED 9916 10.90.6.213:6002`), the library will:
-//!
-//! 1. ✅ Parse the error message and extract slot number and target node
-//! 2. ✅ Automatically update slot mapping
-//! 3. ✅ Create new connection to target node if needed
-//! 4. ✅ Automatically retry the command (up to `max_redirects` times)
-//!
-//! ```no_run
-//! use redis_oxide::{Client, ConnectionConfig};
-//!
-//! # #[tokio::main]
-//! # async fn main() -> Result<(), Box<dyn std::error::Error>> {
-//! let config = ConnectionConfig::new("redis://cluster:7000")
-//!     .with_max_redirects(5); // Allow up to 5 redirects
-//!
-//! let client = Client::connect(config).await?;
-//!
-//! // If encountering "MOVED 9916 10.90.6.213:6002",
-//! // client automatically retries command to 10.90.6.213:6002
-//! let value = client.get("mykey").await?;
-//! # Ok(())
-//! # }
-//! ```
-//!
-//! # Supported Commands
+//! # 🎯 Supported Operations
 //!
 //! ## String Operations
 //!
@@ -133,12 +117,100 @@
 //! # }
 //! ```
 //!
-//! # Configuration
+//! ## Connection Pool Configuration
+//!
+//! ```no_run
+//! use redis_oxide::{Client, ConnectionConfig, PoolConfig, PoolStrategy};
+//! use std::time::Duration;
+//!
+//! # #[tokio::main]
+//! # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! let mut config = ConnectionConfig::new("redis://localhost:6379");
+//! config.pool = PoolConfig {
+//!     strategy: PoolStrategy::Pool,
+//!     max_size: 20,                      // Max 20 connections
+//!     min_idle: 5,                       // Keep at least 5 idle connections
+//!     connection_timeout: Duration::from_secs(5),
+//! };
+//!
+//! let client = Client::connect(config).await?;
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! ## Multiplexed Connection (Default)
+//!
+//! ```no_run
+//! use redis_oxide::{Client, ConnectionConfig, PoolConfig, PoolStrategy};
+//!
+//! # #[tokio::main]
+//! # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! let mut config = ConnectionConfig::new("redis://localhost:6379");
+//! config.pool = PoolConfig {
+//!     strategy: PoolStrategy::Multiplexed,
+//!     ..Default::default()
+//! };
+//!
+//! let client = Client::connect(config).await?;
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! ## Transactions
+//!
+//! ```no_run
+//! use redis_oxide::{Client, ConnectionConfig};
+//!
+//! # #[tokio::main]
+//! # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! # let config = ConnectionConfig::new("redis://localhost:6379");
+//! # let client = Client::connect(config).await?;
+//! // Start a transaction
+//! let mut transaction = client.transaction().await?;
+//!
+//! // Add commands to the transaction (no await for adding commands)
+//! transaction.set("key1", "value1");
+//! transaction.set("key2", "value2");
+//! transaction.incr("counter");
+//!
+//! // Execute the transaction
+//! let results = transaction.exec().await?;
+//! println!("Transaction results: {:?}", results);
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! ## Pipelines
+//!
+//! ```no_run
+//! use redis_oxide::{Client, ConnectionConfig};
+//!
+//! # #[tokio::main]
+//! # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! # let config = ConnectionConfig::new("redis://localhost:6379");
+//! # let client = Client::connect(config).await?;
+//! // Create a pipeline
+//! let mut pipeline = client.pipeline();
+//!
+//! // Add commands to the pipeline (no await for adding commands)
+//! pipeline.set("key1", "value1");
+//! pipeline.set("key2", "value2");
+//! pipeline.get("key1");
+//! pipeline.incr("counter");
+//!
+//! // Execute all commands at once
+//! let results = pipeline.execute().await?;
+//! println!("Pipeline results: {:?}", results);
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! # ⚙️ Configuration Options
 //!
 //! ## Connection Configuration
 //!
 //! ```no_run
-//! use redis_oxide::{ConnectionConfig, TopologyMode};
+//! use redis_oxide::{ConnectionConfig, TopologyMode, ProtocolVersion};
 //! use std::time::Duration;
 //!
 //! let config = ConnectionConfig::new("redis://localhost:6379")
@@ -147,43 +219,32 @@
 //!     .with_connect_timeout(Duration::from_secs(5))
 //!     .with_operation_timeout(Duration::from_secs(30))
 //!     .with_topology_mode(TopologyMode::Auto) // Auto, Standalone, or Cluster
+//!     .with_protocol_version(ProtocolVersion::Resp3)  // Use RESP3 protocol
 //!     .with_max_redirects(3);            // Max retries for cluster redirects
 //! ```
 //!
-//! ## Pool Configuration
+//! # 🧪 Testing
 //!
-//! ### Multiplexed Connection (Default)
+//! To run the tests, you'll need a Redis server running on `localhost:6379`:
 //!
-//! Uses a single connection shared between multiple tasks via mpsc channel. Suitable for most use cases.
+//! ```bash
+//! # Run all tests
+//! cargo test
 //!
-//! ```no_run
-//! use redis_oxide::{ConnectionConfig, PoolConfig, PoolStrategy};
+//! # Run integration tests specifically
+//! cargo test --test integration_tests
 //!
-//! let mut config = ConnectionConfig::new("redis://localhost:6379");
-//! config.pool = PoolConfig {
-//!     strategy: PoolStrategy::Multiplexed,
-//!     ..Default::default()
-//! };
+//! # Run tests with Redis server
+//! docker run --rm -p 6379:6379 redis:7
+//! cargo test
 //! ```
 //!
-//! ### Connection Pool
+//! # 📄 License
 //!
-//! Uses multiple connections. Suitable for very high workload with many concurrent requests.
+//! This project is licensed under either of the following, at your option:
 //!
-//! ```no_run
-//! use redis_oxide::{ConnectionConfig, PoolConfig, PoolStrategy};
-//! use std::time::Duration;
-//!
-//! let pool_config = PoolConfig {
-//!     strategy: PoolStrategy::Pool,
-//!     max_size: 20,                      // Max 20 connections
-//!     min_idle: 5,                       // Keep at least 5 idle connections
-//!     connection_timeout: Duration::from_secs(5),
-//! };
-//!
-//! let mut config = ConnectionConfig::new("redis://localhost:6379");
-//! config.pool = pool_config;
-//! ```
+//! - Apache License, Version 2.0, ([LICENSE-APACHE](https://github.com/nghiaphamln/redis-oxide/blob/main/LICENSE-APACHE) or http://www.apache.org/licenses/LICENSE-2.0)
+//! - MIT license ([LICENSE-MIT](https://github.com/nghiaphamln/redis-oxide/blob/main/LICENSE-MIT) or http://opensource.org/licenses/MIT)
 
 #![allow(unknown_lints)]
 #![allow(clippy::unnecessary_literal_bound)]

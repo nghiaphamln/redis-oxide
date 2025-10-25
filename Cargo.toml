@@ -11,9 +11,10 @@ license = "MIT OR Apache-2.0"
 repository = "https://github.com/nghiaphamln/redis-oxide"
 homepage = "https://github.com/nghiaphamln/redis-oxide"
 documentation = "https://docs.rs/redis-oxide"
-keywords = ["redis", "async", "cluster", "cache"]
-categories = ["database", "asynchronous"]
-description = "High-performance async Redis client for Rust with automatic cluster support"
+readme = "README.md"
+keywords = ["redis", "async", "cluster", "cache", "database"]
+categories = ["database", "asynchronous", "network-programming"]
+description = "High-performance async Redis client for Rust with automatic cluster support, inspired by StackExchange.Redis for .NET"
 
 [workspace.dependencies]
 # Async runtime
