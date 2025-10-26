@@ -1,6 +1,6 @@
-# Contributing to redis-mux
+# Contributing to redis-oxide
 
-Thank you for your interest in contributing to redis-mux! This document provides guidelines for contributing to the project.
+Thank you for your interest in contributing to redis-oxide! This document provides guidelines for contributing to the project.
 
 ## Development Setup
 
