@@ -1,394 +1,126 @@
-name: CIname: CIname: CI
-
-
+name: CI
 
 on:
-
   push:
-
-    branches: [ main, develop ]on:on:
-
+    branches: [ main, develop ]
   pull_request:
+    branches: [ main ]
 
-    branches: [ main ]  push:  push:
-
-
-
-env:    branches: [ main, develop ]    branches: [ main, develop ]
-
+env:
   CARGO_TERM_COLOR: always
-
-  RUST_BACKTRACE: 1  pull_request:  pull_request:
-
-
-
-jobs:    branches: [ main ]    branches: [ main ]
-
-  check:
-
-    name: Check
-
-    runs-on: ubuntu-latest
-
-    steps:env:env:
-
-      - uses: actions/checkout@v4
-
-      - uses: dtolnay/rust-toolchain@stable  CARGO_TERM_COLOR: always  CARGO_TERM_COLOR: always
-
-      - uses: Swatinem/rust-cache@v2
-
-      - name: Check  RUST_BACKTRACE: 1
-
-        run: cargo check --all-targets --all-features
+  RUST_BACKTRACE: 1
 
 jobs:
-
-  fmt:
-
-    name: Rustfmtjobs:  test:
-
+  check:
+    name: Check
     runs-on: ubuntu-latest
-
-    steps:  check:    name: Test on ${{ matrix.os }}
-
-      - uses: actions/checkout@v4
-
-      - uses: dtolnay/rust-toolchain@stable    name: Check    runs-on: ${{ matrix.os }}
-
-        with:
-
-          components: rustfmt    runs-on: ubuntu-latest    strategy:
-
-      - name: Enforce formatting
-
-        run: cargo fmt --check    steps:      matrix:
-
-
-
-  clippy:      - uses: actions/checkout@v4        os: [ubuntu-latest, windows-latest, macOS-latest]
-
-    name: Clippy
-
-    runs-on: ubuntu-latest      - uses: dtolnay/rust-toolchain@stable        rust: [stable, beta]
-
     steps:
-
-      - uses: actions/checkout@v4      - uses: Swatinem/rust-cache@v2    
-
-      - uses: dtolnay/rust-toolchain@stable
-
-        with:      - name: Check    services:
-
-          components: clippy
-
-      - uses: Swatinem/rust-cache@v2        run: cargo check --all-targets --all-features      redis:
-
-      - name: Linting
-
-        run: cargo clippy --workspace --all-targets --all-features -- -D warnings        image: redis:7
-
-
-
-  test:  fmt:        options: >-
-
-    name: Test Suite
-
-    runs-on: ubuntu-latest    name: Rustfmt          --health-cmd "redis-cli ping"
-
-    services:
-
-      redis:    runs-on: ubuntu-latest          --health-interval 10s
-
-        image: redis:7-alpine
-
-        ports:    steps:          --health-timeout 5s
-
-          - 6379:6379
-
-        options: >-      - uses: actions/checkout@v4          --health-retries 5
-
-          --health-cmd "redis-cli ping"
-
-          --health-interval 10s      - uses: dtolnay/rust-toolchain@stable        ports:
-
-          --health-timeout 5s
-
-          --health-retries 5        with:          - 6379:6379
-
-    steps:
-
-      - uses: actions/checkout@v4          components: rustfmt
-
-      - uses: dtolnay/rust-toolchain@stable
-
-      - uses: Swatinem/rust-cache@v2      - name: Enforce formatting    steps:
-
-      - name: Run unit tests
-
-        run: cargo test --lib --all-features        run: cargo fmt --check    - uses: actions/checkout@v4
-
-      - name: Run integration tests
-
-        run: cargo test --test '*' --all-features    - name: Install Rust
-
-        env:
-
-          REDIS_URL: redis://localhost:6379  clippy:      uses: dtolnay/rust-toolchain@master
-
-      - name: Run doc tests
-
-        run: cargo test --doc --all-features    name: Clippy      with:
-
-
-
-  cross-platform:    runs-on: ubuntu-latest        toolchain: ${{ matrix.rust }}
-
-    name: Cross Platform
-
-    strategy:    steps:        components: rustfmt, clippy
-
-      matrix:
-
-        os: [ubuntu-latest, windows-latest, macos-latest]      - uses: actions/checkout@v4    - name: Cache dependencies
-
-    runs-on: ${{ matrix.os }}
-
-    steps:      - uses: dtolnay/rust-toolchain@stable      uses: actions/cache@v4
-
       - uses: actions/checkout@v4
-
-      - uses: dtolnay/rust-toolchain@stable        with:      with:
-
+      - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-
-      - name: Build          components: clippy        path: |
-
-        run: cargo build --release --all-features
-
-      - name: Run unit tests      - uses: Swatinem/rust-cache@v2          ~/.cargo/registry
-
-        run: cargo test --lib --all-features
-
-      - name: Linting          ~/.cargo/git
-
-  msrv:
-
-    name: Minimum Supported Rust Version        run: cargo clippy --workspace --all-targets --all-features -- -D warnings          target
-
-    runs-on: ubuntu-latest
-
-    steps:        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-
-      - uses: actions/checkout@v4
-
-      - uses: dtolnay/rust-toolchain@1.82.0  test:    - name: Check formatting
-
-      - uses: Swatinem/rust-cache@v2
-
-      - name: Check with MSRV    name: Test Suite      run: cargo fmt --all -- --check
-
+      - name: Check
         run: cargo check --all-targets --all-features
 
-    runs-on: ubuntu-latest    - name: Run clippy
+  fmt:
+    name: Rustfmt
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - name: Enforce formatting
+        run: cargo fmt --check
+
+  clippy:
+    name: Clippy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: Linting
+        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+
+  test:
+    name: Test Suite
+    runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Run unit tests
+        run: cargo test --lib --all-features
+      - name: Run integration tests
+        run: cargo test --test '*' --all-features
+        env:
+          REDIS_URL: redis://localhost:6379
+      - name: Run doc tests
+        run: cargo test --doc --all-features
+
+  cross-platform:
+    name: Cross Platform
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Build
+        run: cargo build --release --all-features
+      - name: Run unit tests
+        run: cargo test --lib --all-features
+
+  msrv:
+    name: Minimum Supported Rust Version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.82.0
+      - uses: Swatinem/rust-cache@v2
+      - name: Check with MSRV
+        run: cargo check --all-targets --all-features
 
   security:
-
-    name: Security Audit    services:      run: cargo clippy --all-targets --all-features -- -D warnings
-
+    name: Security Audit
     runs-on: ubuntu-latest
-
-    steps:      redis:    - name: Build
-
+    steps:
       - uses: actions/checkout@v4
-
-      - uses: dtolnay/rust-toolchain@stable        image: redis:7-alpine      run: cargo build --all-targets --all-features
-
+      - uses: dtolnay/rust-toolchain@stable
       - name: Install cargo-audit
-
-        run: cargo install cargo-audit        ports:    - name: Run tests
-
+        run: cargo install cargo-audit
       - name: Security audit
+        run: cargo audit
 
-        run: cargo audit          - 6379:6379      run: cargo test --all-features
-
-
-
-  docs:        options: >-    - name: Run doc tests
-
+  docs:
     name: Documentation
-
-    runs-on: ubuntu-latest          --health-cmd "redis-cli ping"      run: cargo test --doc --all-features
-
-    steps:
-
-      - uses: actions/checkout@v4          --health-interval 10s
-
-      - uses: dtolnay/rust-toolchain@stable
-
-      - uses: Swatinem/rust-cache@v2          --health-timeout 5s  msrv:
-
-      - name: Check documentation
-
-        run: cargo doc --no-deps --all-features          --health-retries 5    name: Check MSRV (1.82.0)
-
-        env:
-
-          RUSTDOCFLAGS: "-D warnings"    steps:    runs-on: ubuntu-latest
-
-
-
-  examples:      - uses: actions/checkout@v4    steps:
-
-    name: Examples
-
-    runs-on: ubuntu-latest      - uses: dtolnay/rust-toolchain@stable    - uses: actions/checkout@v4
-
-    services:
-
-      redis:      - uses: Swatinem/rust-cache@v2    - name: Install Rust
-
-        image: redis:7-alpine
-
-        ports:      - name: Run unit tests      uses: dtolnay/rust-toolchain@master
-
-          - 6379:6379
-
-        options: >-        run: cargo test --lib --all-features      with:
-
-          --health-cmd "redis-cli ping"
-
-          --health-interval 10s      - name: Run integration tests        toolchain: 1.82.0  # MSRV (Minimum Supported Rust Version)
-
-          --health-timeout 5s
-
-          --health-retries 5        run: cargo test --test '*' --all-features        components: rust-src
-
-    steps:
-
-      - uses: actions/checkout@v4        env:    - name: Build
-
-      - uses: dtolnay/rust-toolchain@stable
-
-      - uses: Swatinem/rust-cache@v2          REDIS_URL: redis://localhost:6379      run: cargo build --all-targets --all-features
-
-      - name: Check examples compile
-
-        run: |      - name: Run doc tests    - name: Test
-
-          cargo check --examples --all-features
-
-          cargo build --examples --all-features        run: cargo test --doc --all-features      run: cargo test --all-targets --all-features
-
-      - name: Run basic examples
-
-        run: |
-
-          timeout 30s cargo run --example basic_usage || true
-
-        env:  cross-platform:  docs:
-
-          REDIS_URL: redis://localhost:6379
-
-    name: Cross Platform    name: Check documentation
-
-    strategy:    runs-on: ubuntu-latest
-
-      matrix:    steps:
-
-        os: [ubuntu-latest, windows-latest, macos-latest]    - uses: actions/checkout@v4
-
-    runs-on: ${{ matrix.os }}    - name: Install Rust
-
-    steps:      uses: dtolnay/rust-toolchain@master
-
-      - uses: actions/checkout@v4      with:
-
-      - uses: dtolnay/rust-toolchain@stable        toolchain: stable
-
-      - uses: Swatinem/rust-cache@v2    - name: Build documentation
-
-      - name: Build      run: cargo doc --all-features --no-deps
-
-        run: cargo build --release --all-features      env:
-
-      - name: Run unit tests        RUSTDOCFLAGS: -Dwarnings
-
-        run: cargo test --lib --all-features    - name: Check for broken links
-
-      run: cargo doc --document-private-items --all-features --no-deps
-
-  msrv:      env:
-
-    name: Minimum Supported Rust Version        RUSTDOCFLAGS: -D warnings
-
     runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Check documentation
+        run: cargo doc --no-deps --all-features
+        env:
+          RUSTDOCFLAGS: "-D warnings"
 
-    steps:  security_audit:
-
-      - uses: actions/checkout@v4    name: Security audit
-
-      - uses: dtolnay/rust-toolchain@1.82.0    runs-on: ubuntu-latest
-
-      - uses: Swatinem/rust-cache@v2    steps:
-
-      - name: Check with MSRV    - uses: actions/checkout@v4
-
-        run: cargo check --all-targets --all-features    - name: Install Rust
-
-      uses: dtolnay/rust-toolchain@master
-
-  security:      with:
-
-    name: Security Audit        toolchain: stable
-
-    runs-on: ubuntu-latest    - name: Run security audit
-
-    steps:      run: |
-
-      - uses: actions/checkout@v4        if cargo list --version > /dev/null 2>&1; then
-
-      - uses: dtolnay/rust-toolchain@stable          cargo audit
-
-      - name: Install cargo-audit        else
-
-        run: cargo install cargo-audit          echo "cargo-audit not installed, skipping"
-
-      - name: Security audit        fi
-
-        run: cargo audit      continue-on-error: true
-
-
-
-  docs:  cross_platform_check:
-
-    name: Documentation    name: Cross-platform compatibility check
-
-    runs-on: ubuntu-latest    runs-on: ${{ matrix.os }}
-
-    steps:    strategy:
-
-      - uses: actions/checkout@v4      matrix:
-
-      - uses: dtolnay/rust-toolchain@stable        os: [ubuntu-latest, windows-latest, macOS-latest]
-
-      - uses: Swatinem/rust-cache@v2    
-
-      - name: Check documentation    steps:
-
-        run: cargo doc --no-deps --all-features    - uses: actions/checkout@v4
-
-        env:    - name: Install Rust
-
-          RUSTDOCFLAGS: "-D warnings"      uses: dtolnay/rust-toolchain@master
-
-      with:
-
-  examples:        toolchain: stable
-
-    name: Examples    - name: Run cargo check
-
-    runs-on: ubuntu-latest      run: cargo check --all-targets --all-features
+  examples:
+    name: Examples
+    runs-on: ubuntu-latest
     services:
       redis:
         image: redis:7-alpine
