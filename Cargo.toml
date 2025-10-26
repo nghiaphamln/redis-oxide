@@ -14,7 +14,7 @@ documentation = "https://docs.rs/redis-oxide"
 readme = "README.md"
 keywords = ["redis", "async", "cluster", "cache", "database"]
 categories = ["database", "asynchronous", "network-programming"]
-description = "High-performance async Redis client for Rust with automatic cluster support, inspired by StackExchange.Redis for .NET"
+description = "High-performance async Redis client for Rust with automatic cluster support, multiplexing, and advanced features"
 
 [workspace.dependencies]
 # Async runtime

@@ -14,13 +14,15 @@ fn redis_url() -> String {
 
 #[allow(dead_code)]
 async fn setup_client_resp3() -> Result<Client, redis_oxide::RedisError> {
-    let config = ConnectionConfig::new(redis_url().as_str()).with_protocol_version(ProtocolVersion::Resp3);
+    let config =
+        ConnectionConfig::new(redis_url().as_str()).with_protocol_version(ProtocolVersion::Resp3);
     Client::connect(config).await
 }
 
 #[allow(dead_code)]
 async fn setup_client_resp2() -> Result<Client, redis_oxide::RedisError> {
-    let config = ConnectionConfig::new(redis_url().as_str()).with_protocol_version(ProtocolVersion::Resp2);
+    let config =
+        ConnectionConfig::new(redis_url().as_str()).with_protocol_version(ProtocolVersion::Resp2);
     Client::connect(config).await
 }
 

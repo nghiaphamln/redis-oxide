@@ -28,6 +28,18 @@ async fn setup_client(
 async fn test_string_operations_comprehensive() -> Result<(), Box<dyn std::error::Error>> {
     let client = setup_client(None).await?;
 
+    // Clean up any leftover keys
+    let _ = client
+        .del(vec![
+            "str:basic".to_string(),
+            "str:expire".to_string(),
+            "str:nx".to_string(),
+            "str:counter".to_string(),
+            "str:multi1".to_string(),
+            "str:multi2".to_string(),
+        ])
+        .await;
+
     // Basic SET/GET
     client.set("str:basic", "hello world").await?;
     let value: Option<String> = client.get("str:basic").await?;
@@ -81,6 +93,9 @@ async fn test_string_operations_comprehensive() -> Result<(), Box<dyn std::error
 #[tokio::test]
 async fn test_hash_operations_comprehensive() -> Result<(), Box<dyn std::error::Error>> {
     let client = setup_client(None).await?;
+
+    // Clean up any leftover keys
+    let _ = client.del(vec!["hash:test".to_string()]).await;
 
     let hash_key = "hash:test";
 
@@ -147,6 +162,9 @@ async fn test_hash_operations_comprehensive() -> Result<(), Box<dyn std::error::
 async fn test_list_operations_comprehensive() -> Result<(), Box<dyn std::error::Error>> {
     let client = setup_client(None).await?;
 
+    // Clean up any leftover keys
+    let _ = client.del(vec!["list:test".to_string()]).await;
+
     let list_key = "list:test";
 
     // LPUSH operations
@@ -194,6 +212,9 @@ async fn test_list_operations_comprehensive() -> Result<(), Box<dyn std::error::
 #[tokio::test]
 async fn test_set_operations_comprehensive() -> Result<(), Box<dyn std::error::Error>> {
     let client = setup_client(None).await?;
+
+    // Clean up any leftover keys
+    let _ = client.del(vec!["set:test".to_string()]).await;
 
     let set_key = "set:test";
 
@@ -255,6 +276,9 @@ async fn test_set_operations_comprehensive() -> Result<(), Box<dyn std::error::E
 async fn test_sorted_set_operations_comprehensive() -> Result<(), Box<dyn std::error::Error>> {
     let client = setup_client(None).await?;
 
+    // Clean up any leftover keys
+    let _ = client.del(vec!["zset:test".to_string()]).await;
+
     let zset_key = "zset:test";
 
     // ZADD operations
@@ -309,6 +333,9 @@ async fn test_operations_with_connection_pool() -> Result<(), Box<dyn std::error
     }))
     .await?;
 
+    // Clean up any leftover keys
+    let _ = client.del(vec!["pool:test".to_string()]).await;
+
     // Run basic operations to ensure pool works
     client.set("pool:test", "value").await?;
     let value: Option<String> = client.get("pool:test").await?;
@@ -350,6 +377,17 @@ async fn test_operations_with_multiplexed_connection() -> Result<(), Box<dyn std
     }))
     .await?;
 
+    // Clean up any leftover keys
+    let _ = client
+        .del(vec![
+            "mux:0".to_string(),
+            "mux:1".to_string(),
+            "mux:2".to_string(),
+            "mux:3".to_string(),
+            "mux:4".to_string(),
+        ])
+        .await;
+
     // Test that multiplexed connection can handle concurrent operations
     let mut handles = Vec::new();
     for i in 0..5 {
@@ -377,6 +415,15 @@ async fn test_operations_with_multiplexed_connection() -> Result<(), Box<dyn std
 async fn test_error_handling() -> Result<(), Box<dyn std::error::Error>> {
     let client = setup_client(None).await?;
 
+    // Clean up any leftover keys
+    let _ = client
+        .del(vec![
+            "string_key".to_string(),
+            "nonexistent_key".to_string(),
+            "nonexistent_hash".to_string(),
+        ])
+        .await;
+
     // Test operations on wrong data types
     client.set("string_key", "string_value").await?;
 
@@ -397,6 +444,11 @@ async fn test_error_handling() -> Result<(), Box<dyn std::error::Error>> {
 #[tokio::test]
 async fn test_expiration_and_ttl() -> Result<(), Box<dyn std::error::Error>> {
     let client = setup_client(None).await?;
+
+    // Clean up any leftover keys
+    let _ = client
+        .del(vec!["expire_test".to_string(), "expire_test2".to_string()])
+        .await;
 
     // Set key with expiration
     client
