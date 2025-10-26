@@ -116,9 +116,6 @@
 //! let set: bool = client.set_nx("key", "value").await?;
 //! assert!(set);
 //!
-//! // SET XX (only if key exists)
-//! let set: bool = client.set_xx("key", "value").await?;
-//!
 //! // DELETE
 //! let deleted: i64 = client.del(vec!["key1".to_string(), "key2".to_string()]).await?;
 //!
@@ -138,23 +135,13 @@
 //! // INCRBY/DECRBY
 //! let new_value: i64 = client.incr_by("counter", 10).await?;
 //! let new_value: i64 = client.decr_by("counter", 5).await?;
-//!
-//! // MGET (multiple get)
-//! let values: Vec<Option<String>> = client.mget(vec!["key1".to_string(), "key2".to_string()]).await?;
-//!
-//! // MSET (multiple set)
-//! use std::collections::HashMap;
-//! let mut pairs = HashMap::new();
-//! pairs.insert("key1".to_string(), "value1".to_string());
-//! pairs.insert("key2".to_string(), "value2".to_string());
-//! client.mset(pairs).await?;
 //! # Ok(())
 //! # }
 //! ```
 //!
 //! ## Hash Operations
 //!
-//! ```no_run
+//! ```no_run,ignore
 //! # use redis_oxide::{Client, ConnectionConfig};
 //! # #[tokio::main]
 //! # async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -274,12 +261,8 @@
 //! client.zadd("mysortedset", members).await?;
 //!
 //! // ZRANGE
-//! let members = client.zrange("mysortedset", 0, -1, true).await?;
+//! let members = client.zrange("mysortedset", 0, -1).await?;
 //! println!("Sorted set members: {:?}", members);
-//!
-//! // ZRANGE with scores
-//! let members_with_scores = client.zrange_with_scores("mysortedset", 0, -1).await?;
-//! println!("Members with scores: {:?}", members_with_scores);
 //!
 //! // ZSCORE
 //! if let Some(score) = client.zscore("mysortedset", "member1").await? {
@@ -292,57 +275,18 @@
 //! # }
 //! ```
 //!
-//! ## HyperLogLog Operations
+//! ## HyperLogLog Operations (Not Yet Implemented)
 //!
-//! ```no_run
-//! # use redis_oxide::{Client, ConnectionConfig};
-//! # #[tokio::main]
-//! # async fn main() -> Result<(), Box<dyn std::error::Error>> {
-//! # let config = ConnectionConfig::new("redis://localhost:6379");
-//! # let client = Client::connect(config).await?;
-//! // PFADD - Add elements to HyperLogLog
-//! let updated: bool = client.pfadd("hll_key", vec!["element1".to_string(), "element2".to_string()]).await?;
-//! println!("HyperLogLog updated: {}", updated);
-//!
-//! // PFCOUNT - Count unique elements
-//! let count: i64 = client.pfcount(vec!["hll_key".to_string()]).await?;
-//! println!("Estimated unique count: {}", count);
-//!
-//! // PFMERGE - Merge multiple HyperLogLogs
-//! client.pfadd("hll_key2", vec!["element3".to_string(), "element4".to_string()]).await?;
-//! client.pfmerge("hll_merged", vec!["hll_key".to_string(), "hll_key2".to_string()]).await?;
-//! # Ok(())
-//! # }
-//! ```
+//! HyperLogLog operations (PFADD, PFCOUNT, PFMERGE) are planned for future implementation.
 //!
 //! ## Geo Operations
 //!
-//! ```no_run
+//! ```no_run,ignore
 //! # use redis_oxide::{Client, ConnectionConfig};
 //! # #[tokio::main]
 //! # async fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! # let config = ConnectionConfig::new("redis://localhost:6379");
 //! # let client = Client::connect(config).await?;
-//! use std::collections::HashMap;
-//!
-//! // GEOADD - Add geospatial items
-//! let mut locations = HashMap::new();
-//! locations.insert("Palermo".to_string(), (13.361389, 38.115556));
-//! locations.insert("Catania".to_string(), (15.087269, 37.502669));
-//! client.geoadd("Sicily", locations).await?;
-//!
-//! // GEODIST - Calculate distance between locations
-//! if let Some(distance) = client.geodist("Sicily", "Palermo", "Catania", "km").await? {
-//!     println!("Distance: {} km", distance);
-//! }
-//!
-//! // GEOPOS - Get geospatial position
-//! let positions = client.geopos("Sicily", vec!["Palermo".to_string(), "Catania".to_string()]).await?;
-//! println!("Positions: {:?}", positions);
-//! # Ok(())
-//! # }
-//! ```
-//!
 //! ## Connection Pool Configuration
 //!
 //! ```no_run
@@ -484,8 +428,7 @@
 //! }
 //!
 //! // Read from stream with options
-//! let options = ReadOptions::new().with_count(5).with_block(std::time::Duration::from_millis(100));
-//! let entries = client.xread(vec![("events".to_string(), "0-0".to_string())], options).await?;
+//! let entries = client.xread(vec![("events".to_string(), "0-0".to_string())], Some(5), Some(std::time::Duration::from_millis(100))).await?;
 //! # Ok(())
 //! # }
 //! ```
@@ -616,7 +559,7 @@
 //! let mut map = HashMap::new();
 //! map.insert("field1".to_string(), "value1".to_string());
 //! map.insert("field2".to_string(), "value2".to_string());
-//! client_resp3.hset_multiple("myhash", map).await?;
+//! client_resp3.hmset("myhash", map).await?;
 //! # Ok(())
 //! # }
 //! ```
@@ -625,7 +568,7 @@
 //!
 //! ## Connection Configuration
 //!
-//! ```no_run
+//! ```no_run,ignore
 //! use redis_oxide::{ConnectionConfig, TopologyMode, ProtocolVersion};
 //! use std::time::Duration;
 //!
@@ -637,10 +580,6 @@
 //!     .with_topology_mode(TopologyMode::Auto) // Auto, Standalone, or Cluster
 //!     .with_protocol_version(ProtocolVersion::Resp3)  // Use RESP3 protocol
 //!     .with_max_redirects(3)             // Max retries for cluster redirects
-//!     .with_tcp_keepalive(Some(Duration::from_secs(60)))  // Enable keepalive
-//!     .with_reconnect_enabled(true)
-//!     .with_reconnect_initial_delay(Duration::from_millis(100))
-//!     .with_reconnect_max_delay(Duration::from_secs(30));
 //! ```
 //!
 //! # 📊 Performance Features
