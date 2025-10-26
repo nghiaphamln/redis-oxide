@@ -449,18 +449,18 @@ mod tests {
     fn test_optimized_encoder_simple_string() {
         let mut encoder = OptimizedRespEncoder::new();
         let value = RespValue::SimpleString("OK".to_string());
-        let encoded = encoder.encode(&value).unwrap();
-        assert_eq!(encoded, Bytes::from("+OK\r\n"));
+        let encoded_result = encoder.encode(&value).unwrap();
+        assert_eq!(encoded_result, Bytes::from("+OK\r\n"));
     }
 
     #[test]
     fn test_optimized_encoder_command() {
         let mut encoder = OptimizedRespEncoder::new();
         let args = vec![RespValue::from("mykey")];
-        let encoded = encoder.encode_command("GET", &args).unwrap();
+        let encoded_result = encoder.encode_command("GET", &args).unwrap();
 
         let expected = "*2\r\n$3\r\nGET\r\n$5\r\nmykey\r\n";
-        assert_eq!(encoded, Bytes::from(expected));
+        assert_eq!(encoded_result, Bytes::from(expected));
     }
 
     #[test]

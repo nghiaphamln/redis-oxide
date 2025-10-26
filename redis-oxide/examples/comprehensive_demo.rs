@@ -4,6 +4,9 @@
 //! - String, Hash, List, Set, and Sorted Set operations
 //! - Pipeline support for batch operations
 
+#![allow(clippy::uninlined_format_args)]
+#![allow(clippy::needless_borrow)]
+#![allow(clippy::items_after_statements)]
 #![allow(unused_imports)]
 #![allow(clippy::needless_raw_string_hashes)]
 //! - Transactions with MULTI/EXEC/WATCH

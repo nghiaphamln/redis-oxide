@@ -906,7 +906,10 @@ mod tests {
         assert!(value.as_bool().unwrap());
         assert_eq!(value.as_int().unwrap(), 1);
 
-        let value = Resp3Value::Double(3.14);
-        assert_eq!(value.as_float().unwrap(), 3.14);
+        let value = Resp3Value::Double(std::f64::consts::PI);
+        assert!(
+            (value.as_float().unwrap() - std::f64::consts::PI).abs() < 1e-10,
+            "Float value differs from PI"
+        );
     }
 }

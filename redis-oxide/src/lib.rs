@@ -681,8 +681,8 @@
 //!
 //! This project is licensed under either of the following, at your option:
 //!
-//! - Apache License, Version 2.0, ([LICENSE-APACHE](https://github.com/nghiaphamln/redis-oxide/blob/main/LICENSE-APACHE) or http://www.apache.org/licenses/LICENSE-2.0)
-//! - MIT license ([LICENSE-MIT](https://github.com/nghiaphamln/redis-oxide/blob/main/LICENSE-MIT) or http://opensource.org/licenses/MIT)
+//! - Apache License, Version 2.0, ([LICENSE-APACHE](https://github.com/nghiaphamln/redis-oxide/blob/main/LICENSE-APACHE) or <http://www.apache.org/licenses/LICENSE-2.0>)
+//! - MIT license ([LICENSE-MIT](https://github.com/nghiaphamln/redis-oxide/blob/main/LICENSE-MIT) or <http://opensource.org/licenses/MIT>)
 
 #![allow(unknown_lints)]
 #![allow(clippy::unnecessary_literal_bound)]
@@ -698,6 +698,12 @@
 #![allow(clippy::option_if_let_else)] // Allow option if let else for readability
 #![allow(clippy::needless_pass_by_value)] // Allow pass by value for API design
 #![allow(clippy::only_used_in_recursion)] // Allow for recursive functions
+#![allow(
+    clippy::similar_names,
+    clippy::approx_constant,
+    clippy::float_cmp,
+    clippy::uninlined_format_args
+)] // Allow in tests
 #![allow(clippy::should_implement_trait)] // Allow for custom method names
 #![allow(clippy::cast_precision_loss)] // Allow precision loss for performance metrics
 #![allow(clippy::suboptimal_flops)] // Allow for readability

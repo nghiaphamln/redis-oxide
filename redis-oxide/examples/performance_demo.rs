@@ -3,6 +3,7 @@
 #![allow(clippy::uninlined_format_args)]
 #![allow(clippy::cast_lossless)]
 #![allow(clippy::cast_precision_loss)]
+#![allow(clippy::similar_names)]
 
 use bytes::BytesMut;
 use redis_oxide::{
@@ -131,7 +132,7 @@ fn test_command_building_performance() {
         let cmd = GetCommand::new(&key);
         let _args = cmd.args();
     }
-    let original_get_time = start.elapsed();
+    let get_time_original = start.elapsed();
 
     // Optimized GET command
     let start = Instant::now();
@@ -140,22 +141,22 @@ fn test_command_building_performance() {
         let cmd = OptimizedGetCommand::new(&key).with_cached_args();
         let _args = cmd.args();
     }
-    let optimized_get_time = start.elapsed();
+    let get_time_optimized = start.elapsed();
 
     println!("  GET Command:");
     println!(
         "    Original:  {:?} ({:.2} ops/sec)",
-        original_get_time,
-        iterations as f64 / original_get_time.as_secs_f64()
+        get_time_original,
+        iterations as f64 / get_time_original.as_secs_f64()
     );
     println!(
         "    Optimized: {:?} ({:.2} ops/sec)",
-        optimized_get_time,
-        iterations as f64 / optimized_get_time.as_secs_f64()
+        get_time_optimized,
+        iterations as f64 / get_time_optimized.as_secs_f64()
     );
 
     let get_improvement =
-        (original_get_time.as_nanos() as f64 / optimized_get_time.as_nanos() as f64 - 1.0) * 100.0;
+        (get_time_original.as_nanos() as f64 / get_time_optimized.as_nanos() as f64 - 1.0) * 100.0;
     println!("    Improvement: {:.1}%", get_improvement);
 
     // Original SET command
@@ -166,7 +167,7 @@ fn test_command_building_performance() {
         let cmd = SetCommand::new(&key, &value).expire(Duration::from_secs(60));
         let _args = cmd.args();
     }
-    let original_set_time = start.elapsed();
+    let set_time_original = start.elapsed();
 
     // Optimized SET command
     let start = Instant::now();
@@ -178,22 +179,22 @@ fn test_command_building_performance() {
             .with_cached_args();
         let _args = cmd.args();
     }
-    let optimized_set_time = start.elapsed();
+    let set_time_optimized = start.elapsed();
 
     println!("  SET Command:");
     println!(
         "    Original:  {:?} ({:.2} ops/sec)",
-        original_set_time,
-        iterations as f64 / original_set_time.as_secs_f64()
+        set_time_original,
+        iterations as f64 / set_time_original.as_secs_f64()
     );
     println!(
         "    Optimized: {:?} ({:.2} ops/sec)",
-        optimized_set_time,
-        iterations as f64 / optimized_set_time.as_secs_f64()
+        set_time_optimized,
+        iterations as f64 / set_time_optimized.as_secs_f64()
     );
 
     let set_improvement =
-        (original_set_time.as_nanos() as f64 / optimized_set_time.as_nanos() as f64 - 1.0) * 100.0;
+        (set_time_original.as_nanos() as f64 / set_time_optimized.as_nanos() as f64 - 1.0) * 100.0;
     println!("    Improvement: {:.1}%", set_improvement);
 }
 
@@ -286,15 +287,15 @@ fn test_bulk_operations() {
 
         // Optimized approach
         let start = Instant::now();
-        let mut encoder = OptimizedRespEncoder::new();
+        let mut opt_encoder = OptimizedRespEncoder::new();
         let mut total_bytes_opt = 0;
         for i in 0..batch_size {
             let key = format!("key_{}", i);
             let value = format!("value_{}", i);
             let cmd = OptimizedSetCommand::new(&key, &value).with_cached_args();
             let args = cmd.args();
-            let encoded = encoder.encode_command("SET", &args).unwrap();
-            total_bytes_opt += encoded.len();
+            let encoded_cmd = opt_encoder.encode_command("SET", &args).unwrap();
+            total_bytes_opt += encoded_cmd.len();
         }
         let optimized_time = start.elapsed();
 

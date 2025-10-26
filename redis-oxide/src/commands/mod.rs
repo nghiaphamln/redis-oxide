@@ -1,3 +1,4 @@
+#![allow(clippy::items_after_test_module)]
 //! Command builders for Redis operations
 //!
 //! This module provides type-safe command builders for Redis commands.

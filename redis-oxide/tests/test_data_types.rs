@@ -2,27 +2,22 @@
 //!
 //! These tests verify that all Redis data type operations work correctly
 //! with both standalone and cluster configurations.
+//! Set `REDIS_URL` environment variable or use default `redis://localhost:6379`
 
-#![allow(unused_imports)]
 #![allow(clippy::uninlined_format_args)]
 
 use redis_oxide::{Client, ConnectionConfig, PoolConfig, PoolStrategy};
 use std::collections::{HashMap, HashSet};
 use std::time::Duration;
-use testcontainers::{core::WaitFor, runners::AsyncRunner, ContainerAsync, GenericImage};
+
+fn redis_url() -> String {
+    std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://localhost:6379".to_string())
+}
 
 async fn setup_client(
     config_modifier: Option<fn(&mut ConnectionConfig)>,
 ) -> Result<Client, redis_oxide::RedisError> {
-    let redis_image = GenericImage::new("redis", "7-alpine")
-        .with_exposed_port(testcontainers::core::ContainerPort::Tcp(6379))
-        .with_wait_for(WaitFor::message_on_stdout("Ready to accept connections"));
-
-    let container = redis_image.start().await.unwrap();
-    let host_port = container.get_host_port_ipv4(6379).await.unwrap();
-    let redis_url = format!("redis://localhost:{}", host_port);
-
-    let mut config = ConnectionConfig::new(&redis_url);
+    let mut config = ConnectionConfig::new(redis_url().as_str());
     if let Some(modifier) = config_modifier {
         modifier(&mut config);
     }
@@ -233,7 +228,7 @@ async fn test_set_operations_comprehensive() -> Result<(), Box<dyn std::error::E
     let members: HashSet<String> = client.smembers(set_key).await?;
     let expected: HashSet<String> = ["member1", "member2", "member3"]
         .iter()
-        .map(|s| s.to_string())
+        .map(|s| (*s).to_string())
         .collect();
     assert_eq!(members, expected);
 

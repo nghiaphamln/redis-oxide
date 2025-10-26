@@ -1,0 +1,16 @@
+    Checking redis-oxide v0.2.2 (D:\working\base-e-invoice\rust-mux\redis-oxide)
+error: calling `as_bytes()` on a string literal
+   --> redis-oxide\src\pipeline.rs:520:35
+    |
+520 |             RespValue::BulkString("value1".as_bytes().into()),
+    |                                   ^^^^^^^^^^^^^^^^^^^ help: consider using a byte string literal instead: `b"value1"`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#string_lit_as_bytes
+note: the lint level is defined here
+   --> redis-oxide\src\lib.rs:692:9
+    |
+692 | #![deny(clippy::nursery)]
+    |         ^^^^^^^^^^^^^^^
+    = note: `#[deny(clippy::string_lit_as_bytes)]` implied by `#[deny(clippy::nursery)]`
+
+error: could not compile `redis-oxide` (lib test) due to 1 previous error

@@ -4,9 +4,10 @@
 #![allow(clippy::uninlined_format_args)]
 #![allow(clippy::needless_borrows_for_generic_args)]
 #![allow(clippy::explicit_iter_loop)]
+#![allow(clippy::similar_names)]
 
 use bytes::{Bytes, BytesMut};
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
 use redis_oxide::{
     commands::optimized::{init_string_interner, OptimizedGetCommand, OptimizedSetCommand},
     commands::{Command, GetCommand, SetCommand},
@@ -16,6 +17,7 @@ use redis_oxide::{
         resp2_optimized::{OptimizedRespDecoder, OptimizedRespEncoder},
     },
 };
+use std::hint::black_box;
 use std::io::Cursor;
 use std::time::Duration;
 
@@ -56,10 +58,10 @@ fn bench_resp2_encoding_comparison(c: &mut Criterion) {
 
         // Optimized encoder
         group.bench_function(&format!("optimized_{}", name), |b| {
-            let mut encoder = OptimizedRespEncoder::new();
+            let mut opt_encoder = OptimizedRespEncoder::new();
             b.iter(|| {
-                let encoded = encoder.encode(black_box(&value)).unwrap();
-                black_box(encoded);
+                let result = opt_encoder.encode(black_box(&value)).unwrap();
+                black_box(result);
             });
         });
     }
@@ -120,13 +122,13 @@ fn bench_command_encoding_comparison(c: &mut Criterion) {
     group.bench_function("optimized_get_command", |b| {
         setup_string_interner();
         let cmd = OptimizedGetCommand::new("test_key").with_cached_args();
-        let mut encoder = OptimizedRespEncoder::new();
+        let mut opt_encoder = OptimizedRespEncoder::new();
         b.iter(|| {
             let args = cmd.args();
-            let encoded = encoder
+            let result = opt_encoder
                 .encode_command(black_box("GET"), black_box(&args))
                 .unwrap();
-            black_box(encoded);
+            black_box(result);
         });
     });
 
@@ -135,8 +137,9 @@ fn bench_command_encoding_comparison(c: &mut Criterion) {
         let cmd = SetCommand::new("test_key", "test_value").expire(Duration::from_secs(60));
         b.iter(|| {
             let args = cmd.args();
-            let encoded = RespEncoder::encode_command(black_box("SET"), black_box(&args)).unwrap();
-            black_box(encoded);
+            let set_encoded =
+                RespEncoder::encode_command(black_box("SET"), black_box(&args)).unwrap();
+            black_box(set_encoded);
         });
     });
 
@@ -146,13 +149,13 @@ fn bench_command_encoding_comparison(c: &mut Criterion) {
         let cmd = OptimizedSetCommand::new("test_key", "test_value")
             .expire(Duration::from_secs(60))
             .with_cached_args();
-        let mut encoder = OptimizedRespEncoder::new();
+        let mut opt_encoder2 = OptimizedRespEncoder::new();
         b.iter(|| {
             let args = cmd.args();
-            let encoded = encoder
+            let set_encoded = opt_encoder2
                 .encode_command(black_box("SET"), black_box(&args))
                 .unwrap();
-            black_box(encoded);
+            black_box(set_encoded);
         });
     });
 

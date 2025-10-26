@@ -442,7 +442,7 @@ mod tests {
     fn test_stream_entry_timestamp_parsing() {
         let entry = StreamEntry::new("1234567890123-5".to_string(), HashMap::new());
 
-        assert_eq!(entry.timestamp(), Some(1234567890123));
+        assert_eq!(entry.timestamp(), Some(1_234_567_890_123));
         assert_eq!(entry.sequence(), Some(5));
     }
 

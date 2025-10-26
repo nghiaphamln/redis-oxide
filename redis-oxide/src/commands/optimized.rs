@@ -599,7 +599,7 @@ mod tests {
 
     #[test]
     fn test_memory_pool() {
-        let mut pool = MemoryPool::new(3, || Vec::<i32>::new());
+        let mut pool = MemoryPool::new(3, Vec::<i32>::new);
 
         let mut vec1 = pool.get();
         vec1.push(1);

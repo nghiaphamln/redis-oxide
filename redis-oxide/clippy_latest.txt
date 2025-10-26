@@ -1,0 +1,168 @@
+    Checking redis-oxide v0.2.2 (D:\working\base-e-invoice\rust-mux\redis-oxide)
+error: collection is never read
+   --> redis-oxide\tests\test_streams.rs:191:5
+    |
+191 |     let mut message_ids = Vec::new();
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#collection_is_never_read
+    = note: `-D clippy::collection-is-never-read` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::collection_is_never_read)]`
+
+error: empty String is being created manually
+   --> redis-oxide\tests\test_streams.rs:316:46
+    |
+316 |     fields.insert("empty_field".to_string(), "".to_string());
+    |                                              ^^^^^^^^^^^^^^ help: consider using: `String::new()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#manual_string_new
+    = note: `-D clippy::manual-string-new` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::manual_string_new)]`
+
+error: empty String is being created manually
+   --> redis-oxide\tests\test_streams.rs:337:54
+    |
+337 |     assert_eq!(entry.get_field("empty_field"), Some(&"".to_string()));
+    |                                                      ^^^^^^^^^^^^^^ help: consider using: `String::new()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#manual_string_new
+
+error: this comparison involving the minimum or maximum element for this type contains a case that is always true or always false
+   --> redis-oxide\tests\test_streams.rs:350:17
+    |
+350 |         assert!(sequence >= 0);
+    |                 ^^^^^^^^^^^^^
+    |
+    = help: because `0` is the minimum value for this type, this comparison is always true
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#absurd_extreme_comparisons
+    = note: `-D clippy::absurd-extreme-comparisons` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::absurd_extreme_comparisons)]`
+
+error: adding items after statements is confusing, since items exist from the start of the scope
+   --> redis-oxide\tests\test_streams.rs:398:5
+    |
+398 |     use std::time::{SystemTime, UNIX_EPOCH};
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#items_after_statements
+    = note: `-D clippy::items-after-statements` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::items_after_statements)]`
+
+error: adding items after statements is confusing, since items exist from the start of the scope
+   --> redis-oxide\tests\test_streams.rs:398:21
+    |
+398 |     use std::time::{SystemTime, UNIX_EPOCH};
+    |                     ^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#items_after_statements
+
+error: adding items after statements is confusing, since items exist from the start of the scope
+   --> redis-oxide\tests\test_streams.rs:398:33
+    |
+398 |     use std::time::{SystemTime, UNIX_EPOCH};
+    |                                 ^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#items_after_statements
+
+error: casting `u128` to `u64` may truncate the value
+   --> redis-oxide\tests\test_streams.rs:399:21
+    |
+399 |       let timestamp = SystemTime::now()
+    |  _____________________^
+400 | |         .duration_since(UNIX_EPOCH)
+401 | |         .unwrap()
+402 | |         .as_millis() as u64;
+    | |___________________________^
+    |
+    = help: if this is intentional allow the lint with `#[allow(clippy::cast_possible_truncation)]` ...
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_possible_truncation
+    = note: `-D clippy::cast-possible-truncation` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::cast_possible_truncation)]`
+help: ... or use `try_from` and handle the error accordingly
+    |
+399 ~     let timestamp = u64::try_from(SystemTime::now()
+400 +         .duration_since(UNIX_EPOCH)
+401 +         .unwrap()
+402 ~         .as_millis());
+    |
+
+error: comparison is useless due to type limits
+   --> redis-oxide\tests\test_streams.rs:350:17
+    |
+350 |         assert!(sequence >= 0);
+    |                 ^^^^^^^^^^^^^
+    |
+    = note: `-D unused-comparisons` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(unused_comparisons)]`
+
+error: could not compile `redis-oxide` (test "test_streams") due to 9 previous errors
+warning: build failed, waiting for other jobs to finish...
+error: items after a test module
+   --> redis-oxide\src\commands\mod.rs:465:1
+    |
+465 | mod tests {
+    | ^^^^^^^^^
+...
+513 | impl PipelineCommand for GetCommand {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+527 | impl PipelineCommand for SetCommand {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+541 | impl PipelineCommand for DelCommand {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+555 | impl PipelineCommand for IncrCommand {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+569 | impl PipelineCommand for DecrCommand {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+583 | impl PipelineCommand for IncrByCommand {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+597 | impl PipelineCommand for DecrByCommand {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+611 | impl PipelineCommand for ExistsCommand {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+625 | impl PipelineCommand for ExpireCommand {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+639 | impl PipelineCommand for TtlCommand {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#items_after_test_module
+note: the lint level is defined here
+   --> redis-oxide\src\lib.rs:690:9
+    |
+690 | #![deny(clippy::all)]
+    |         ^^^^^^^^^^^
+    = note: `#[deny(clippy::items_after_test_module)]` implied by `#[deny(clippy::all)]`
+    = help: move the items to before the test module was defined
+
+error: redundant closure
+   --> redis-oxide\src\commands\optimized.rs:602:43
+    |
+602 |         let mut pool = MemoryPool::new(3, || Vec::<i32>::new());
+    |                                           ^^^^^^^^^^^^^^^^^^^^ help: replace the closure with the function itself: `Vec::<i32>::new`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#redundant_closure
+    = note: `#[deny(clippy::redundant_closure)]` implied by `#[deny(clippy::all)]`
+
+error: calling `as_bytes()` on a string literal
+   --> redis-oxide\src\pipeline.rs:520:35
+    |
+520 |             RespValue::BulkString("value1".as_bytes().into()),
+    |                                   ^^^^^^^^^^^^^^^^^^^ help: consider using a byte string literal instead: `b"value1"`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#string_lit_as_bytes
+note: the lint level is defined here
+   --> redis-oxide\src\lib.rs:692:9
+    |
+692 | #![deny(clippy::nursery)]
+    |         ^^^^^^^^^^^^^^^
+    = note: `#[deny(clippy::string_lit_as_bytes)]` implied by `#[deny(clippy::nursery)]`
+
+error: could not compile `redis-oxide` (lib test) due to 3 previous errors

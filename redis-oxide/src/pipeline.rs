@@ -517,7 +517,7 @@ mod tests {
     async fn test_pipeline_result() {
         let results = vec![
             RespValue::SimpleString("OK".to_string()),
-            RespValue::BulkString("value1".as_bytes().into()),
+            RespValue::BulkString(b"value1".to_vec().into()),
             RespValue::Integer(42),
         ];
 

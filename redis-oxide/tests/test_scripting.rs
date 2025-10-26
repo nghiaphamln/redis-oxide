@@ -1,22 +1,16 @@
 //! Integration tests for Lua scripting functionality
 
-#![allow(unused_imports)]
 #![allow(clippy::needless_raw_string_hashes)]
 #![allow(clippy::uninlined_format_args)]
 
 use redis_oxide::{Client, ConnectionConfig, Script, ScriptManager};
-use std::collections::HashMap;
-use testcontainers::{core::WaitFor, runners::AsyncRunner, ContainerAsync, GenericImage};
+
+fn redis_url() -> String {
+    std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://localhost:6379".to_string())
+}
 
 async fn setup_client() -> Result<Client, redis_oxide::RedisError> {
-    let redis_image = GenericImage::new("redis", "7-alpine")
-        .with_exposed_port(testcontainers::core::ContainerPort::Tcp(6379))
-        .with_wait_for(WaitFor::message_on_stdout("Ready to accept connections"));
-
-    let container = redis_image.start().await.unwrap();
-    let host_port = container.get_host_port_ipv4(6379).await.unwrap();
-    let redis_url = format!("redis://localhost:{}", host_port);
-    let config = ConnectionConfig::new(&redis_url);
+    let config = ConnectionConfig::new(redis_url().as_str());
     Client::connect(config).await
 }
 

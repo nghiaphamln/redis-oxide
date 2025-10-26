@@ -1,0 +1,21 @@
+[advisories]
+# The path where the advisory database is cloned/fetched into
+db-path = "${CARGO_HOME}/advisory-db"
+# The url(s) of the advisory databases to use
+db-urls = ["https://github.com/RustSec/advisory-db.git"]
+# How to handle crates with security vulnerabilities
+vulnerability = "deny"
+# How to handle unmaintained crates
+unmaintained = "warn"
+# How to handle crates that have been yanked from crates.io
+yanked = "warn"
+# How to handle crates with security notices
+notice = "warn"
+# Lint level for when multiple versions of the same crate are detected
+# Note that if this is set to "allow", it will also allow duplicates where versions differ only in metadata
+# If you wish to disallow this, then use "deny" instead
+allow = [
+    # RUSTSEC-2025-0111: tokio-tar parses PAX extended headers incorrectly, allows file smuggling
+    # No fixed version available yet. This is only used in tests with testcontainers.
+    { name = "tokio-tar", version = "0.3.1" },
+]

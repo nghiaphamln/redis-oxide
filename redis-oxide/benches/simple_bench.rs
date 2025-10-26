@@ -1,11 +1,14 @@
 //! Simple benchmark for testing baseline performance
 
+#![allow(missing_docs)]
+
 use bytes::{Bytes, BytesMut};
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{criterion_group, criterion_main, Criterion};
 use redis_oxide::{
     core::value::RespValue,
     protocol::resp2::{RespDecoder, RespEncoder},
 };
+use std::hint::black_box;
 use std::io::Cursor;
 
 fn bench_resp2_simple_encoding(c: &mut Criterion) {

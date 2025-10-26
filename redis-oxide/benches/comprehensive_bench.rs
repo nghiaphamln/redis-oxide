@@ -13,18 +13,19 @@
 //! - Memory allocation patterns
 
 use bytes::{Bytes, BytesMut};
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
+use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use redis_oxide::{
     commands::{
         Command, GetCommand, HSetCommand, LPushCommand, SAddCommand, SetCommand, ZAddCommand,
     },
-    core::{error::RedisError, value::RespValue},
+    core::value::RespValue,
     protocol::{
         resp2::{RespDecoder, RespEncoder},
         resp3::{Resp3Decoder, Resp3Encoder, Resp3Value},
     },
 };
 use std::collections::HashMap;
+use std::hint::black_box;
 use std::io::Cursor;
 
 // Test data generation
@@ -179,9 +180,9 @@ fn bench_resp3_encoding(c: &mut Criterion) {
     for (name, value) in test_cases {
         group.bench_function(name, |b| {
             b.iter(|| {
-                let mut encoder = Resp3Encoder::new();
-                let encoded = encoder.encode(black_box(&value)).unwrap();
-                black_box(encoded);
+                let mut resp3_encoder = Resp3Encoder::new();
+                let result = resp3_encoder.encode(black_box(&value)).unwrap();
+                black_box(result);
             });
         });
     }
@@ -194,9 +195,9 @@ fn bench_resp3_encoding(c: &mut Criterion) {
         group.throughput(Throughput::Elements(*size as u64));
         group.bench_with_input(BenchmarkId::new("map", size), size, |b, _| {
             b.iter(|| {
-                let mut encoder = Resp3Encoder::new();
-                let encoded = encoder.encode(black_box(&value)).unwrap();
-                black_box(encoded);
+                let mut resp3_encoder = Resp3Encoder::new();
+                let result = resp3_encoder.encode(black_box(&value)).unwrap();
+                black_box(result);
             });
         });
     }

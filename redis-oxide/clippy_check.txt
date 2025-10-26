@@ -1,0 +1,1135 @@
+    Checking redis-oxide v0.2.2 (D:\working\base-e-invoice\rust-mux\redis-oxide)
+error: approximate value of `f{32, 64}::consts::PI` found
+  --> redis-oxide\tests\test_resp3_protocol.rs:53:41
+   |
+53 |     let double_val = Resp3Value::Double(3.14159);
+   |                                         ^^^^^^^
+   |
+   = help: consider using the constant directly
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#approx_constant
+   = note: `-D clippy::approx-constant` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[allow(clippy::approx_constant)]`
+
+error: approximate value of `f{32, 64}::consts::PI` found
+   --> redis-oxide\tests\test_resp3_protocol.rs:212:41
+    |
+212 |     let double_val = Resp3Value::Double(3.14);
+    |                                         ^^^^
+    |
+    = help: consider using the constant directly
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#approx_constant
+
+error: approximate value of `f{32, 64}::consts::PI` found
+   --> redis-oxide\tests\test_resp3_protocol.rs:216:40
+    |
+216 |     assert_eq!(double_val.as_float()?, 3.14);
+    |                                        ^^^^
+    |
+    = help: consider using the constant directly
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#approx_constant
+
+error: strict comparison of `f32` or `f64`
+   --> redis-oxide\tests\test_resp3_protocol.rs:216:5
+    |
+216 |     assert_eq!(double_val.as_float()?, 3.14);
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#float_cmp
+    = note: `-D clippy::float-cmp` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::float_cmp)]`
+    = note: this error originates in the macro `assert_eq` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: strict comparison of `f32` or `f64`
+   --> redis-oxide\tests\test_resp3_protocol.rs:217:5
+    |
+217 |     assert_eq!(num_val.as_float()?, 42.0);
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#float_cmp
+    = note: this error originates in the macro `assert_eq` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: approximate value of `f{32, 64}::consts::PI` found
+   --> redis-oxide\tests\test_resp3_protocol.rs:280:35
+    |
+280 |     assert_eq!(Resp3Value::Double(3.14).type_name(), "double");
+    |                                   ^^^^
+    |
+    = help: consider using the constant directly
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#approx_constant
+
+error: approximate value of `f{32, 64}::consts::E` found
+   --> redis-oxide\tests\test_resp3_protocol.rs:313:70
+    |
+313 |     inner_map.insert("nested_number".to_string(), Resp3Value::Double(2.718));
+    |                                                                      ^^^^^
+    |
+    = help: consider using the constant directly
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#approx_constant
+
+error: variables can be used directly in the `format!` string
+  --> redis-oxide\examples\comprehensive_demo.rs:69:5
+   |
+69 |     println!("SET/GET: {:?}", value);
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#uninlined_format_args
+   = note: `-D clippy::uninlined-format-args` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[allow(clippy::uninlined_format_args)]`
+help: change this to
+   |
+69 -     println!("SET/GET: {:?}", value);
+69 +     println!("SET/GET: {value:?}");
+   |
+
+error: variables can be used directly in the `format!` string
+  --> redis-oxide\examples\comprehensive_demo.rs:76:5
+   |
+76 |     println!("SET EX: TTL = {:?} seconds", ttl);
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#uninlined_format_args
+help: change this to
+   |
+76 -     println!("SET EX: TTL = {:?} seconds", ttl);
+76 +     println!("SET EX: TTL = {ttl:?} seconds");
+   |
+
+error: variables can be used directly in the `format!` string
+  --> redis-oxide\examples\comprehensive_demo.rs:81:5
+   |
+81 |     println!("SET NX: first={}, second={}", set1, set2);
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#uninlined_format_args
+help: change this to
+   |
+81 -     println!("SET NX: first={}, second={}", set1, set2);
+81 +     println!("SET NX: first={set1}, second={set2}");
+   |
+
+error: variables can be used directly in the `format!` string
+  --> redis-oxide\examples\comprehensive_demo.rs:86:5
+   |
+86 |     println!("INCR: {}", val);
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#uninlined_format_args
+help: change this to
+   |
+86 -     println!("INCR: {}", val);
+86 +     println!("INCR: {val}");
+   |
+
+error: empty String is being created manually
+   --> redis-oxide\tests\test_resp3_protocol.rs:399:44
+    |
+399 |     let empty_str = Resp3Value::BlobString("".to_string());
+    |                                            ^^^^^^^^^^^^^^ help: consider using: `String::new()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#manual_string_new
+    = note: `-D clippy::manual-string-new` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::manual_string_new)]`
+
+error: variables can be used directly in the `format!` string
+  --> redis-oxide\examples\comprehensive_demo.rs:88:5
+   |
+88 |     println!("INCRBY 5: {}", val);
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#uninlined_format_args
+help: change this to
+   |
+88 -     println!("INCRBY 5: {}", val);
+88 +     println!("INCRBY 5: {val}");
+   |
+
+error: long literal lacking separators
+   --> redis-oxide\src\streams.rs:445:44
+    |
+445 |         assert_eq!(entry.timestamp(), Some(1234567890123));
+    |                                            ^^^^^^^^^^^^^ help: consider: `1_234_567_890_123`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unreadable_literal
+note: the lint level is defined here
+   --> redis-oxide\src\lib.rs:689:9
+    |
+689 | #![deny(warnings)]
+    |         ^^^^^^^^
+    = note: `#[deny(clippy::unreadable_literal)]` implied by `#[deny(warnings)]`
+
+error: variables can be used directly in the `format!` string
+  --> redis-oxide\examples\comprehensive_demo.rs:94:5
+   |
+94 |     println!("EXISTS (2 keys): {}", exists);
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#uninlined_format_args
+help: change this to
+   |
+94 -     println!("EXISTS (2 keys): {}", exists);
+94 +     println!("EXISTS (2 keys): {exists}");
+   |
+
+error: approximate value of `f{32, 64}::consts::PI` found
+   --> redis-oxide\tests\test_resp3_protocol.rs:439:46
+    |
+439 |     let negative_float = Resp3Value::Double(-3.14);
+    |                                              ^^^^
+    |
+    = help: consider using the constant directly
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#approx_constant
+
+error: variables can be used directly in the `format!` string
+   --> redis-oxide\examples\comprehensive_demo.rs:113:5
+    |
+113 |     println!("HGET name: {:?}", name);
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#uninlined_format_args
+help: change this to
+    |
+113 -     println!("HGET name: {:?}", name);
+113 +     println!("HGET name: {name:?}");
+    |
+
+error: variables can be used directly in the `format!` string
+   --> redis-oxide\examples\comprehensive_demo.rs:117:5
+    |
+117 |     println!("HGETALL: {:?}", all_fields);
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#uninlined_format_args
+help: change this to
+    |
+117 -     println!("HGETALL: {:?}", all_fields);
+117 +     println!("HGETALL: {all_fields:?}");
+    |
+
+error: variables can be used directly in the `format!` string
+   --> redis-oxide\examples\comprehensive_demo.rs:122:5
+    |
+122 |     println!("HMGET: {:?}", values);
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#uninlined_format_args
+help: change this to
+    |
+122 -     println!("HMGET: {:?}", values);
+122 +     println!("HMGET: {values:?}");
+    |
+
+error: variables can be used directly in the `format!` string
+   --> redis-oxide\examples\comprehensive_demo.rs:127:5
+    |
+127 |     println!("HLEN: {}, HEXISTS email: {}", len, exists);
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#uninlined_format_args
+help: change this to
+    |
+127 -     println!("HLEN: {}, HEXISTS email: {}", len, exists);
+127 +     println!("HLEN: {len}, HEXISTS email: {exists}");
+    |
+
+error: variables can be used directly in the `format!` string
+   --> redis-oxide\examples\comprehensive_demo.rs:143:5
+    |
+143 |     println!("LPUSH: length = {}", len);
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#uninlined_format_args
+help: change this to
+    |
+143 -     println!("LPUSH: length = {}", len);
+143 +     println!("LPUSH: length = {len}");
+    |
+
+error: variables can be used directly in the `format!` string
+   --> redis-oxide\examples\comprehensive_demo.rs:146:5
+    |
+146 |     println!("RPUSH: length = {}", len);
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#uninlined_format_args
+help: change this to
+    |
+146 -     println!("RPUSH: length = {}", len);
+146 +     println!("RPUSH: length = {len}");
+    |
+
+error: variables can be used directly in the `format!` string
+   --> redis-oxide\examples\comprehensive_demo.rs:150:5
+    |
+150 |     println!("LRANGE: {:?}", items);
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#uninlined_format_args
+help: change this to
+    |
+150 -     println!("LRANGE: {:?}", items);
+150 +     println!("LRANGE: {items:?}");
+    |
+
+error: variables can be used directly in the `format!` string
+   --> redis-oxide\examples\comprehensive_demo.rs:154:5
+    |
+154 |     println!("LINDEX 0: {:?}", first);
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#uninlined_format_args
+help: change this to
+    |
+154 -     println!("LINDEX 0: {:?}", first);
+154 +     println!("LINDEX 0: {first:?}");
+    |
+
+error: variables can be used directly in the `format!` string
+   --> redis-oxide\examples\comprehensive_demo.rs:158:5
+    |
+158 |     println!("LSET then LINDEX 1: {:?}", modified);
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#uninlined_format_args
+help: change this to
+    |
+158 -     println!("LSET then LINDEX 1: {:?}", modified);
+158 +     println!("LSET then LINDEX 1: {modified:?}");
+    |
+
+error: variables can be used directly in the `format!` string
+   --> redis-oxide\examples\comprehensive_demo.rs:162:5
+    |
+162 |     println!("LPOP: {:?}", popped);
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#uninlined_format_args
+help: change this to
+    |
+162 -     println!("LPOP: {:?}", popped);
+162 +     println!("LPOP: {popped:?}");
+    |
+
+error: variables can be used directly in the `format!` string
+   --> redis-oxide\examples\comprehensive_demo.rs:165:5
+    |
+165 |     println!("Final LLEN: {}", final_len);
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#uninlined_format_args
+help: change this to
+    |
+165 -     println!("Final LLEN: {}", final_len);
+165 +     println!("Final LLEN: {final_len}");
+    |
+
+error: variables can be used directly in the `format!` string
+   --> redis-oxide\examples\comprehensive_demo.rs:184:5
+    |
+184 |     println!("SADD: {} members added", added);
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#uninlined_format_args
+help: change this to
+    |
+184 -     println!("SADD: {} members added", added);
+184 +     println!("SADD: {added} members added");
+    |
+
+error: variables can be used directly in the `format!` string
+   --> redis-oxide\examples\comprehensive_demo.rs:188:5
+    |
+188 |     println!("SMEMBERS: {:?}", members);
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#uninlined_format_args
+help: change this to
+    |
+188 -     println!("SMEMBERS: {:?}", members);
+188 +     println!("SMEMBERS: {members:?}");
+    |
+
+error: variables can be used directly in the `format!` string
+   --> redis-oxide\examples\comprehensive_demo.rs:192:5
+    |
+192 |     println!("SISMEMBER rust: {}", is_member);
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#uninlined_format_args
+help: change this to
+    |
+192 -     println!("SISMEMBER rust: {}", is_member);
+192 +     println!("SISMEMBER rust: {is_member}");
+    |
+
+error: variables can be used directly in the `format!` string
+   --> redis-oxide\examples\comprehensive_demo.rs:196:5
+    |
+196 |     println!("SCARD: {}", cardinality);
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#uninlined_format_args
+help: change this to
+    |
+196 -     println!("SCARD: {}", cardinality);
+196 +     println!("SCARD: {cardinality}");
+    |
+
+error: variables can be used directly in the `format!` string
+   --> redis-oxide\examples\comprehensive_demo.rs:200:5
+    |
+200 |     println!("SRANDMEMBER: {:?}", random);
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#uninlined_format_args
+help: change this to
+    |
+200 -     println!("SRANDMEMBER: {:?}", random);
+200 +     println!("SRANDMEMBER: {random:?}");
+    |
+
+error: variables can be used directly in the `format!` string
+   --> redis-oxide\examples\comprehensive_demo.rs:204:5
+    |
+204 |     println!("SREM: {} members removed", removed);
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#uninlined_format_args
+help: change this to
+    |
+204 -     println!("SREM: {} members removed", removed);
+204 +     println!("SREM: {removed} members removed");
+    |
+
+error: could not compile `redis-oxide` (test "test_resp3_protocol") due to 9 previous errors
+warning: build failed, waiting for other jobs to finish...
+error: variables can be used directly in the `format!` string
+   --> redis-oxide\examples\comprehensive_demo.rs:223:5
+    |
+223 |     println!("ZADD: {} members added", added);
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#uninlined_format_args
+help: change this to
+    |
+223 -     println!("ZADD: {} members added", added);
+223 +     println!("ZADD: {added} members added");
+    |
+
+error: variables can be used directly in the `format!` string
+   --> redis-oxide\examples\comprehensive_demo.rs:227:5
+    |
+227 |     println!("ZRANGE: {:?}", range);
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#uninlined_format_args
+help: change this to
+    |
+227 -     println!("ZRANGE: {:?}", range);
+227 +     println!("ZRANGE: {range:?}");
+    |
+
+error: variables can be used directly in the `format!` string
+   --> redis-oxide\examples\comprehensive_demo.rs:233:5
+    |
+233 | /     println!(
+234 | |         "alice - score: {:?}, rank: {:?}, rev_rank: {:?}",
+235 | |         score, rank, rev_rank
+236 | |     );
+    | |_____^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#uninlined_format_args
+
+error: variables can be used directly in the `format!` string
+   --> redis-oxide\examples\comprehensive_demo.rs:240:5
+    |
+240 |     println!("ZCARD: {}", cardinality);
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#uninlined_format_args
+help: change this to
+    |
+240 -     println!("ZCARD: {}", cardinality);
+240 +     println!("ZCARD: {cardinality}");
+    |
+
+error: variables can be used directly in the `format!` string
+   --> redis-oxide\examples\comprehensive_demo.rs:264:9
+    |
+264 |         println!("  Result {}: {:?}", i, result);
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#uninlined_format_args
+help: change this to
+    |
+264 -         println!("  Result {}: {:?}", i, result);
+264 +         println!("  Result {i}: {result:?}");
+    |
+
+error: used `assert_eq!` with a literal bool
+  --> redis-oxide\tests\test_transactions_pipelines.rs:39:5
+   |
+39 |     assert_eq!(results[0].as_bool()?, true);
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#bool_assert_comparison
+   = note: `-D clippy::bool-assert-comparison` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[allow(clippy::bool_assert_comparison)]`
+help: replace it with `assert!(..)`
+   |
+39 -     assert_eq!(results[0].as_bool()?, true);
+39 +     assert!(results[0].as_bool()?);
+   |
+
+error: used `assert_eq!` with a literal bool
+  --> redis-oxide\tests\test_transactions_pipelines.rs:40:5
+   |
+40 |     assert_eq!(results[1].as_bool()?, true);
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#bool_assert_comparison
+help: replace it with `assert!(..)`
+   |
+40 -     assert_eq!(results[1].as_bool()?, true);
+40 +     assert!(results[1].as_bool()?);
+   |
+
+error: variables can be used directly in the `format!` string
+   --> redis-oxide\examples\comprehensive_demo.rs:294:9
+    |
+294 |         println!("  Result {}: {:?}", i, result);
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#uninlined_format_args
+help: change this to
+    |
+294 -         println!("  Result {}: {:?}", i, result);
+294 +         println!("  Result {i}: {result:?}");
+    |
+
+error: variables can be used directly in the `format!` string
+   --> redis-oxide\examples\comprehensive_demo.rs:299:5
+    |
+299 |     println!("Final balance: {:?}", balance);
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#uninlined_format_args
+help: change this to
+    |
+299 -     println!("Final balance: {:?}", balance);
+299 +     println!("Final balance: {balance:?}");
+    |
+
+error: variables can be used directly in the `format!` string
+   --> redis-oxide\examples\comprehensive_demo.rs:331:5
+    |
+331 |     println!("EVAL result: {}", result);
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#uninlined_format_args
+help: change this to
+    |
+331 -     println!("EVAL result: {}", result);
+331 +     println!("EVAL result: {result}");
+    |
+
+error: variables can be used directly in the `format!` string
+   --> redis-oxide\examples\comprehensive_demo.rs:335:5
+    |
+335 |     println!("Script loaded with SHA: {}", sha);
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#uninlined_format_args
+help: change this to
+    |
+335 -     println!("Script loaded with SHA: {}", sha);
+335 +     println!("Script loaded with SHA: {sha}");
+    |
+
+error: variables can be used directly in the `format!` string
+   --> redis-oxide\examples\comprehensive_demo.rs:344:5
+    |
+344 |     println!("EVALSHA result: {}", result);
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#uninlined_format_args
+help: change this to
+    |
+344 -     println!("EVALSHA result: {}", result);
+344 +     println!("EVALSHA result: {result}");
+    |
+
+error: this expression creates a reference which is immediately dereferenced by the compiler
+   --> redis-oxide\examples\comprehensive_demo.rs:354:13
+    |
+354 |             &client,
+    |             ^^^^^^^ help: change this to: `client`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#needless_borrow
+    = note: `-D clippy::needless-borrow` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::needless_borrow)]`
+
+error: used `assert_eq!` with a literal bool
+   --> redis-oxide\tests\test_transactions_pipelines.rs:115:5
+    |
+115 |     assert_eq!(results[2].as_bool()?, true);
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#bool_assert_comparison
+help: replace it with `assert!(..)`
+    |
+115 -     assert_eq!(results[2].as_bool()?, true);
+115 +     assert!(results[2].as_bool()?);
+    |
+
+error: variables can be used directly in the `format!` string
+   --> redis-oxide\examples\comprehensive_demo.rs:359:5
+    |
+359 |     println!("ScriptManager result: {}", result);
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#uninlined_format_args
+help: change this to
+    |
+359 -     println!("ScriptManager result: {}", result);
+359 +     println!("ScriptManager result: {result}");
+    |
+
+error: used `assert_eq!` with a literal bool
+   --> redis-oxide\tests\test_transactions_pipelines.rs:116:5
+    |
+116 |     assert_eq!(results[3].as_bool()?, true);
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#bool_assert_comparison
+help: replace it with `assert!(..)`
+    |
+116 -     assert_eq!(results[3].as_bool()?, true);
+116 +     assert!(results[3].as_bool()?);
+    |
+
+error: variables can be used directly in the `format!` string
+   --> redis-oxide\examples\comprehensive_demo.rs:380:5
+    |
+380 |     println!("XADD entry 1: {}", entry_id1);
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#uninlined_format_args
+help: change this to
+    |
+380 -     println!("XADD entry 1: {}", entry_id1);
+380 +     println!("XADD entry 1: {entry_id1}");
+    |
+
+error: variables can be used directly in the `format!` string
+   --> redis-oxide\examples\comprehensive_demo.rs:387:5
+    |
+387 |     println!("XADD entry 2: {}", entry_id2);
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#uninlined_format_args
+help: change this to
+    |
+387 -     println!("XADD entry 2: {}", entry_id2);
+387 +     println!("XADD entry 2: {entry_id2}");
+    |
+
+error: variables can be used directly in the `format!` string
+   --> redis-oxide\examples\comprehensive_demo.rs:391:5
+    |
+391 |     println!("XLEN: {}", length);
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#uninlined_format_args
+help: change this to
+    |
+391 -     println!("XLEN: {}", length);
+391 +     println!("XLEN: {length}");
+    |
+
+error: only a `panic!` in `if`-then statement
+   --> redis-oxide\tests\test_transactions_pipelines.rs:151:5
+    |
+151 | /     if !results.is_empty() {
+152 | |         panic!("Transaction should be aborted due to watched key modification");
+153 | |     }
+    | |_____^ help: try instead: `assert!(results.is_empty(), "Transaction should be aborted due to watched key modification");`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#manual_assert
+    = note: `-D clippy::manual-assert` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::manual_assert)]`
+
+error: variables can be used directly in the `format!` string
+   --> redis-oxide\examples\comprehensive_demo.rs:404:5
+    |
+404 |     println!("Consumer group '{}' created", group_name);
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#uninlined_format_args
+help: change this to
+    |
+404 -     println!("Consumer group '{}' created", group_name);
+404 +     println!("Consumer group '{group_name}' created");
+    |
+
+error: variables can be used directly in the `format!` string
+   --> redis-oxide\examples\comprehensive_demo.rs:425:13
+    |
+425 |             println!("XACK: {} messages acknowledged", acked);
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#uninlined_format_args
+help: change this to
+    |
+425 -             println!("XACK: {} messages acknowledged", acked);
+425 +             println!("XACK: {acked} messages acknowledged");
+    |
+
+error: adding items after statements is confusing, since items exist from the start of the scope
+   --> redis-oxide\examples\comprehensive_demo.rs:438:5
+    |
+438 |     use redis_oxide::RedisError;
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#items_after_statements
+    = note: `-D clippy::items-after-statements` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::items_after_statements)]`
+
+error: variables can be used directly in the `format!` string
+   --> redis-oxide\examples\comprehensive_demo.rs:442:5
+    |
+442 |     println!("GET nonexistent key: {:?}", result);
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#uninlined_format_args
+help: change this to
+    |
+442 -     println!("GET nonexistent key: {:?}", result);
+442 +     println!("GET nonexistent key: {result:?}");
+    |
+
+error: used `assert_eq!` with a literal bool
+   --> redis-oxide\tests\test_transactions_pipelines.rs:230:5
+    |
+230 |     assert_eq!(results[0].as_bool()?, true); // SET
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#bool_assert_comparison
+help: replace it with `assert!(..)`
+    |
+230 -     assert_eq!(results[0].as_bool()?, true); // SET
+230 +     assert!(results[0].as_bool()?); // SET
+    |
+
+error: variables can be used directly in the `format!` string
+   --> redis-oxide\examples\comprehensive_demo.rs:449:5
+    |
+449 |     println!("HGET on string key: {:?}", hash_result);
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#uninlined_format_args
+help: change this to
+    |
+449 -     println!("HGET on string key: {:?}", hash_result);
+449 +     println!("HGET on string key: {hash_result:?}");
+    |
+
+error: variables can be used directly in the `format!` string
+   --> redis-oxide\examples\comprehensive_demo.rs:453:28
+    |
+453 |         Ok(Some(value)) => println!("Found value: {}", value),
+    |                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#uninlined_format_args
+help: change this to
+    |
+453 -         Ok(Some(value)) => println!("Found value: {}", value),
+453 +         Ok(Some(value)) => println!("Found value: {value}"),
+    |
+
+error: variables can be used directly in the `format!` string
+   --> redis-oxide\examples\comprehensive_demo.rs:455:45
+    |
+455 |         Err(RedisError::Connection(msg)) => println!("Connection error: {}", msg),
+    |                                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#uninlined_format_args
+help: change this to
+    |
+455 -         Err(RedisError::Connection(msg)) => println!("Connection error: {}", msg),
+455 +         Err(RedisError::Connection(msg)) => println!("Connection error: {msg}"),
+    |
+
+error: variables can be used directly in the `format!` string
+   --> redis-oxide\examples\comprehensive_demo.rs:456:43
+    |
+456 |         Err(RedisError::Protocol(msg)) => println!("Protocol error: {}", msg),
+    |                                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#uninlined_format_args
+help: change this to
+    |
+456 -         Err(RedisError::Protocol(msg)) => println!("Protocol error: {}", msg),
+456 +         Err(RedisError::Protocol(msg)) => println!("Protocol error: {msg}"),
+    |
+
+error: variables can be used directly in the `format!` string
+   --> redis-oxide\examples\comprehensive_demo.rs:457:42
+    |
+457 |         Err(RedisError::Cluster(msg)) => println!("Cluster error: {}", msg),
+    |                                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#uninlined_format_args
+help: change this to
+    |
+457 -         Err(RedisError::Cluster(msg)) => println!("Cluster error: {}", msg),
+457 +         Err(RedisError::Cluster(msg)) => println!("Cluster error: {msg}"),
+    |
+
+error: variables can be used directly in the `format!` string
+   --> redis-oxide\examples\comprehensive_demo.rs:458:43
+    |
+458 |         Err(RedisError::Sentinel(msg)) => println!("Sentinel error: {}", msg),
+    |                                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#uninlined_format_args
+help: change this to
+    |
+458 -         Err(RedisError::Sentinel(msg)) => println!("Sentinel error: {}", msg),
+458 +         Err(RedisError::Sentinel(msg)) => println!("Sentinel error: {msg}"),
+    |
+
+error: variables can be used directly in the `format!` string
+   --> redis-oxide\examples\comprehensive_demo.rs:459:19
+    |
+459 |         Err(e) => println!("Other error: {}", e),
+    |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#uninlined_format_args
+help: change this to
+    |
+459 -         Err(e) => println!("Other error: {}", e),
+459 +         Err(e) => println!("Other error: {e}"),
+    |
+
+error: used `assert_eq!` with a literal bool
+   --> redis-oxide\tests\test_transactions_pipelines.rs:268:5
+    |
+268 |     assert_eq!(results[0].as_bool()?, true);
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#bool_assert_comparison
+help: replace it with `assert!(..)`
+    |
+268 -     assert_eq!(results[0].as_bool()?, true);
+268 +     assert!(results[0].as_bool()?);
+    |
+
+error: used `assert_eq!` with a literal bool
+   --> redis-oxide\tests\test_transactions_pipelines.rs:298:5
+    |
+298 |     assert_eq!(results1[0].as_bool()?, true);
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#bool_assert_comparison
+help: replace it with `assert!(..)`
+    |
+298 -     assert_eq!(results1[0].as_bool()?, true);
+298 +     assert!(results1[0].as_bool()?);
+    |
+
+error: used `assert_eq!` with a literal bool
+   --> redis-oxide\tests\test_transactions_pipelines.rs:299:5
+    |
+299 |     assert_eq!(results2[0].as_bool()?, true);
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#bool_assert_comparison
+help: replace it with `assert!(..)`
+    |
+299 -     assert_eq!(results2[0].as_bool()?, true);
+299 +     assert!(results2[0].as_bool()?);
+    |
+
+error: the borrowed expression implements the required traits
+   --> redis-oxide\tests\test_transactions_pipelines.rs:319:22
+    |
+319 |         pipeline.set(&format!("large:key{}", i), &format!("value{}", i));
+    |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^ help: change this to: `format!("large:key{}", i)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#needless_borrows_for_generic_args
+    = note: `-D clippy::needless-borrows-for-generic-args` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::needless_borrows_for_generic_args)]`
+
+error: the borrowed expression implements the required traits
+   --> redis-oxide\tests\test_transactions_pipelines.rs:319:50
+    |
+319 |         pipeline.set(&format!("large:key{}", i), &format!("value{}", i));
+    |                                                  ^^^^^^^^^^^^^^^^^^^^^^ help: change this to: `format!("value{}", i)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#needless_borrows_for_generic_args
+
+error: the borrowed expression implements the required traits
+   --> redis-oxide\tests\test_transactions_pipelines.rs:324:22
+    |
+324 |         pipeline.get(&format!("large:key{}", i));
+    |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^ help: change this to: `format!("large:key{}", i)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#needless_borrows_for_generic_args
+
+error: the loop variable `i` is only used to index `results`
+   --> redis-oxide\tests\test_transactions_pipelines.rs:331:14
+    |
+331 |     for i in 0..num_operations {
+    |              ^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#needless_range_loop
+    = note: `-D clippy::needless-range-loop` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::needless_range_loop)]`
+help: consider using an iterator
+    |
+331 -     for i in 0..num_operations {
+331 +     for <item> in results.iter().take(num_operations) {
+    |
+
+error: used `assert_eq!` with a literal bool
+   --> redis-oxide\tests\test_transactions_pipelines.rs:332:9
+    |
+332 |         assert_eq!(results[i].as_bool()?, true);
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#bool_assert_comparison
+help: replace it with `assert!(..)`
+    |
+332 -         assert_eq!(results[i].as_bool()?, true);
+332 +         assert!(results[i].as_bool()?);
+    |
+
+error: used `assert_eq!` with a literal bool
+   --> redis-oxide\tests\test_transactions_pipelines.rs:382:13
+    |
+382 |             assert_eq!(results[set_index].as_bool()?, true);
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#bool_assert_comparison
+help: replace it with `assert!(..)`
+    |
+382 -             assert_eq!(results[set_index].as_bool()?, true);
+382 +             assert!(results[set_index].as_bool()?);
+    |
+
+error: used `assert_eq!` with a literal bool
+   --> redis-oxide\tests\test_transactions_pipelines.rs:419:5
+    |
+419 |     assert_eq!(results[2].as_bool()?, true); // SET balance
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#bool_assert_comparison
+help: replace it with `assert!(..)`
+    |
+419 -     assert_eq!(results[2].as_bool()?, true); // SET balance
+419 +     assert!(results[2].as_bool()?); // SET balance
+    |
+
+error: used `assert_eq!` with a literal bool
+   --> redis-oxide\tests\test_transactions_pipelines.rs:420:5
+    |
+420 |     assert_eq!(results[3].as_bool()?, true); // SET last_transaction
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#bool_assert_comparison
+help: replace it with `assert!(..)`
+    |
+420 -     assert_eq!(results[3].as_bool()?, true); // SET last_transaction
+420 +     assert!(results[3].as_bool()?); // SET last_transaction
+    |
+
+error: collection is never read
+   --> redis-oxide\tests\test_streams.rs:190:5
+    |
+190 |     let mut message_ids = Vec::new();
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#collection_is_never_read
+    = note: `-D clippy::collection-is-never-read` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::collection_is_never_read)]`
+
+error: empty String is being created manually
+   --> redis-oxide\tests\test_streams.rs:315:46
+    |
+315 |     fields.insert("empty_field".to_string(), "".to_string());
+    |                                              ^^^^^^^^^^^^^^ help: consider using: `String::new()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#manual_string_new
+    = note: `-D clippy::manual-string-new` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::manual_string_new)]`
+
+error: empty String is being created manually
+   --> redis-oxide\tests\test_streams.rs:336:54
+    |
+336 |     assert_eq!(entry.get_field("empty_field"), Some(&"".to_string()));
+    |                                                      ^^^^^^^^^^^^^^ help: consider using: `String::new()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#manual_string_new
+
+error: this comparison involving the minimum or maximum element for this type contains a case that is always true or always false
+   --> redis-oxide\tests\test_streams.rs:349:17
+    |
+349 |         assert!(sequence >= 0);
+    |                 ^^^^^^^^^^^^^
+    |
+    = help: because `0` is the minimum value for this type, this comparison is always true
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#absurd_extreme_comparisons
+    = note: `-D clippy::absurd-extreme-comparisons` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::absurd_extreme_comparisons)]`
+
+error: could not compile `redis-oxide` (example "comprehensive_demo") due to 49 previous errors
+error: adding items after statements is confusing, since items exist from the start of the scope
+   --> redis-oxide\tests\test_streams.rs:397:5
+    |
+397 |     use std::time::{SystemTime, UNIX_EPOCH};
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#items_after_statements
+    = note: `-D clippy::items-after-statements` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::items_after_statements)]`
+
+error: adding items after statements is confusing, since items exist from the start of the scope
+   --> redis-oxide\tests\test_streams.rs:397:21
+    |
+397 |     use std::time::{SystemTime, UNIX_EPOCH};
+    |                     ^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#items_after_statements
+
+error: adding items after statements is confusing, since items exist from the start of the scope
+   --> redis-oxide\tests\test_streams.rs:397:33
+    |
+397 |     use std::time::{SystemTime, UNIX_EPOCH};
+    |                                 ^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#items_after_statements
+
+error: casting `u128` to `u64` may truncate the value
+   --> redis-oxide\tests\test_streams.rs:398:21
+    |
+398 |       let timestamp = SystemTime::now()
+    |  _____________________^
+399 | |         .duration_since(UNIX_EPOCH)
+400 | |         .unwrap()
+401 | |         .as_millis() as u64;
+    | |___________________________^
+    |
+    = help: if this is intentional allow the lint with `#[allow(clippy::cast_possible_truncation)]` ...
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_possible_truncation
+    = note: `-D clippy::cast-possible-truncation` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::cast_possible_truncation)]`
+help: ... or use `try_from` and handle the error accordingly
+    |
+398 ~     let timestamp = u64::try_from(SystemTime::now()
+399 +         .duration_since(UNIX_EPOCH)
+400 +         .unwrap()
+401 ~         .as_millis());
+    |
+
+error: redundant closure
+   --> redis-oxide\tests\test_data_types.rs:236:14
+    |
+236 |         .map(|s| s.to_string())
+    |              ^^^^^^^^^^^^^^^^^ help: replace the closure with the method itself: `std::string::ToString::to_string`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#redundant_closure_for_method_calls
+    = note: `-D clippy::redundant-closure-for-method-calls` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::redundant_closure_for_method_calls)]`
+
+error: calling `to_string` on `&&str`
+   --> redis-oxide\tests\test_data_types.rs:236:18
+    |
+236 |         .map(|s| s.to_string())
+    |                  ^^^^^^^^^^^^^ help: try dereferencing the receiver: `(*s).to_string()`
+    |
+    = help: `&str` implements `ToString` through a slower blanket impl, but `str` has a fast specialization of `ToString`
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#inefficient_to_string
+    = note: `-D clippy::inefficient-to-string` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::inefficient_to_string)]`
+
+error: could not compile `redis-oxide` (test "test_transactions_pipelines") due to 17 previous errors
+error: comparison is useless due to type limits
+   --> redis-oxide\tests\test_streams.rs:349:17
+    |
+349 |         assert!(sequence >= 0);
+    |                 ^^^^^^^^^^^^^
+    |
+    = note: `-D unused-comparisons` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(unused_comparisons)]`
+
+error: could not compile `redis-oxide` (test "test_streams") due to 9 previous errors
+error: could not compile `redis-oxide` (test "test_data_types") due to 2 previous errors
+error: items after a test module
+   --> redis-oxide\src\commands\mod.rs:465:1
+    |
+465 | mod tests {
+    | ^^^^^^^^^
+...
+513 | impl PipelineCommand for GetCommand {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+527 | impl PipelineCommand for SetCommand {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+541 | impl PipelineCommand for DelCommand {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+555 | impl PipelineCommand for IncrCommand {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+569 | impl PipelineCommand for DecrCommand {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+583 | impl PipelineCommand for IncrByCommand {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+597 | impl PipelineCommand for DecrByCommand {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+611 | impl PipelineCommand for ExistsCommand {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+625 | impl PipelineCommand for ExpireCommand {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+639 | impl PipelineCommand for TtlCommand {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#items_after_test_module
+note: the lint level is defined here
+   --> redis-oxide\src\lib.rs:690:9
+    |
+690 | #![deny(clippy::all)]
+    |         ^^^^^^^^^^^
+    = note: `#[deny(clippy::items_after_test_module)]` implied by `#[deny(clippy::all)]`
+    = help: move the items to before the test module was defined
+
+error: redundant closure
+   --> redis-oxide\src\commands\optimized.rs:602:43
+    |
+602 |         let mut pool = MemoryPool::new(3, || Vec::<i32>::new());
+    |                                           ^^^^^^^^^^^^^^^^^^^^ help: replace the closure with the function itself: `Vec::<i32>::new`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#redundant_closure
+    = note: `#[deny(clippy::redundant_closure)]` implied by `#[deny(clippy::all)]`
+
+error: calling `as_bytes()` on a string literal
+   --> redis-oxide\src\pipeline.rs:520:35
+    |
+520 |             RespValue::BulkString("value1".as_bytes().into()),
+    |                                   ^^^^^^^^^^^^^^^^^^^ help: consider using a byte string literal instead: `b"value1"`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#string_lit_as_bytes
+note: the lint level is defined here
+   --> redis-oxide\src\lib.rs:692:9
+    |
+692 | #![deny(clippy::nursery)]
+    |         ^^^^^^^^^^^^^^^
+    = note: `#[deny(clippy::string_lit_as_bytes)]` implied by `#[deny(clippy::nursery)]`
+
+error: could not compile `redis-oxide` (lib test) due to 4 previous errors

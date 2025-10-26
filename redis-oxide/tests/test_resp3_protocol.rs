@@ -1,36 +1,26 @@
 //! Integration tests for RESP3 protocol support
 
 #![allow(clippy::uninlined_format_args)]
+#![allow(clippy::similar_names)]
+#![allow(clippy::approx_constant)]
+#![allow(clippy::float_cmp)]
 
 use redis_oxide::{Client, ConnectionConfig, ProtocolVersion, Resp3Value};
 use std::collections::{HashMap, HashSet};
-use testcontainers::{core::WaitFor, runners::AsyncRunner, ContainerAsync, GenericImage};
 
+fn redis_url() -> String {
+    std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://localhost:6379".to_string())
+}
+
+#[allow(dead_code)]
 async fn setup_client_resp3() -> Result<Client, redis_oxide::RedisError> {
-    let redis_image = GenericImage::new("redis", "7-alpine")
-        .with_exposed_port(testcontainers::core::ContainerPort::Tcp(6379))
-        .with_wait_for(WaitFor::message_on_stdout("Ready to accept connections"));
-
-    let container = redis_image.start().await.unwrap();
-    let host_port = container.get_host_port_ipv4(6379).await.unwrap();
-    let redis_url = format!("redis://localhost:{}", host_port);
-
-    let config = ConnectionConfig::new(&redis_url).with_protocol_version(ProtocolVersion::Resp3);
-
+    let config = ConnectionConfig::new(redis_url().as_str()).with_protocol_version(ProtocolVersion::Resp3);
     Client::connect(config).await
 }
 
+#[allow(dead_code)]
 async fn setup_client_resp2() -> Result<Client, redis_oxide::RedisError> {
-    let redis_image = GenericImage::new("redis", "7-alpine")
-        .with_exposed_port(testcontainers::core::ContainerPort::Tcp(6379))
-        .with_wait_for(WaitFor::message_on_stdout("Ready to accept connections"));
-
-    let container = redis_image.start().await.unwrap();
-    let host_port = container.get_host_port_ipv4(6379).await.unwrap();
-    let redis_url = format!("redis://localhost:{}", host_port);
-
-    let config = ConnectionConfig::new(&redis_url).with_protocol_version(ProtocolVersion::Resp2);
-
+    let config = ConnectionConfig::new(redis_url().as_str()).with_protocol_version(ProtocolVersion::Resp2);
     Client::connect(config).await
 }
 
@@ -308,7 +298,10 @@ async fn test_resp3_complex_nested_structures() -> Result<(), Box<dyn std::error
     // Create a complex nested structure
     let mut inner_map = HashMap::new();
     inner_map.insert("nested_key".to_string(), Resp3Value::Boolean(true));
-    inner_map.insert("nested_number".to_string(), Resp3Value::Double(2.718));
+    inner_map.insert(
+        "nested_number".to_string(),
+        Resp3Value::Double(std::f64::consts::E),
+    );
 
     let mut inner_set = HashSet::new();
     inner_set.insert(Resp3Value::SimpleString("set_item1".to_string()));
@@ -394,7 +387,7 @@ async fn test_resp3_encoding_edge_cases() -> Result<(), Box<dyn std::error::Erro
     let mut decoder = Resp3Decoder::new();
 
     // Test empty string
-    let empty_str = Resp3Value::BlobString("".to_string());
+    let empty_str = Resp3Value::BlobString(String::new());
     let encoded = encoder.encode(&empty_str)?;
     let decoded = decoder.decode(&encoded)?;
     assert_eq!(empty_str, decoded);
