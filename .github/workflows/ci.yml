@@ -90,10 +90,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
-      - name: Install cargo-audit
-        run: cargo install cargo-audit
-      - name: Security audit
-        run: cargo audit
+      - name: Install cargo-deny
+        run: cargo install cargo-deny
+      - name: Security audit with deny.toml exceptions
+        run: cargo deny check advisories
 
   docs:
     name: Documentation
