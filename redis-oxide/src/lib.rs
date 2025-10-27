@@ -279,14 +279,10 @@
 //!
 //! HyperLogLog operations (PFADD, PFCOUNT, PFMERGE) are planned for future implementation.
 //!
-//! ## Geo Operations
+//! ## Geo Operations (Not Yet Implemented)
 //!
-//! ```no_run,ignore
-//! # use redis_oxide::{Client, ConnectionConfig};
-//! # #[tokio::main]
-//! # async fn main() -> Result<(), Box<dyn std::error::Error>> {
-//! # let config = ConnectionConfig::new("redis://localhost:6379");
-//! # let client = Client::connect(config).await?;
+//! Geo operations (GEOADD, GEODIST, GEOPOS) are planned for future implementation.
+//!
 //! ## Connection Pool Configuration
 //!
 //! ```no_run
