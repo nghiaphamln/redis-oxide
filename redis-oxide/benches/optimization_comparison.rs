@@ -1,5 +1,8 @@
-//! Benchmark comparing original vs optimized implementations
+//! Benchmark for redis-oxide optimizations
+//!
+//! This benchmark requires the `internal-optimizations` feature to compile.
 
+#![cfg(feature = "internal-optimizations")]
 #![allow(missing_docs)]
 #![allow(clippy::uninlined_format_args)]
 #![allow(clippy::needless_borrows_for_generic_args)]
@@ -12,10 +15,7 @@ use redis_oxide::{
     commands::optimized::{init_string_interner, OptimizedGetCommand, OptimizedSetCommand},
     commands::{Command, GetCommand, SetCommand},
     core::value::RespValue,
-    protocol::{
-        resp2::{RespDecoder, RespEncoder},
-        resp2_optimized::{OptimizedRespDecoder, OptimizedRespEncoder},
-    },
+    protocol::resp2::{RespDecoder, RespEncoder},
 };
 use std::hint::black_box;
 use std::io::Cursor;
@@ -25,10 +25,9 @@ fn setup_string_interner() {
     init_string_interner(1000);
 }
 
-fn bench_resp2_encoding_comparison(c: &mut Criterion) {
-    let mut group = c.benchmark_group("resp2_encoding_comparison");
+fn bench_resp2_encoding(c: &mut Criterion) {
+    let mut group = c.benchmark_group("resp2_encoding");
 
-    // Test data
     let test_values = vec![
         ("simple_string", RespValue::SimpleString("OK".to_string())),
         (
@@ -47,20 +46,10 @@ fn bench_resp2_encoding_comparison(c: &mut Criterion) {
     ];
 
     for (name, value) in test_values {
-        // Original encoder
-        group.bench_function(&format!("original_{}", name), |b| {
+        group.bench_function(name, |b| {
+            let mut encoder = RespEncoder::new();
             b.iter(|| {
-                let mut buf = BytesMut::new();
-                RespEncoder::encode(black_box(&value), &mut buf).unwrap();
-                black_box(buf);
-            });
-        });
-
-        // Optimized encoder
-        group.bench_function(&format!("optimized_{}", name), |b| {
-            let mut opt_encoder = OptimizedRespEncoder::new();
-            b.iter(|| {
-                let result = opt_encoder.encode(black_box(&value)).unwrap();
+                let result = encoder.encode(black_box(&value)).unwrap();
                 black_box(result);
             });
         });
@@ -69,8 +58,8 @@ fn bench_resp2_encoding_comparison(c: &mut Criterion) {
     group.finish();
 }
 
-fn bench_resp2_decoding_comparison(c: &mut Criterion) {
-    let mut group = c.benchmark_group("resp2_decoding_comparison");
+fn bench_resp2_decoding(c: &mut Criterion) {
+    let mut group = c.benchmark_group("resp2_decoding");
 
     let test_data = vec![
         ("simple_string", b"+OK\r\n".to_vec()),
@@ -83,21 +72,11 @@ fn bench_resp2_decoding_comparison(c: &mut Criterion) {
     ];
 
     for (name, data) in test_data {
-        // Original decoder
-        group.bench_function(&format!("original_{}", name), |b| {
+        group.bench_function(name, |b| {
             b.iter(|| {
                 let mut cursor = Cursor::new(black_box(&data[..]));
                 let result = RespDecoder::decode(&mut cursor).unwrap();
                 black_box(result);
-            });
-        });
-
-        // Optimized decoder (streaming)
-        group.bench_function(&format!("optimized_{}", name), |b| {
-            let mut decoder = OptimizedRespDecoder::new();
-            b.iter(|| {
-                let results = decoder.decode_streaming(black_box(&data)).unwrap();
-                black_box(results);
             });
         });
     }
@@ -105,67 +84,61 @@ fn bench_resp2_decoding_comparison(c: &mut Criterion) {
     group.finish();
 }
 
-fn bench_command_encoding_comparison(c: &mut Criterion) {
-    let mut group = c.benchmark_group("command_encoding_comparison");
+fn bench_command_encoding(c: &mut Criterion) {
+    let mut group = c.benchmark_group("command_encoding");
 
-    // Original GET command
-    group.bench_function("original_get_command", |b| {
+    // GET command
+    group.bench_function("get_standard", |b| {
         let cmd = GetCommand::new("test_key");
+        let args = cmd.args();
+        let mut encoder = RespEncoder::new();
         b.iter(|| {
-            let args = cmd.args();
-            let encoded = RespEncoder::encode_command(black_box("GET"), black_box(&args)).unwrap();
-            black_box(encoded);
-        });
-    });
-
-    // Optimized GET command
-    group.bench_function("optimized_get_command", |b| {
-        setup_string_interner();
-        let cmd = OptimizedGetCommand::new("test_key").with_cached_args();
-        let mut opt_encoder = OptimizedRespEncoder::new();
-        b.iter(|| {
-            let args = cmd.args();
-            let result = opt_encoder
-                .encode_command(black_box("GET"), black_box(&args))
-                .unwrap();
+            let result = encoder.encode_command(black_box("GET"), &args).unwrap();
             black_box(result);
         });
     });
 
-    // Original SET command
-    group.bench_function("original_set_command", |b| {
-        let cmd = SetCommand::new("test_key", "test_value").expire(Duration::from_secs(60));
+    group.bench_function("get_optimized", |b| {
+        setup_string_interner();
+        let cmd = OptimizedGetCommand::new("test_key").with_cached_args();
+        let args = cmd.args();
+        let mut encoder = RespEncoder::new();
         b.iter(|| {
-            let args = cmd.args();
-            let set_encoded =
-                RespEncoder::encode_command(black_box("SET"), black_box(&args)).unwrap();
-            black_box(set_encoded);
+            let result = encoder.encode_command(black_box("GET"), &args).unwrap();
+            black_box(result);
         });
     });
 
-    // Optimized SET command
-    group.bench_function("optimized_set_command", |b| {
+    // SET command
+    group.bench_function("set_standard", |b| {
+        let cmd = SetCommand::new("test_key", "test_value").expire(Duration::from_secs(60));
+        let args = cmd.args();
+        let mut encoder = RespEncoder::new();
+        b.iter(|| {
+            let result = encoder.encode_command(black_box("SET"), &args).unwrap();
+            black_box(result);
+        });
+    });
+
+    group.bench_function("set_optimized", |b| {
         setup_string_interner();
         let cmd = OptimizedSetCommand::new("test_key", "test_value")
             .expire(Duration::from_secs(60))
             .with_cached_args();
-        let mut opt_encoder2 = OptimizedRespEncoder::new();
+        let args = cmd.args();
+        let mut encoder = RespEncoder::new();
         b.iter(|| {
-            let args = cmd.args();
-            let set_encoded = opt_encoder2
-                .encode_command(black_box("SET"), black_box(&args))
-                .unwrap();
-            black_box(set_encoded);
+            let result = encoder.encode_command(black_box("SET"), &args).unwrap();
+            black_box(result);
         });
     });
 
     group.finish();
 }
 
-fn bench_memory_allocation_patterns(c: &mut Criterion) {
-    let mut group = c.benchmark_group("memory_allocation_patterns");
+fn bench_memory_allocation(c: &mut Criterion) {
+    let mut group = c.benchmark_group("memory_allocation");
 
-    // BytesMut allocation comparison
     group.bench_function("bytesmut_new_each_time", |b| {
         b.iter(|| {
             let mut buf = BytesMut::new();
@@ -182,7 +155,6 @@ fn bench_memory_allocation_patterns(c: &mut Criterion) {
         });
     });
 
-    // String allocation comparison
     group.bench_function("string_allocation_each_time", |b| {
         b.iter(|| {
             let s = format!("key_{}", black_box(42));
@@ -205,7 +177,6 @@ fn bench_memory_allocation_patterns(c: &mut Criterion) {
 fn bench_bulk_operations(c: &mut Criterion) {
     let mut group = c.benchmark_group("bulk_operations");
 
-    // Bulk encoding - original
     for size in [10, 100, 1000].iter() {
         let commands: Vec<_> = (0..*size)
             .map(|i| {
@@ -215,13 +186,14 @@ fn bench_bulk_operations(c: &mut Criterion) {
             })
             .collect();
 
-        group.bench_with_input(BenchmarkId::new("original_bulk_set", size), size, |b, _| {
+        group.bench_with_input(BenchmarkId::new("standard_bulk_set", size), size, |b, _| {
             b.iter(|| {
+                let mut encoder = RespEncoder::new();
                 let mut total_size = 0;
                 for (key, value) in &commands {
                     let cmd = SetCommand::new(key, value);
                     let args = cmd.args();
-                    let encoded = RespEncoder::encode_command("SET", &args).unwrap();
+                    let encoded = encoder.encode_command("SET", &args).unwrap();
                     total_size += encoded.len();
                 }
                 black_box(total_size);
@@ -239,7 +211,7 @@ fn bench_bulk_operations(c: &mut Criterion) {
                     .collect();
 
                 b.iter(|| {
-                    let mut encoder = OptimizedRespEncoder::new();
+                    let mut encoder = RespEncoder::new();
                     let mut total_size = 0;
                     for cmd in &optimized_commands {
                         let args = cmd.args();
@@ -257,10 +229,10 @@ fn bench_bulk_operations(c: &mut Criterion) {
 
 criterion_group!(
     benches,
-    bench_resp2_encoding_comparison,
-    bench_resp2_decoding_comparison,
-    bench_command_encoding_comparison,
-    bench_memory_allocation_patterns,
+    bench_resp2_encoding,
+    bench_resp2_decoding,
+    bench_command_encoding,
+    bench_memory_allocation,
     bench_bulk_operations
 );
 

@@ -1,6 +1,6 @@
 #![allow(missing_docs)]
 
-use bytes::{Bytes, BytesMut};
+use bytes::Bytes;
 use criterion::{criterion_group, criterion_main, Criterion};
 use redis_oxide::protocol::{RespDecoder, RespEncoder};
 use redis_oxide::RespValue;
@@ -11,9 +11,9 @@ fn bench_encode_simple_string(c: &mut Criterion) {
     c.bench_function("encode_simple_string", |b| {
         let value = RespValue::SimpleString("OK".to_string());
         b.iter(|| {
-            let mut buf = BytesMut::new();
-            RespEncoder::encode(black_box(&value), &mut buf).unwrap();
-            black_box(buf);
+            let mut enc = RespEncoder::new();
+            let bytes = enc.encode(black_box(&value)).unwrap();
+            black_box(bytes);
         });
     });
 }
@@ -22,9 +22,9 @@ fn bench_encode_bulk_string(c: &mut Criterion) {
     c.bench_function("encode_bulk_string", |b| {
         let value = RespValue::BulkString(Bytes::from("Hello, Redis!"));
         b.iter(|| {
-            let mut buf = BytesMut::new();
-            RespEncoder::encode(black_box(&value), &mut buf).unwrap();
-            black_box(buf);
+            let mut enc = RespEncoder::new();
+            let bytes = enc.encode(black_box(&value)).unwrap();
+            black_box(bytes);
         });
     });
 }
@@ -37,9 +37,9 @@ fn bench_encode_array(c: &mut Criterion) {
             RespValue::BulkString(Bytes::from("value")),
         ]);
         b.iter(|| {
-            let mut buf = BytesMut::new();
-            RespEncoder::encode(black_box(&value), &mut buf).unwrap();
-            black_box(buf);
+            let mut enc = RespEncoder::new();
+            let bytes = enc.encode(black_box(&value)).unwrap();
+            black_box(bytes);
         });
     });
 }
@@ -51,7 +51,8 @@ fn bench_encode_command(c: &mut Criterion) {
             RespValue::BulkString(Bytes::from("myvalue")),
         ];
         b.iter(|| {
-            RespEncoder::encode_command(black_box("SET"), black_box(&args)).unwrap();
+            let mut enc = RespEncoder::new();
+            enc.encode_command(black_box("SET"), &args).unwrap();
         });
     });
 }
@@ -60,8 +61,8 @@ fn bench_decode_simple_string(c: &mut Criterion) {
     c.bench_function("decode_simple_string", |b| {
         let data = b"+OK\r\n";
         b.iter(|| {
-            let mut cursor = Cursor::new(black_box(&data[..]));
-            RespDecoder::decode(&mut cursor).unwrap();
+            let mut cur = Cursor::new(black_box(&data[..]));
+            RespDecoder::decode(&mut cur).unwrap();
         });
     });
 }
@@ -70,8 +71,8 @@ fn bench_decode_bulk_string(c: &mut Criterion) {
     c.bench_function("decode_bulk_string", |b| {
         let data = b"$13\r\nHello, Redis!\r\n";
         b.iter(|| {
-            let mut cursor = Cursor::new(black_box(&data[..]));
-            RespDecoder::decode(&mut cursor).unwrap();
+            let mut cur = Cursor::new(black_box(&data[..]));
+            RespDecoder::decode(&mut cur).unwrap();
         });
     });
 }
@@ -80,8 +81,8 @@ fn bench_decode_array(c: &mut Criterion) {
     c.bench_function("decode_array", |b| {
         let data = b"*3\r\n$3\r\nSET\r\n$3\r\nkey\r\n$5\r\nvalue\r\n";
         b.iter(|| {
-            let mut cursor = Cursor::new(black_box(&data[..]));
-            RespDecoder::decode(&mut cursor).unwrap();
+            let mut cur = Cursor::new(black_box(&data[..]));
+            RespDecoder::decode(&mut cur).unwrap();
         });
     });
 }

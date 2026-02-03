@@ -26,6 +26,7 @@ pub enum TopologyType {
 }
 
 /// A connection to a Redis server
+#[derive(Debug)]
 pub struct RedisConnection {
     stream: TcpStream,
     read_buffer: BytesMut,
@@ -98,9 +99,9 @@ impl RedisConnection {
 
     /// Send a command to the server
     pub async fn send_command(&mut self, command: &RespValue) -> RedisResult<()> {
-        let mut buffer = BytesMut::new();
-        RespEncoder::encode(command, &mut buffer)?;
-        self.stream.write_all(&buffer).await?;
+        let mut encoder = RespEncoder::new();
+        let encoded = encoder.encode(command)?;
+        self.stream.write_all(&encoded).await?;
         Ok(())
     }
 
@@ -111,7 +112,8 @@ impl RedisConnection {
         args: &[RespValue],
     ) -> RedisResult<RespValue> {
         // Encode command
-        let encoded = RespEncoder::encode_command(command, args)?;
+        let mut encoder = RespEncoder::new();
+        let encoded = encoder.encode_command(command, args)?;
 
         // Send command with timeout
         timeout(

@@ -58,7 +58,7 @@ pub enum Resp3Value {
     /// Blob string: $5\r\nhello\r\n
     BlobString(String),
     /// Array: *3\r\n$3\r\nfoo\r\n$3\r\nbar\r\n$3\r\nbaz\r\n
-    Array(Vec<Resp3Value>),
+    Array(Vec<Self>),
     /// Null: _\r\n
     Null,
     /// Boolean: #t\r\n or #f\r\n
@@ -77,18 +77,18 @@ pub enum Resp3Value {
         data: String,
     },
     /// Map: %2\r\n+first\r\n:1\r\n+second\r\n:2\r\n
-    Map(HashMap<String, Resp3Value>),
+    Map(HashMap<String, Self>),
     /// Set: ~3\r\n+orange\r\n+apple\r\n+one\r\n
-    Set(HashSet<Resp3Value>),
+    Set(HashSet<Self>),
     /// Attribute: |1\r\n+ttl\r\n:3600\r\n+key\r\n+value\r\n
     Attribute {
         /// The attribute key-value pairs
-        attrs: HashMap<String, Resp3Value>,
+        attrs: HashMap<String, Self>,
         /// The actual data with attributes attached
-        data: Box<Resp3Value>,
+        data: Box<Self>,
     },
     /// Push: >4\r\n+pubsub\r\n+message\r\n+channel\r\n+hello\r\n
-    Push(Vec<Resp3Value>),
+    Push(Vec<Self>),
 }
 
 impl std::hash::Hash for Resp3Value {

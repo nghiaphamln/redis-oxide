@@ -18,6 +18,18 @@ use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
 
+/// Estimate the serialized size of a RespValue
+fn estimate_resp_value_size(value: &RespValue) -> usize {
+    match value {
+        RespValue::SimpleString(s) => s.len() + 3,
+        RespValue::Error(e) => e.len() + 3,
+        RespValue::Integer(_) => 10,
+        RespValue::BulkString(b) => b.len() + 10,
+        RespValue::Null => 5,
+        RespValue::Array(arr) => 10 + arr.iter().map(estimate_resp_value_size).sum::<usize>(),
+    }
+}
+
 /// String interning cache for frequently used strings
 #[derive(Debug)]
 pub struct StringInterner {
@@ -462,19 +474,7 @@ impl BatchCommandBuilder {
 
     /// Estimate the serialized size of a RespValue
     fn estimate_arg_size(&self, value: &RespValue) -> usize {
-        match value {
-            RespValue::SimpleString(s) => s.len() + 3, // +str\r\n
-            RespValue::Error(e) => e.len() + 3,        // -err\r\n
-            RespValue::Integer(_) => 10,               // Rough estimate for :num\r\n
-            RespValue::BulkString(b) => b.len() + 10,  // $len\r\ndata\r\n
-            RespValue::Null => 5,                      // $-1\r\n
-            RespValue::Array(arr) => {
-                10 + arr
-                    .iter()
-                    .map(|item| self.estimate_arg_size(item))
-                    .sum::<usize>()
-            }
-        }
+        estimate_resp_value_size(value)
     }
 
     /// Get the estimated total size

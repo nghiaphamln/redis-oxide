@@ -658,7 +658,6 @@
 #![allow(clippy::missing_errors_doc)]
 #![allow(clippy::must_use_candidate)]
 #![allow(clippy::missing_const_for_fn)]
-#![allow(clippy::uninlined_format_args)]
 #![allow(clippy::future_not_send)]
 #![allow(clippy::significant_drop_tightening)]
 #![allow(clippy::doc_markdown)]
@@ -679,7 +678,6 @@ pub mod commands;
 pub mod connection;
 pub mod pipeline;
 pub mod pool;
-pub mod pool_optimized;
 pub mod protocol;
 pub mod pubsub;
 pub mod script;

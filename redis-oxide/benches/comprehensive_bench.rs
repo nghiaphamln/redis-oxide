@@ -62,9 +62,8 @@ fn bench_resp2_encoding(c: &mut Criterion) {
         group.throughput(Throughput::Bytes(*size as u64));
         group.bench_with_input(BenchmarkId::new("bulk_string", size), size, |b, _| {
             b.iter(|| {
-                let mut buf = BytesMut::new();
-                RespEncoder::encode(black_box(&value), &mut buf).unwrap();
-                black_box(buf);
+                let mut encoder = RespEncoder::new();
+                encoder.encode(black_box(&value)).unwrap();
             });
         });
     }
@@ -77,9 +76,8 @@ fn bench_resp2_encoding(c: &mut Criterion) {
         group.throughput(Throughput::Elements(*size as u64));
         group.bench_with_input(BenchmarkId::new("array", size), size, |b, _| {
             b.iter(|| {
-                let mut buf = BytesMut::new();
-                RespEncoder::encode(black_box(&value), &mut buf).unwrap();
-                black_box(buf);
+                let mut encoder = RespEncoder::new();
+                encoder.encode(black_box(&value)).unwrap();
             });
         });
     }
@@ -112,9 +110,8 @@ fn bench_resp2_encoding(c: &mut Criterion) {
     for (cmd_name, args) in commands {
         group.bench_function(&format!("command_{}", cmd_name.to_lowercase()), |b| {
             b.iter(|| {
-                let encoded =
-                    RespEncoder::encode_command(black_box(cmd_name), black_box(&args)).unwrap();
-                black_box(encoded);
+                let mut encoder = RespEncoder::new();
+                encoder.encode_command(black_box(cmd_name), &args).unwrap();
             });
         });
     }
