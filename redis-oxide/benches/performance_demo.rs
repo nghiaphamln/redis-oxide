@@ -1,5 +1,9 @@
 //! Performance demonstration comparing original vs optimized implementations
+//!
+//! This example requires the `internal-optimizations` feature to compile.
+//! Run with: cargo run --example performance_demo --features internal-optimizations
 
+#![cfg(feature = "internal-optimizations")]
 #![allow(clippy::uninlined_format_args)]
 #![allow(clippy::cast_lossless)]
 #![allow(clippy::cast_precision_loss)]
@@ -10,10 +14,7 @@ use redis_oxide::{
     commands::optimized::{init_string_interner, OptimizedGetCommand, OptimizedSetCommand},
     commands::{Command, GetCommand, SetCommand},
     core::value::RespValue,
-    protocol::{
-        resp2::{RespDecoder, RespEncoder},
-        resp2_optimized::{OptimizedRespDecoder, OptimizedRespEncoder},
-    },
+    protocol::resp2::{RespDecoder, RespEncoder},
 };
 use std::io::Cursor;
 use std::time::{Duration, Instant};

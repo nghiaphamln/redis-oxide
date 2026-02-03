@@ -41,9 +41,6 @@ tracing.workspace = true
 # Cluster support
 crc16.workspace = true
 
-# Connection pooling
-deadpool.workspace = true
-
 # Serialization
 serde.workspace = true
 
@@ -86,4 +83,9 @@ nursery = "warn"
 all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
 targets = ["x86_64-unknown-linux-gnu", "x86_64-pc-windows-msvc", "x86_64-apple-darwin"]
+
+[features]
+# Internal optimizations for benchmarks and demos
+# Not intended for general use
+internal-optimizations = []
 

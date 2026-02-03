@@ -1,5 +1,8 @@
 //! Benchmark comparing original vs optimized implementations
+//!
+//! This benchmark requires the `internal-optimizations` feature to compile.
 
+#![cfg(feature = "internal-optimizations")]
 #![allow(missing_docs)]
 #![allow(clippy::uninlined_format_args)]
 #![allow(clippy::needless_borrows_for_generic_args)]
@@ -12,10 +15,7 @@ use redis_oxide::{
     commands::optimized::{init_string_interner, OptimizedGetCommand, OptimizedSetCommand},
     commands::{Command, GetCommand, SetCommand},
     core::value::RespValue,
-    protocol::{
-        resp2::{RespDecoder, RespEncoder},
-        resp2_optimized::{OptimizedRespDecoder, OptimizedRespEncoder},
-    },
+    protocol::resp2::{RespDecoder, RespEncoder},
 };
 use std::hint::black_box;
 use std::io::Cursor;

@@ -4,27 +4,19 @@
 //! providing encoding and decoding functionality for Redis communication.
 
 pub mod resp2;
-pub mod resp2_optimized;
 pub mod resp3;
 
-// Re-export the existing protocol functionality
 pub use resp2::{RespDecoder, RespEncoder};
-pub use resp2_optimized::{OptimizedRespDecoder, OptimizedRespEncoder};
 pub use resp3::{Resp3Decoder, Resp3Encoder, Resp3Value};
 
 /// Protocol version enumeration
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum ProtocolVersion {
     /// RESP2 (Redis Serialization Protocol version 2)
+    #[default]
     Resp2,
     /// RESP3 (Redis Serialization Protocol version 3)
     Resp3,
-}
-
-impl Default for ProtocolVersion {
-    fn default() -> Self {
-        Self::Resp2
-    }
 }
 
 impl std::fmt::Display for ProtocolVersion {
