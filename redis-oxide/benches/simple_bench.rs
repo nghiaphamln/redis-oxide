@@ -15,27 +15,27 @@ fn bench_resp2_simple_encoding(c: &mut Criterion) {
     c.bench_function("resp2_encode_simple_string", |b| {
         let value = RespValue::SimpleString("OK".to_string());
         b.iter(|| {
-            let mut encoder = RespEncoder::new();
-            let encoded = encoder.encode(black_box(&value)).unwrap();
-            black_box(encoded);
+            let mut enc = RespEncoder::new();
+            let bytes = enc.encode(black_box(&value)).unwrap();
+            black_box(bytes);
         });
     });
 
     c.bench_function("resp2_encode_bulk_string", |b| {
         let value = RespValue::BulkString(Bytes::from("hello world"));
         b.iter(|| {
-            let mut encoder = RespEncoder::new();
-            let encoded = encoder.encode(black_box(&value)).unwrap();
-            black_box(encoded);
+            let mut enc = RespEncoder::new();
+            let bytes = enc.encode(black_box(&value)).unwrap();
+            black_box(bytes);
         });
     });
 
     c.bench_function("resp2_encode_integer", |b| {
         let value = RespValue::Integer(42);
         b.iter(|| {
-            let mut encoder = RespEncoder::new();
-            let encoded = encoder.encode(black_box(&value)).unwrap();
-            black_box(encoded);
+            let mut enc = RespEncoder::new();
+            let bytes = enc.encode(black_box(&value)).unwrap();
+            black_box(bytes);
         });
     });
 }
@@ -44,8 +44,8 @@ fn bench_resp2_simple_decoding(c: &mut Criterion) {
     c.bench_function("resp2_decode_simple_string", |b| {
         let data = b"+OK\r\n";
         b.iter(|| {
-            let mut cursor = Cursor::new(black_box(&data[..]));
-            let result = RespDecoder::decode(&mut cursor).unwrap();
+            let mut cur = Cursor::new(black_box(&data[..]));
+            let result = RespDecoder::decode(&mut cur).unwrap();
             black_box(result);
         });
     });
@@ -53,8 +53,8 @@ fn bench_resp2_simple_decoding(c: &mut Criterion) {
     c.bench_function("resp2_decode_bulk_string", |b| {
         let data = b"$11\r\nhello world\r\n";
         b.iter(|| {
-            let mut cursor = Cursor::new(black_box(&data[..]));
-            let result = RespDecoder::decode(&mut cursor).unwrap();
+            let mut cur = Cursor::new(black_box(&data[..]));
+            let result = RespDecoder::decode(&mut cur).unwrap();
             black_box(result);
         });
     });
@@ -62,8 +62,8 @@ fn bench_resp2_simple_decoding(c: &mut Criterion) {
     c.bench_function("resp2_decode_integer", |b| {
         let data = b":42\r\n";
         b.iter(|| {
-            let mut cursor = Cursor::new(black_box(&data[..]));
-            let result = RespDecoder::decode(&mut cursor).unwrap();
+            let mut cur = Cursor::new(black_box(&data[..]));
+            let result = RespDecoder::decode(&mut cur).unwrap();
             black_box(result);
         });
     });
@@ -73,18 +73,18 @@ fn bench_command_encoding(c: &mut Criterion) {
     c.bench_function("resp2_encode_get_command", |b| {
         let args = vec![RespValue::from("mykey")];
         b.iter(|| {
-            let mut encoder = RespEncoder::new();
-            let encoded = encoder.encode_command(black_box("GET"), &args).unwrap();
-            black_box(encoded);
+            let mut enc = RespEncoder::new();
+            let bytes = enc.encode_command(black_box("GET"), &args).unwrap();
+            black_box(bytes);
         });
     });
 
     c.bench_function("resp2_encode_set_command", |b| {
         let args = vec![RespValue::from("mykey"), RespValue::from("myvalue")];
         b.iter(|| {
-            let mut encoder = RespEncoder::new();
-            let encoded = encoder.encode_command(black_box("SET"), &args).unwrap();
-            black_box(encoded);
+            let mut enc = RespEncoder::new();
+            let bytes = enc.encode_command(black_box("SET"), &args).unwrap();
+            black_box(bytes);
         });
     });
 }
