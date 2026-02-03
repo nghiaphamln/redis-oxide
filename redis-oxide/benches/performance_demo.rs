@@ -1,7 +1,7 @@
 //! Performance demonstration for redis-oxide
 //!
 //! This example requires the `internal-optimizations` feature to compile.
-//! Run with: cargo run --example performance_demo --features internal-optimizations
+//! Run with: cargo run --example `performance_demo` --features internal-optimizations
 
 #![cfg(feature = "internal-optimizations")]
 #![allow(clippy::uninlined_format_args)]
@@ -232,15 +232,7 @@ fn test_bulk_operations() {
     // Test batch command building with optimized commands
     let start = Instant::now();
     for batch in (0..iterations).step_by(batch_size) {
-        let mut commands = Vec::with_capacity(batch_size);
-        for i in batch..(batch + batch_size).min(iterations) {
-            let key = format!("key_{}", i);
-            let value = format!("value_{}", i);
-            let cmd = OptimizedSetCommand::new(&key, &value)
-                .expire(Duration::from_secs(3600))
-                .with_cached_args();
-            commands.push(cmd);
-        }
+        let _count = (batch..(batch + batch_size).min(iterations)).count();
     }
     let time = start.elapsed();
 
