@@ -2,7 +2,7 @@
 
 #![allow(missing_docs)]
 
-use bytes::{Bytes, BytesMut};
+use bytes::Bytes;
 use criterion::{criterion_group, criterion_main, Criterion};
 use redis_oxide::{
     core::value::RespValue,
@@ -15,27 +15,27 @@ fn bench_resp2_simple_encoding(c: &mut Criterion) {
     c.bench_function("resp2_encode_simple_string", |b| {
         let value = RespValue::SimpleString("OK".to_string());
         b.iter(|| {
-            let mut buf = BytesMut::new();
-            RespEncoder::encode(black_box(&value), &mut buf).unwrap();
-            black_box(buf);
+            let mut encoder = RespEncoder::new();
+            let encoded = encoder.encode(black_box(&value)).unwrap();
+            black_box(encoded);
         });
     });
 
     c.bench_function("resp2_encode_bulk_string", |b| {
         let value = RespValue::BulkString(Bytes::from("hello world"));
         b.iter(|| {
-            let mut buf = BytesMut::new();
-            RespEncoder::encode(black_box(&value), &mut buf).unwrap();
-            black_box(buf);
+            let mut encoder = RespEncoder::new();
+            let encoded = encoder.encode(black_box(&value)).unwrap();
+            black_box(encoded);
         });
     });
 
     c.bench_function("resp2_encode_integer", |b| {
         let value = RespValue::Integer(42);
         b.iter(|| {
-            let mut buf = BytesMut::new();
-            RespEncoder::encode(black_box(&value), &mut buf).unwrap();
-            black_box(buf);
+            let mut encoder = RespEncoder::new();
+            let encoded = encoder.encode(black_box(&value)).unwrap();
+            black_box(encoded);
         });
     });
 }
@@ -73,7 +73,8 @@ fn bench_command_encoding(c: &mut Criterion) {
     c.bench_function("resp2_encode_get_command", |b| {
         let args = vec![RespValue::from("mykey")];
         b.iter(|| {
-            let encoded = RespEncoder::encode_command(black_box("GET"), black_box(&args)).unwrap();
+            let mut encoder = RespEncoder::new();
+            let encoded = encoder.encode_command(black_box("GET"), &args).unwrap();
             black_box(encoded);
         });
     });
@@ -81,7 +82,8 @@ fn bench_command_encoding(c: &mut Criterion) {
     c.bench_function("resp2_encode_set_command", |b| {
         let args = vec![RespValue::from("mykey"), RespValue::from("myvalue")];
         b.iter(|| {
-            let encoded = RespEncoder::encode_command(black_box("SET"), black_box(&args)).unwrap();
+            let mut encoder = RespEncoder::new();
+            let encoded = encoder.encode_command(black_box("SET"), &args).unwrap();
             black_box(encoded);
         });
     });

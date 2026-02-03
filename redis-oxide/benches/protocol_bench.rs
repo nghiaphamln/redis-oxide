@@ -1,6 +1,6 @@
 #![allow(missing_docs)]
 
-use bytes::{Bytes, BytesMut};
+use bytes::Bytes;
 use criterion::{criterion_group, criterion_main, Criterion};
 use redis_oxide::protocol::{RespDecoder, RespEncoder};
 use redis_oxide::RespValue;
@@ -11,9 +11,9 @@ fn bench_encode_simple_string(c: &mut Criterion) {
     c.bench_function("encode_simple_string", |b| {
         let value = RespValue::SimpleString("OK".to_string());
         b.iter(|| {
-            let mut buf = BytesMut::new();
-            RespEncoder::encode(black_box(&value), &mut buf).unwrap();
-            black_box(buf);
+            let mut encoder = RespEncoder::new();
+            let encoded = encoder.encode(black_box(&value)).unwrap();
+            black_box(encoded);
         });
     });
 }
@@ -22,9 +22,9 @@ fn bench_encode_bulk_string(c: &mut Criterion) {
     c.bench_function("encode_bulk_string", |b| {
         let value = RespValue::BulkString(Bytes::from("Hello, Redis!"));
         b.iter(|| {
-            let mut buf = BytesMut::new();
-            RespEncoder::encode(black_box(&value), &mut buf).unwrap();
-            black_box(buf);
+            let mut encoder = RespEncoder::new();
+            let encoded = encoder.encode(black_box(&value)).unwrap();
+            black_box(encoded);
         });
     });
 }
@@ -37,9 +37,9 @@ fn bench_encode_array(c: &mut Criterion) {
             RespValue::BulkString(Bytes::from("value")),
         ]);
         b.iter(|| {
-            let mut buf = BytesMut::new();
-            RespEncoder::encode(black_box(&value), &mut buf).unwrap();
-            black_box(buf);
+            let mut encoder = RespEncoder::new();
+            let encoded = encoder.encode(black_box(&value)).unwrap();
+            black_box(encoded);
         });
     });
 }
@@ -51,7 +51,8 @@ fn bench_encode_command(c: &mut Criterion) {
             RespValue::BulkString(Bytes::from("myvalue")),
         ];
         b.iter(|| {
-            RespEncoder::encode_command(black_box("SET"), black_box(&args)).unwrap();
+            let mut encoder = RespEncoder::new();
+            encoder.encode_command(black_box("SET"), &args).unwrap();
         });
     });
 }

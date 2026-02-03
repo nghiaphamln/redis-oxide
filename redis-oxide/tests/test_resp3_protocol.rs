@@ -5,26 +5,8 @@
 #![allow(clippy::approx_constant)]
 #![allow(clippy::float_cmp)]
 
-use redis_oxide::{Client, ConnectionConfig, ProtocolVersion, Resp3Value};
+use redis_oxide::{ConnectionConfig, ProtocolVersion, Resp3Value};
 use std::collections::{HashMap, HashSet};
-
-fn redis_url() -> String {
-    std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://localhost:6379".to_string())
-}
-
-#[allow(dead_code)]
-async fn setup_client_resp3() -> Result<Client, redis_oxide::RedisError> {
-    let config =
-        ConnectionConfig::new(redis_url().as_str()).with_protocol_version(ProtocolVersion::Resp3);
-    Client::connect(config).await
-}
-
-#[allow(dead_code)]
-async fn setup_client_resp2() -> Result<Client, redis_oxide::RedisError> {
-    let config =
-        ConnectionConfig::new(redis_url().as_str()).with_protocol_version(ProtocolVersion::Resp2);
-    Client::connect(config).await
-}
 
 #[tokio::test]
 async fn test_resp3_basic_data_types() -> Result<(), Box<dyn std::error::Error>> {
