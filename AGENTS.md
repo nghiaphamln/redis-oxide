@@ -137,9 +137,11 @@ REDIS_URL=redis://localhost:6379 cargo test -p redis-oxide --test integration_te
 - ALWAYS run `cargo clippy --all-targets --all-features -- -D warnings` before committing
 - CI enforces `-D warnings` on ALL targets (lib + tests + benchmarks + examples)
 - Common issues:
-  - `similar_names`: Don't use `encoder` and `encoded` in same scope
-  - `use_self`: Use `Self` instead of type name in enum variants
+  - `similar_names`: Don't use `encoder` and `encoded` in same scope. Use `enc` and `bytes` instead
+  - `use_self`: Use `Self` instead of type name in enum variants (e.g., `Array(Vec<Self>)`)
   - `self_only_used_in_recursion`: Use standalone function for recursive helpers
+  - `doc_markdown`: Use backticks around code identifiers in doc comments (e.g., `` `performance_demo` ``)
+  - `collection_is_never_read`: Don't create unused collections. Remove dead code or use the collection
 
 ### Pre-Commit Checklist
 - [ ] `cargo fmt` runs clean
