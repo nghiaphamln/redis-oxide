@@ -18,16 +18,16 @@ cargo build --benches --features internal-optimizations
 ## Linting
 
 ```bash
-# Run clippy on library
+# Run clippy on library (REQUIRED before commit)
 cargo clippy -p redis-oxide
 
-# Run clippy with all warnings enabled
-cargo clippy -p redis-oxide --all-features -- -D warnings
+# Run clippy on ALL targets including benchmarks (REQUIRED)
+cargo clippy --all-targets --all-features -- -D warnings
 
 # Check formatting
 cargo fmt --check
 
-# Auto-format code
+# Auto-format code (REQUIRED before commit)
 cargo fmt
 ```
 
@@ -61,11 +61,13 @@ REDIS_URL=redis://localhost:6379 cargo test -p redis-oxide --test integration_te
 - Use absolute paths with `crate::` for internal imports
 - Group imports: std -> external -> internal
 - Avoid re-exports unless for public API stability
+- Do NOT use full paths like `redis_oxide::core::value::RespValue` - use `crate::RespValue`
 
 ### Formatting
-- Run `cargo fmt` before committing
+- Run `cargo fmt` before committing (MANDATORY)
 - Max line length: 100 characters (default rustfmt)
 - Use 4 spaces for indentation
+- Use `#[allow(...)]` sparingly - only when intentional
 
 ### Naming Conventions
 - **Structs/Enums**: UpperCamelCase (e.g., `Client`, `PoolStats`)
@@ -74,6 +76,7 @@ REDIS_URL=redis://localhost:6379 cargo test -p redis-oxide --test integration_te
 - **Type Parameters**: UpperCamelCase (e.g., `T: Command`)
 - **Modules**: snake_case (e.g., `pool`, `protocol`)
 - **Variables**: snake_case with `_` prefix for unused (e.g., `_unused_var`)
+- **Avoid similar names**: `encoder` vs `encoded`, `cursor` vs `cur`
 
 ### Error Handling
 - Use `thiserror` for error enum definitions
@@ -88,6 +91,7 @@ REDIS_URL=redis://localhost:6379 cargo test -p redis-oxide --test integration_te
 - Use `Arc<RwLock<T>>` for shared mutable state
 - Use `Option<T>` for nullable Redis values
 - Use `Vec<T>` for arrays from Redis
+- Use `Self` instead of type name in enum variants (e.g., `Array(Vec<Self>)`)
 
 ### Async/Tokio
 - All async functions should be `async`
@@ -119,7 +123,7 @@ REDIS_URL=redis://localhost:6379 cargo test -p redis-oxide --test integration_te
 - Use testcontainers for integration tests
 
 ### Feature Flags
-- `internal-optimizations`: For benchmarks/demos only
+- `internal-optimizations`: For benchmarks/demos only, gated behind feature flag
 - Do not use unstable features
 - All public API must be stable
 
@@ -128,3 +132,18 @@ REDIS_URL=redis://localhost:6379 cargo test -p redis-oxide --test integration_te
 - Use `///` doc comments
 - Include examples in doc comments where helpful
 - Update docs/ directory for user-facing documentation
+
+### Clippy Compliance (CRITICAL)
+- ALWAYS run `cargo clippy --all-targets --all-features -- -D warnings` before committing
+- CI enforces `-D warnings` on ALL targets (lib + tests + benchmarks + examples)
+- Common issues:
+  - `similar_names`: Don't use `encoder` and `encoded` in same scope
+  - `use_self`: Use `Self` instead of type name in enum variants
+  - `self_only_used_in_recursion`: Use standalone function for recursive helpers
+
+### Pre-Commit Checklist
+- [ ] `cargo fmt` runs clean
+- [ ] `cargo clippy --all-targets --all-features -- -D warnings` passes with 0 errors
+- [ ] `cargo test --lib` passes
+- [ ] No `TODO` or `FIXME` comments without documentation
+- [ ] No `#![allow(...)]` unless intentional and documented
