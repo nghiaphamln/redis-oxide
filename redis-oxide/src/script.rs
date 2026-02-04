@@ -635,4 +635,44 @@ mod tests {
         let _lock = patterns::distributed_lock();
         let _unlock = patterns::release_lock();
     }
+
+    #[test]
+    fn test_sha1_empty_string() {
+        let sha = calculate_sha1("");
+        assert_eq!(sha, "da39a3ee5e6b4b0d3255bfef95601890afd80709");
+    }
+
+    #[test]
+    fn test_sha1_long_string() {
+        let long_input = "a".repeat(1000);
+        let sha = calculate_sha1(&long_input);
+        assert_eq!(sha.len(), 40);
+        assert!(!sha.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_script_manager_get_nonexistent() {
+        let manager = ScriptManager::new();
+        let result = manager.get("nonexistent").await;
+        assert!(result.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_script_manager_register_duplicate() {
+        let manager = ScriptManager::new();
+        let script1 = Script::new("return 1");
+        let script2 = Script::new("return 2");
+
+        manager.register("test", script1).await;
+        manager.register("test", script2).await;
+
+        // Should only have one script (last one registered)
+        assert_eq!(manager.len().await, 1);
+    }
+
+    #[tokio::test]
+    async fn test_script_manager_default() {
+        let manager = ScriptManager::default();
+        assert!(manager.is_empty().await);
+    }
 }

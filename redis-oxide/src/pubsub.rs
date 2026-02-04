@@ -642,4 +642,18 @@ mod tests {
         let message = parse_pubsub_message(response).unwrap();
         assert!(message.is_none());
     }
+
+    #[test]
+    fn test_parse_pubsub_invalid_type() {
+        let response = RespValue::SimpleString("invalid".to_string());
+        let result = parse_pubsub_message(response);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_pubsub_empty_array() {
+        let response = RespValue::Array(vec![]);
+        let result = parse_pubsub_message(response);
+        assert!(result.is_err());
+    }
 }
