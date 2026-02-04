@@ -261,3 +261,126 @@ impl TryFrom<RespValue> for Vec<i64> {
         }
     }
 }
+
+#[cfg(test)]
+mod value_edge_case_tests {
+    use super::*;
+    use bytes::Bytes;
+
+    #[test]
+    fn test_resp_value_partial_eq_different_types() {
+        let v1 = RespValue::SimpleString("42".to_string());
+        let v2 = RespValue::Integer(42);
+        assert_ne!(v1, v2);
+    }
+
+    #[test]
+    fn test_resp_value_array_clone() {
+        let original = RespValue::Array(vec![
+            RespValue::BulkString(Bytes::from("a")),
+            RespValue::BulkString(Bytes::from("b")),
+        ]);
+        let cloned = original.clone();
+        assert_eq!(original, cloned);
+    }
+
+    #[test]
+    fn test_resp_value_as_string_from_utf8_error() {
+        let invalid_utf8 = vec![0x80, 0x81, 0x82];
+        let value = RespValue::BulkString(Bytes::from(invalid_utf8));
+        let result = value.as_string();
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_resp_value_as_int_from_invalid_string() {
+        let value = RespValue::BulkString(Bytes::from("not_a_number"));
+        let result = value.as_int();
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_resp_value_as_bool_from_invalid_type() {
+        let value = RespValue::SimpleString("maybe".to_string());
+        let result = value.as_bool();
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_resp_value_as_array_from_non_array() {
+        let value = RespValue::Integer(42);
+        let result = value.as_array();
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_resp_value_as_bytes_from_simple_string() {
+        let value = RespValue::SimpleString("hello".to_string());
+        let result = value.as_bytes();
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), Bytes::from("hello"));
+    }
+
+    #[test]
+    fn test_from_i64_negative() {
+        let value: RespValue = (-100i64).into();
+        assert_eq!(value, RespValue::Integer(-100));
+    }
+
+    #[test]
+    fn test_from_vec_u8_empty() {
+        let value: RespValue = Vec::<u8>::new().into();
+        assert_eq!(value, RespValue::BulkString(Bytes::new()));
+    }
+
+    #[test]
+    fn test_try_into_vec_string_with_null() {
+        let value = RespValue::Array(vec![
+            RespValue::BulkString(Bytes::from("a")),
+            RespValue::Null,
+            RespValue::BulkString(Bytes::from("b")),
+        ]);
+        let result: Result<Vec<String>, _> = value.try_into();
+        assert!(result.is_ok());
+        let vec = result.unwrap();
+        assert_eq!(vec.len(), 2);
+        assert_eq!(vec[0], "a");
+        assert_eq!(vec[1], "b");
+    }
+
+    #[test]
+    fn test_try_into_vec_string_with_mixed_types() {
+        let value = RespValue::Array(vec![
+            RespValue::BulkString(Bytes::from("valid")),
+            RespValue::Integer(42), // Invalid
+        ]);
+        let result: Result<Vec<String>, _> = value.try_into();
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_try_into_vec_i64_mixed_array() {
+        let value = RespValue::Array(vec![
+            RespValue::Integer(1),
+            RespValue::Integer(2),
+            RespValue::Integer(3),
+        ]);
+        let result: Result<Vec<i64>, _> = value.try_into();
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), vec![1, 2, 3]);
+    }
+
+    #[test]
+    fn test_resp_value_null_equality() {
+        let v1 = RespValue::Null;
+        let v2 = RespValue::Null;
+        assert_eq!(v1, v2);
+    }
+
+    #[test]
+    fn test_resp_value_error_message() {
+        let error = RespValue::Error("ERR test error".to_string());
+        let message = error.into_error();
+        assert_eq!(message, Some("ERR test error".to_string()));
+    }
+}

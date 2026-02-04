@@ -912,4 +912,78 @@ mod tests {
             "Float value differs from PI"
         );
     }
+
+    #[test]
+    fn test_encode_decode_null() {
+        let mut encoder = Resp3Encoder::new();
+        let value = Resp3Value::Null;
+        let encoded = encoder.encode(&value).unwrap();
+
+        let mut decoder = Resp3Decoder::new();
+        let decoded = decoder.decode(&encoded).unwrap();
+
+        assert_eq!(value, decoded);
+    }
+
+    #[test]
+    fn test_encode_decode_verbatim_string() {
+        let mut encoder = Resp3Encoder::new();
+        let value = Resp3Value::VerbatimString {
+            encoding: "txt".to_string(),
+            data: "Hello World".to_string(),
+        };
+        let encoded = encoder.encode(&value).unwrap();
+
+        let mut decoder = Resp3Decoder::new();
+        let decoded = decoder.decode(&encoded).unwrap();
+
+        assert_eq!(value, decoded);
+    }
+
+    #[test]
+    fn test_encode_decode_big_number() {
+        let mut encoder = Resp3Encoder::new();
+        let value = Resp3Value::BigNumber("123456789012345678901234567890".to_string());
+        let encoded = encoder.encode(&value).unwrap();
+
+        let mut decoder = Resp3Decoder::new();
+        let decoded = decoder.decode(&encoded).unwrap();
+
+        assert_eq!(value, decoded);
+    }
+
+    #[test]
+    fn test_encode_decode_blob_error() {
+        let mut encoder = Resp3Encoder::new();
+        let value = Resp3Value::BlobError("ERR test error".to_string());
+        let encoded = encoder.encode(&value).unwrap();
+
+        let mut decoder = Resp3Decoder::new();
+        let decoded = decoder.decode(&encoded).unwrap();
+
+        assert_eq!(value, decoded);
+    }
+
+    #[test]
+    fn test_resp3_value_type_name() {
+        assert_eq!(
+            Resp3Value::SimpleString("test".to_string()).type_name(),
+            "simple-string"
+        );
+        assert_eq!(Resp3Value::Number(42).type_name(), "number");
+        assert_eq!(Resp3Value::Boolean(true).type_name(), "boolean");
+        assert_eq!(Resp3Value::Double(1.5).type_name(), "double");
+        assert_eq!(Resp3Value::Null.type_name(), "null");
+        assert_eq!(
+            Resp3Value::BlobString("test".to_string()).type_name(),
+            "blob-string"
+        );
+    }
+
+    #[test]
+    fn test_resp3_value_is_null() {
+        assert!(Resp3Value::Null.is_null());
+        assert!(!Resp3Value::Number(0).is_null());
+        assert!(!Resp3Value::Boolean(false).is_null());
+    }
 }
