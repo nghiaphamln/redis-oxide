@@ -3,9 +3,10 @@
 This roadmap tracks likely future work for redis-oxide. It is not a release
 commitment.
 
-## Current Version
+## Current Release Line
 
-Current crate version: `0.2.3`
+The active release line is `0.2`. See `CHANGELOG.md` and crates.io for the
+latest published patch version.
 
 The current release supports:
 
@@ -46,6 +47,5 @@ The current release supports:
 Each release should update:
 
 - `Cargo.toml` workspace version
-- `README.md` installation snippet
 - `CHANGELOG.md`
 - docs that mention version-specific behavior

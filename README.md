@@ -16,9 +16,12 @@ deployments.
 
 ```toml
 [dependencies]
-redis-oxide = "0.2.3"
+redis-oxide = "0.2"
 tokio = { version = "1", features = ["full"] }
 ```
+
+You can also add the latest compatible 0.2 release with
+`cargo add redis-oxide`.
 
 ## Quick Start
 

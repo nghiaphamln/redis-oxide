@@ -32,9 +32,11 @@ Add dependencies:
 
 ```toml
 [dependencies]
-redis-oxide = "0.2.3"
+redis-oxide = "0.2"
 tokio = { version = "1", features = ["full"] }
 ```
+
+Alternatively, run `cargo add redis-oxide` to use the latest published release.
 
 ## First Program
 

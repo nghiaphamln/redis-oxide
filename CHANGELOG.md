@@ -5,6 +5,16 @@ All notable changes to this project are documented in this file.
 The format is based on Keep a Changelog, and this project uses semantic
 versioning while the public API is still stabilizing.
 
+## [0.2.5] - 2026-05-14
+
+### Changed
+
+- Bumped the crate version after the `0.2.4` publish.
+- Updated installation documentation to use the `0.2` release line instead of
+  hardcoding a patch version.
+- Reworded the roadmap to point readers to `CHANGELOG.md` and crates.io for the
+  latest published version.
+
 ## [0.2.4] - 2026-05-14
 
 ### Fixed
