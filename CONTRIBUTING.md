@@ -1,83 +1,56 @@
-# Contributing to redis-oxide
+# Contributing
 
-Thank you for your interest in contributing to redis-oxide! This document provides guidelines for contributing to the project.
+Contributions should keep the crate reliable, documented, and easy to verify.
 
 ## Development Setup
 
-### Prerequisites
-
-- Rust 1.82 or later
-- Redis server for testing (6.0+)
-
-### Clone and Build
+Install Rust 1.82.0 or newer and run Redis locally for integration tests:
 
 ```bash
-git clone https://github.com/nghiaphamln/redis-oxide.git
-cd redis-oxide
-cargo build
+docker run --rm -p 6379:6379 redis:7
 ```
 
-### Run Tests
+Build and test:
 
 ```bash
-# Run unit tests
-cargo test --lib
-
-# Run integration tests (requires Redis server)
-cargo test --test '*'
-
-# Run all tests
-cargo test
+cargo check --workspace --all-targets
+cargo test --workspace --all-targets
 ```
 
-### Code Quality
+## Quality Gates
 
-Before submitting a PR, ensure:
+Run these before opening a pull request:
 
 ```bash
-# Format code
-cargo fmt --all
-
-# Run clippy
-cargo clippy --workspace --all-targets --all-features
-
-# Build release
-cargo build --release
+cargo fmt --all --check
+cargo check --workspace --all-targets
+cargo clippy --workspace --all-targets -- -D warnings
+cargo test --workspace --all-targets
+cargo doc --workspace --no-deps --document-private-items
+cargo audit
+cargo deny check
 ```
 
 ## Code Guidelines
 
-1. **Code Style**: Follow Rust standard formatting (use `cargo fmt`)
-2. **Documentation**: Add doc comments for all public APIs
-3. **Tests**: Write tests for new functionality
-4. **Error Handling**: Use the `RedisError` type for all errors
-5. **Async**: Use Tokio runtime for async operations
+- Keep public APIs consistent with existing naming and return types.
+- Prefer typed command builders over ad hoc command construction.
+- Preserve Redis server semantics unless the public API documents otherwise.
+- Add focused tests for behavior changes.
+- Avoid broad refactors in feature or bugfix patches.
 
-## Pull Request Process
+## Documentation Guidelines
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Make your changes
-4. Add tests for your changes
-5. Run all tests and checks
-6. Commit your changes (`git commit -m 'Add amazing feature'`)
-7. Push to the branch (`git push origin feature/amazing-feature`)
-8. Open a Pull Request
+- Keep docs professional and concise.
+- Do not use emoji in headings, status labels, or prose.
+- Verify examples against the current public API.
+- Update `CHANGELOG.md` for user-visible changes.
 
-## Testing Guidelines
+## Pull Requests
 
-- Write unit tests for individual components
-- Write integration tests for end-to-end functionality
-- Use `testcontainers` for integration tests requiring Redis
-- Ensure tests are deterministic and don't rely on external state
+Include:
 
-## Documentation
-
-- Update README.md if adding new features
-- Add examples in `examples/` for significant new functionality
-
-## Questions?
-
-Feel free to open an issue for questions or discussions.
-
-Thank you for contributing!
+- the problem being solved
+- the behavior change
+- tests or verification commands run
+- any compatibility notes

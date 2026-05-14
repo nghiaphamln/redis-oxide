@@ -14,7 +14,7 @@ pub enum RedisValue {
     /// Integer value
     Int(i64),
     /// Array of values
-    Array(Vec<RedisValue>),
+    Array(Vec<Self>),
 }
 
 impl From<String> for RedisValue {

@@ -17,7 +17,7 @@ pub enum RespValue {
     /// Null bulk string: $-1\r\n
     Null,
     /// Array: *2\r\n$3\r\nfoo\r\n$3\r\nbar\r\n
-    Array(Vec<RespValue>),
+    Array(Vec<Self>),
 }
 
 impl RespValue {

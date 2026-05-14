@@ -33,6 +33,10 @@ pub struct RedisConnection {
 }
 
 impl RedisConnection {
+    fn is_cluster_info(info: &str) -> bool {
+        info.contains("cluster_enabled:1") || info.contains("cluster_state:ok")
+    }
+
     /// Connect to a Redis server
     pub async fn connect(host: &str, port: u16, config: ConnectionConfig) -> RedisResult<Self> {
         let addr = format!("{}:{}", host, port);
@@ -173,17 +177,15 @@ impl RedisConnection {
                     .map_err(|e| RedisError::Protocol(format!("Invalid UTF-8: {}", e)))?;
 
                 // Parse cluster_state
-                if info_str.contains("cluster_enabled:1") || info_str.contains("cluster_state:ok") {
+                if Self::is_cluster_info(&info_str) {
                     info!("Detected Redis Cluster");
                     return Ok(TopologyType::Cluster);
                 }
             }
-            Ok(RespValue::SimpleString(info_str)) => {
+            Ok(RespValue::SimpleString(info_str)) if Self::is_cluster_info(&info_str) => {
                 // Parse cluster_state
-                if info_str.contains("cluster_enabled:1") || info_str.contains("cluster_state:ok") {
-                    info!("Detected Redis Cluster");
-                    return Ok(TopologyType::Cluster);
-                }
+                info!("Detected Redis Cluster");
+                return Ok(TopologyType::Cluster);
             }
             Ok(RespValue::Error(ref e))
                 if e.contains("command not supported")

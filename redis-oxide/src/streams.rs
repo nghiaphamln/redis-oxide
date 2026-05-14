@@ -381,22 +381,10 @@ pub fn parse_stream_info(response: RespValue) -> RedisResult<StreamInfo> {
                         "length" => length = chunk[1].as_int()? as u64,
                         "groups" => groups = chunk[1].as_int()? as u64,
                         "first-entry" => {
-                            if !chunk[1].is_null() {
-                                if let RespValue::Array(entry) = &chunk[1] {
-                                    if !entry.is_empty() {
-                                        first_entry = Some(entry[0].as_string()?);
-                                    }
-                                }
-                            }
+                            first_entry = parse_stream_info_entry_id(&chunk[1])?;
                         }
                         "last-entry" => {
-                            if !chunk[1].is_null() {
-                                if let RespValue::Array(entry) = &chunk[1] {
-                                    if !entry.is_empty() {
-                                        last_entry = Some(entry[0].as_string()?);
-                                    }
-                                }
-                            }
+                            last_entry = parse_stream_info_entry_id(&chunk[1])?;
                         }
                         "last-generated-id" => last_generated_id = chunk[1].as_string()?,
                         _ => {} // Ignore unknown fields
@@ -416,6 +404,13 @@ pub fn parse_stream_info(response: RespValue) -> RedisResult<StreamInfo> {
             "Expected array for stream info, got: {:?}",
             response
         ))),
+    }
+}
+
+fn parse_stream_info_entry_id(value: &RespValue) -> RedisResult<Option<String>> {
+    match value {
+        RespValue::Array(entry) => entry.first().map(RespValue::as_string).transpose(),
+        _ => Ok(None),
     }
 }
 

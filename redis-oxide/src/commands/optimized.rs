@@ -448,11 +448,8 @@ impl BatchCommandBuilder {
     {
         // Estimate size for this command
         let args = command.args();
-        let cmd_size = command.command_name().len()
-            + args
-                .iter()
-                .map(|arg| self.estimate_arg_size(arg))
-                .sum::<usize>();
+        let cmd_size =
+            command.command_name().len() + args.iter().map(Self::estimate_arg_size).sum::<usize>();
         self.estimated_size += cmd_size;
 
         // Box the command with type erasure
@@ -461,19 +458,14 @@ impl BatchCommandBuilder {
     }
 
     /// Estimate the serialized size of a RespValue
-    fn estimate_arg_size(&self, value: &RespValue) -> usize {
+    fn estimate_arg_size(value: &RespValue) -> usize {
         match value {
             RespValue::SimpleString(s) => s.len() + 3, // +str\r\n
             RespValue::Error(e) => e.len() + 3,        // -err\r\n
             RespValue::Integer(_) => 10,               // Rough estimate for :num\r\n
             RespValue::BulkString(b) => b.len() + 10,  // $len\r\ndata\r\n
             RespValue::Null => 5,                      // $-1\r\n
-            RespValue::Array(arr) => {
-                10 + arr
-                    .iter()
-                    .map(|item| self.estimate_arg_size(item))
-                    .sum::<usize>()
-            }
+            RespValue::Array(arr) => 10 + arr.iter().map(Self::estimate_arg_size).sum::<usize>(),
         }
     }
 
