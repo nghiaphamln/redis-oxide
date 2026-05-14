@@ -56,6 +56,35 @@ impl RespEncoder {
         Ok(())
     }
 
+    fn encode_bulk_argument(data: &[u8], buf: &mut BytesMut) {
+        buf.put_u8(b'$');
+        buf.put_slice(data.len().to_string().as_bytes());
+        buf.put_slice(CRLF);
+        buf.put_slice(data);
+        buf.put_slice(CRLF);
+    }
+
+    fn encode_command_arg(arg: &RespValue, buf: &mut BytesMut) -> RedisResult<()> {
+        match arg {
+            RespValue::SimpleString(s) | RespValue::Error(s) => {
+                Self::encode_bulk_argument(s.as_bytes(), buf);
+            }
+            RespValue::Integer(i) => {
+                Self::encode_bulk_argument(i.to_string().as_bytes(), buf);
+            }
+            RespValue::BulkString(data) => {
+                Self::encode_bulk_argument(data, buf);
+            }
+            RespValue::Null => {
+                buf.put_slice(b"$-1\r\n");
+            }
+            RespValue::Array(_) => {
+                Self::encode(arg, buf)?;
+            }
+        }
+        Ok(())
+    }
+
     /// Encode a command with arguments
     pub fn encode_command(command: &str, args: &[RespValue]) -> RedisResult<Bytes> {
         let mut buf = BytesMut::new();
@@ -75,7 +104,7 @@ impl RespEncoder {
 
         // Encode arguments
         for arg in args {
-            Self::encode(arg, &mut buf)?;
+            Self::encode_command_arg(arg, &mut buf)?;
         }
 
         Ok(buf.freeze())
@@ -294,6 +323,24 @@ mod tests {
             RespEncoder::encode_command("GET", &[RespValue::BulkString(Bytes::from("mykey"))])
                 .unwrap();
         assert_eq!(&bytes[..], b"*2\r\n$3\r\nGET\r\n$5\r\nmykey\r\n");
+    }
+
+    #[test]
+    fn test_encode_command_arguments_are_bulk_strings() {
+        let bytes = RespEncoder::encode_command(
+            "LRANGE",
+            &[
+                RespValue::from("items"),
+                RespValue::from(0),
+                RespValue::from(-1),
+            ],
+        )
+        .unwrap();
+
+        assert_eq!(
+            &bytes[..],
+            b"*4\r\n$6\r\nLRANGE\r\n$5\r\nitems\r\n$1\r\n0\r\n$2\r\n-1\r\n"
+        );
     }
 
     #[test]

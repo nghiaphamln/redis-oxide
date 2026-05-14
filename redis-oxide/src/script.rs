@@ -177,7 +177,9 @@ impl Script {
         // First try EVALSHA
         match client.evalsha(&self.sha, keys.clone(), args.clone()).await {
             Ok(result) => Ok(result),
-            Err(RedisError::Protocol(msg)) if msg.contains("NOSCRIPT") => {
+            Err(RedisError::Protocol(msg) | RedisError::Server(msg))
+                if msg.contains("NOSCRIPT") =>
+            {
                 // Script not cached, use EVAL
                 client.eval(&self.source, keys, args).await
             }

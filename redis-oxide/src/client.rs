@@ -1880,6 +1880,19 @@ impl PipelineExecutor for ClientPipelineExecutor {
 }
 
 impl ClientPipelineExecutor {
+    async fn execute_pipeline_command(
+        &self,
+        pool: &Arc<Pool>,
+        command: String,
+        args: Vec<RespValue>,
+    ) -> RedisResult<RespValue> {
+        match pool.execute_command(command, args).await {
+            Ok(result) => Ok(result),
+            Err(RedisError::Server(message)) => Ok(RespValue::Error(message)),
+            Err(error) => Err(error),
+        }
+    }
+
     /// Execute pipeline commands on a specific pool
     async fn execute_pipeline_on_pool(
         &self,
@@ -1905,13 +1918,17 @@ impl ClientPipelineExecutor {
 
                     // For now, execute commands sequentially
                     // TODO: Implement true pipelining at the protocol level
-                    let result = pool.execute_command(command, cmd_args).await?;
+                    let result = self
+                        .execute_pipeline_command(pool, command, cmd_args)
+                        .await?;
                     results.push(result);
                 } else if let Some(RespValue::SimpleString(cmd_name)) = args.first() {
                     let command = cmd_name.clone();
                     let cmd_args = args.into_iter().skip(1).collect();
 
-                    let result = pool.execute_command(command, cmd_args).await?;
+                    let result = self
+                        .execute_pipeline_command(pool, command, cmd_args)
+                        .await?;
                     results.push(result);
                 }
             }

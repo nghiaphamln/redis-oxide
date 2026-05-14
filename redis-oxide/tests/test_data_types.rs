@@ -6,7 +6,7 @@
 
 #![allow(clippy::uninlined_format_args)]
 
-use redis_oxide::{Client, ConnectionConfig, PoolConfig, PoolStrategy};
+use redis_oxide::{Client, ConnectionConfig, PoolConfig, PoolStrategy, RedisError, RedisResult};
 use std::collections::{HashMap, HashSet};
 use std::time::Duration;
 
@@ -427,9 +427,11 @@ async fn test_error_handling() -> Result<(), Box<dyn std::error::Error>> {
     // Test operations on wrong data types
     client.set("string_key", "string_value").await?;
 
-    // Try to use string key as hash - should return appropriate error or empty result
-    let hash_result: Option<String> = client.hget("string_key", "field").await?;
-    assert_eq!(hash_result, None); // Redis returns nil for wrong type operations
+    // Try to use string key as hash - Redis returns a WRONGTYPE server error
+    let hash_result: RedisResult<Option<String>> = client.hget("string_key", "field").await;
+    assert!(
+        matches!(hash_result, Err(RedisError::Server(message)) if message.contains("WRONGTYPE"))
+    );
 
     // Test operations on non-existent keys
     let nonexistent: Option<String> = client.get("nonexistent_key").await?;

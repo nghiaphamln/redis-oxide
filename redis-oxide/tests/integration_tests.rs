@@ -328,7 +328,7 @@ async fn test_nonexistent_key() {
         .ttl("test:nonexistent:key")
         .await
         .expect("TTL failed");
-    assert!(ttl.is_none());
+    assert_eq!(ttl, Some(-2));
 }
 
 #[tokio::test]

@@ -20,6 +20,13 @@ async fn setup_client() -> Result<Client, redis_oxide::RedisError> {
 #[tokio::test]
 async fn test_basic_pipeline() -> Result<(), Box<dyn std::error::Error>> {
     let client = setup_client().await?;
+    client
+        .del(vec![
+            "pipe:key1".to_string(),
+            "pipe:key2".to_string(),
+            "pipe:counter".to_string(),
+        ])
+        .await?;
 
     // Create a pipeline with multiple commands
     let mut pipeline = client.pipeline();
@@ -59,6 +66,7 @@ async fn test_basic_pipeline() -> Result<(), Box<dyn std::error::Error>> {
 #[tokio::test]
 async fn test_pipeline_with_hash_operations() -> Result<(), Box<dyn std::error::Error>> {
     let client = setup_client().await?;
+    client.del(vec!["pipe:hash".to_string()]).await?;
 
     let mut pipeline = client.pipeline();
     pipeline.hset("pipe:hash", "field1", "value1");
@@ -90,6 +98,9 @@ async fn test_pipeline_with_hash_operations() -> Result<(), Box<dyn std::error::
 #[tokio::test]
 async fn test_basic_transaction() -> Result<(), Box<dyn std::error::Error>> {
     let client = setup_client().await?;
+    client
+        .del(vec!["tx:account1".to_string(), "tx:account2".to_string()])
+        .await?;
 
     // Set initial values
     client.set("tx:account1", "100").await?;
@@ -125,6 +136,12 @@ async fn test_basic_transaction() -> Result<(), Box<dyn std::error::Error>> {
 #[tokio::test]
 async fn test_transaction_with_watch() -> Result<(), Box<dyn std::error::Error>> {
     let client = setup_client().await?;
+    client
+        .del(vec![
+            "tx:watched_key".to_string(),
+            "tx:other_key".to_string(),
+        ])
+        .await?;
 
     // Set initial value
     client.set("tx:watched_key", "initial").await?;
@@ -164,6 +181,12 @@ async fn test_transaction_with_watch() -> Result<(), Box<dyn std::error::Error>>
 #[tokio::test]
 async fn test_transaction_discard() -> Result<(), Box<dyn std::error::Error>> {
     let client = setup_client().await?;
+    client
+        .del(vec![
+            "tx:discard_key".to_string(),
+            "tx:another_key".to_string(),
+        ])
+        .await?;
 
     // Set initial value
     client.set("tx:discard_key", "initial").await?;
@@ -190,6 +213,15 @@ async fn test_transaction_discard() -> Result<(), Box<dyn std::error::Error>> {
 async fn test_complex_pipeline_with_different_data_types() -> Result<(), Box<dyn std::error::Error>>
 {
     let client = setup_client().await?;
+    client
+        .del(vec![
+            "complex:string".to_string(),
+            "complex:counter".to_string(),
+            "complex:hash".to_string(),
+            "complex:list".to_string(),
+            "complex:set".to_string(),
+        ])
+        .await?;
 
     let mut pipeline = client.pipeline();
 
@@ -249,6 +281,12 @@ async fn test_complex_pipeline_with_different_data_types() -> Result<(), Box<dyn
 #[tokio::test]
 async fn test_pipeline_error_handling() -> Result<(), Box<dyn std::error::Error>> {
     let client = setup_client().await?;
+    client
+        .del(vec![
+            "error:string_key".to_string(),
+            "error:good_key".to_string(),
+        ])
+        .await?;
 
     // Set up a string key
     client.set("error:string_key", "string_value").await?;
@@ -277,6 +315,9 @@ async fn test_pipeline_error_handling() -> Result<(), Box<dyn std::error::Error>
 #[tokio::test]
 async fn test_nested_transactions_not_allowed() -> Result<(), Box<dyn std::error::Error>> {
     let client = setup_client().await?;
+    client
+        .del(vec!["nested:key1".to_string(), "nested:key2".to_string()])
+        .await?;
 
     // Create first transaction
     let mut transaction1 = client.transaction().await?;
@@ -308,6 +349,8 @@ async fn test_nested_transactions_not_allowed() -> Result<(), Box<dyn std::error
 #[tokio::test]
 async fn test_large_pipeline() -> Result<(), Box<dyn std::error::Error>> {
     let client = setup_client().await?;
+    let keys: Vec<String> = (0..100).map(|i| format!("large:key{}", i)).collect();
+    client.del(keys).await?;
 
     let mut pipeline = client.pipeline();
     let num_operations = 100;
@@ -347,6 +390,10 @@ async fn test_concurrent_pipelines() -> Result<(), Box<dyn std::error::Error>> {
     let client = setup_client().await?;
 
     let num_concurrent = 10;
+    let keys: Vec<String> = (0..num_concurrent)
+        .flat_map(|task_id| (0..5).map(move |i| format!("concurrent:task{}:key{}", task_id, i)))
+        .collect();
+    client.del(keys).await?;
     let mut handles = Vec::new();
 
     // Spawn multiple tasks that each run a pipeline

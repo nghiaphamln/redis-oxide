@@ -328,8 +328,13 @@ impl Transaction {
     /// ```
     pub async fn discard(&mut self) -> RedisResult<()> {
         let mut connection = self.connection.lock().await;
-        connection.discard().await?;
+        if self.is_started {
+            connection.discard().await?;
+        } else if !self.watched_keys.is_empty() {
+            connection.unwatch().await?;
+        }
         self.commands.clear();
+        self.watched_keys.clear();
         self.is_started = false;
         Ok(())
     }

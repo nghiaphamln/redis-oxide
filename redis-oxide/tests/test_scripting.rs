@@ -4,6 +4,14 @@
 #![allow(clippy::uninlined_format_args)]
 
 use redis_oxide::{Client, ConnectionConfig, Script, ScriptManager};
+use std::sync::OnceLock;
+use tokio::sync::{Mutex, MutexGuard};
+
+static SCRIPT_TEST_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+
+async fn script_test_guard() -> MutexGuard<'static, ()> {
+    SCRIPT_TEST_LOCK.get_or_init(|| Mutex::new(())).lock().await
+}
 
 fn redis_url() -> String {
     std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://localhost:6379".to_string())
@@ -16,7 +24,9 @@ async fn setup_client() -> Result<Client, redis_oxide::RedisError> {
 
 #[tokio::test]
 async fn test_basic_script_execution() -> Result<(), Box<dyn std::error::Error>> {
+    let _guard = script_test_guard().await;
     let client = setup_client().await?;
+    client.del(vec!["test_key".to_string()]).await?;
 
     // Simple script that returns a string
     let script = "return 'Hello, World!'";
@@ -47,7 +57,9 @@ async fn test_basic_script_execution() -> Result<(), Box<dyn std::error::Error>>
 
 #[tokio::test]
 async fn test_script_with_redis_operations() -> Result<(), Box<dyn std::error::Error>> {
+    let _guard = script_test_guard().await;
     let client = setup_client().await?;
+    client.del(vec!["script_key".to_string()]).await?;
 
     // Script that performs SET and GET operations
     let script = r#"
@@ -73,6 +85,7 @@ async fn test_script_with_redis_operations() -> Result<(), Box<dyn std::error::E
 
 #[tokio::test]
 async fn test_script_load_and_evalsha() -> Result<(), Box<dyn std::error::Error>> {
+    let _guard = script_test_guard().await;
     let client = setup_client().await?;
 
     // Load a script
@@ -100,6 +113,7 @@ async fn test_script_load_and_evalsha() -> Result<(), Box<dyn std::error::Error>
 
 #[tokio::test]
 async fn test_script_struct() -> Result<(), Box<dyn std::error::Error>> {
+    let _guard = script_test_guard().await;
     let client = setup_client().await?;
 
     // Create a Script instance
@@ -136,6 +150,7 @@ async fn test_script_struct() -> Result<(), Box<dyn std::error::Error>> {
 
 #[tokio::test]
 async fn test_script_manager() -> Result<(), Box<dyn std::error::Error>> {
+    let _guard = script_test_guard().await;
     let client = setup_client().await?;
 
     let manager = ScriptManager::new();
@@ -178,7 +193,9 @@ async fn test_script_manager() -> Result<(), Box<dyn std::error::Error>> {
 
 #[tokio::test]
 async fn test_atomic_increment_script() -> Result<(), Box<dyn std::error::Error>> {
+    let _guard = script_test_guard().await;
     let client = setup_client().await?;
+    client.del(vec!["counter".to_string()]).await?;
 
     // Atomic increment with expiration script
     let script = r#"
@@ -228,7 +245,9 @@ async fn test_atomic_increment_script() -> Result<(), Box<dyn std::error::Error>
 
 #[tokio::test]
 async fn test_conditional_set_script() -> Result<(), Box<dyn std::error::Error>> {
+    let _guard = script_test_guard().await;
     let client = setup_client().await?;
+    client.del(vec!["conditional_key".to_string()]).await?;
 
     // Conditional set script
     let script = r#"
@@ -282,7 +301,11 @@ async fn test_conditional_set_script() -> Result<(), Box<dyn std::error::Error>>
 
 #[tokio::test]
 async fn test_script_with_multiple_keys() -> Result<(), Box<dyn std::error::Error>> {
+    let _guard = script_test_guard().await;
     let client = setup_client().await?;
+    client
+        .del(vec!["multi_key1".to_string(), "multi_key2".to_string()])
+        .await?;
 
     // Script that operates on multiple keys
     let script = r#"
@@ -317,6 +340,7 @@ async fn test_script_with_multiple_keys() -> Result<(), Box<dyn std::error::Erro
 
 #[tokio::test]
 async fn test_script_flush() -> Result<(), Box<dyn std::error::Error>> {
+    let _guard = script_test_guard().await;
     let client = setup_client().await?;
 
     // Load a script
@@ -339,6 +363,7 @@ async fn test_script_flush() -> Result<(), Box<dyn std::error::Error>> {
 
 #[tokio::test]
 async fn test_script_error_handling() -> Result<(), Box<dyn std::error::Error>> {
+    let _guard = script_test_guard().await;
     let client = setup_client().await?;
 
     // Try to execute EVALSHA with non-existent script
@@ -360,7 +385,9 @@ async fn test_script_error_handling() -> Result<(), Box<dyn std::error::Error>> 
 
 #[tokio::test]
 async fn test_script_pattern_examples() -> Result<(), Box<dyn std::error::Error>> {
+    let _guard = script_test_guard().await;
     let client = setup_client().await?;
+    client.del(vec!["rate_limit:user1".to_string()]).await?;
 
     // Test rate limiting pattern
     let rate_limit_script = r#"

@@ -64,6 +64,22 @@ impl OptimizedRespEncoder {
         }
     }
 
+    fn estimate_bulk_argument_size(data_len: usize) -> usize {
+        1 + data_len.to_string().len() + 2 + data_len + 2
+    }
+
+    fn estimate_command_arg_size(value: &RespValue) -> usize {
+        match value {
+            RespValue::SimpleString(s) | RespValue::Error(s) => {
+                Self::estimate_bulk_argument_size(s.len())
+            }
+            RespValue::Integer(i) => Self::estimate_bulk_argument_size(i.to_string().len()),
+            RespValue::BulkString(b) => Self::estimate_bulk_argument_size(b.len()),
+            RespValue::Null => 5,
+            RespValue::Array(_) => Self::estimate_size(value),
+        }
+    }
+
     /// Estimate buffer size needed for a command with arguments
     fn estimate_command_size(command: &str, args: &[RespValue]) -> usize {
         let total_items = 1 + args.len();
@@ -73,7 +89,7 @@ impl OptimizedRespEncoder {
         let cmd_size = 1 + command.len().to_string().len() + 2 + command.len() + 2; // $len\r\ncmd\r\n
 
         // Arguments size
-        let args_size: usize = args.iter().map(Self::estimate_size).sum();
+        let args_size: usize = args.iter().map(Self::estimate_command_arg_size).sum();
 
         array_header + cmd_size + args_size
     }
@@ -118,10 +134,39 @@ impl OptimizedRespEncoder {
 
         // Encode arguments
         for arg in args {
-            self.encode_value(arg)?;
+            self.encode_command_arg(arg)?;
         }
 
         Ok(self.buffer.split().freeze())
+    }
+
+    fn encode_bulk_argument(&mut self, data: &[u8]) {
+        self.buffer.put_u8(b'$');
+        self.put_integer_bytes(data.len());
+        self.buffer.put_slice(CRLF);
+        self.buffer.put_slice(data);
+        self.buffer.put_slice(CRLF);
+    }
+
+    fn encode_command_arg(&mut self, value: &RespValue) -> RedisResult<()> {
+        match value {
+            RespValue::SimpleString(s) | RespValue::Error(s) => {
+                self.encode_bulk_argument(s.as_bytes());
+            }
+            RespValue::Integer(i) => {
+                self.encode_bulk_argument(i.to_string().as_bytes());
+            }
+            RespValue::BulkString(data) => {
+                self.encode_bulk_argument(data);
+            }
+            RespValue::Null => {
+                self.buffer.put_slice(b"$-1\r\n");
+            }
+            RespValue::Array(_) => {
+                self.encode_value(value)?;
+            }
+        }
+        Ok(())
     }
 
     /// Internal method to encode a value into the buffer
@@ -460,6 +505,20 @@ mod tests {
         let encoded_result = encoder.encode_command("GET", &args).unwrap();
 
         let expected = "*2\r\n$3\r\nGET\r\n$5\r\nmykey\r\n";
+        assert_eq!(encoded_result, Bytes::from(expected));
+    }
+
+    #[test]
+    fn test_optimized_encoder_command_arguments_are_bulk_strings() {
+        let mut encoder = OptimizedRespEncoder::new();
+        let args = vec![
+            RespValue::from("items"),
+            RespValue::from(0),
+            RespValue::from(-1),
+        ];
+        let encoded_result = encoder.encode_command("LRANGE", &args).unwrap();
+
+        let expected = "*4\r\n$6\r\nLRANGE\r\n$5\r\nitems\r\n$1\r\n0\r\n$2\r\n-1\r\n";
         assert_eq!(encoded_result, Bytes::from(expected));
     }
 

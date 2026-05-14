@@ -26,6 +26,7 @@ async fn test_basic_stream_operations() -> Result<(), Box<dyn std::error::Error>
     let client = setup_client().await?;
 
     let stream_name = "test_stream";
+    client.del(vec![stream_name.to_string()]).await?;
 
     // Add entries to stream
     let mut fields1 = HashMap::new();
@@ -57,6 +58,7 @@ async fn test_xrange_operations() -> Result<(), Box<dyn std::error::Error>> {
     let client = setup_client().await?;
 
     let stream_name = "range_stream";
+    client.del(vec![stream_name.to_string()]).await?;
 
     // Add multiple entries
     for i in 0..5 {
@@ -93,6 +95,7 @@ async fn test_xread_operations() -> Result<(), Box<dyn std::error::Error>> {
     let client = setup_client().await?;
 
     let stream_name = "read_stream";
+    client.del(vec![stream_name.to_string()]).await?;
 
     // Add some initial entries
     let mut fields = HashMap::new();
@@ -137,6 +140,7 @@ async fn test_consumer_groups() -> Result<(), Box<dyn std::error::Error>> {
     let stream_name = "consumer_stream";
     let group_name = "test_group";
     let consumer_name = "test_consumer";
+    client.del(vec![stream_name.to_string()]).await?;
 
     // Add some entries first
     for i in 0..3 {
@@ -180,6 +184,7 @@ async fn test_consumer_group_with_new_messages() -> Result<(), Box<dyn std::erro
     let stream_name = "new_messages_stream";
     let group_name = "processors";
     let consumer_name = "worker_1";
+    client.del(vec![stream_name.to_string()]).await?;
 
     // Create consumer group starting from latest messages
     client
@@ -226,22 +231,25 @@ async fn test_blocking_xread() -> Result<(), Box<dyn std::error::Error>> {
     let client = setup_client().await?;
 
     let stream_name = "blocking_stream";
+    client.del(vec![stream_name.to_string()]).await?;
 
     // Start a task that will add a message after a delay
-    let client_clone = client.clone();
     let stream_name_clone = stream_name.to_string();
-    tokio::spawn(async move {
+    let producer = tokio::spawn(async move {
         tokio::time::sleep(Duration::from_millis(100)).await;
+        let client = setup_client().await?;
         let mut fields = HashMap::new();
         fields.insert("delayed_message".to_string(), "hello".to_string());
-        let _ = client_clone.xadd(&stream_name_clone, "*", fields).await;
+        client.xadd(&stream_name_clone, "*", fields).await?;
+        Ok::<(), redis_oxide::RedisError>(())
     });
 
     // Blocking read with short timeout
     let streams = vec![(stream_name.to_string(), "$".to_string())];
     let messages = client
-        .xread(streams, Some(1), Some(Duration::from_millis(200)))
+        .xread(streams, Some(1), Some(Duration::from_secs(1)))
         .await?;
+    producer.await??;
 
     // Should receive the delayed message
     assert_eq!(messages.len(), 1);
@@ -261,6 +269,9 @@ async fn test_multiple_streams() -> Result<(), Box<dyn std::error::Error>> {
 
     let stream1 = "stream_1";
     let stream2 = "stream_2";
+    client
+        .del(vec![stream1.to_string(), stream2.to_string()])
+        .await?;
 
     // Add entries to both streams
     let mut fields1 = HashMap::new();
@@ -306,6 +317,7 @@ async fn test_stream_entry_parsing() -> Result<(), Box<dyn std::error::Error>> {
     let client = setup_client().await?;
 
     let stream_name = "parsing_stream";
+    client.del(vec![stream_name.to_string()]).await?;
 
     // Add entry with various field types
     let mut fields = HashMap::new();
@@ -355,6 +367,12 @@ async fn test_stream_entry_parsing() -> Result<(), Box<dyn std::error::Error>> {
 #[tokio::test]
 async fn test_stream_error_conditions() -> Result<(), Box<dyn std::error::Error>> {
     let client = setup_client().await?;
+    client
+        .del(vec![
+            "nonexistent_stream".to_string(),
+            "auto_created_stream".to_string(),
+        ])
+        .await?;
 
     // Test XLEN on non-existent stream
     let length = client.xlen("nonexistent_stream").await?;
@@ -392,6 +410,7 @@ async fn test_stream_with_specific_ids() -> Result<(), Box<dyn std::error::Error
     let client = setup_client().await?;
 
     let stream_name = "specific_id_stream";
+    client.del(vec![stream_name.to_string()]).await?;
 
     // Add entry with specific timestamp-based ID
     use std::time::{SystemTime, UNIX_EPOCH};
@@ -427,6 +446,7 @@ async fn test_concurrent_stream_operations() -> Result<(), Box<dyn std::error::E
 
     let stream_name = "concurrent_stream";
     let num_tasks = 10;
+    client.del(vec![stream_name.to_string()]).await?;
 
     // Spawn multiple tasks that add entries concurrently
     let mut handles = Vec::new();

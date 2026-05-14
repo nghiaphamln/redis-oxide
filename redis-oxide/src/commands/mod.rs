@@ -307,12 +307,7 @@ impl Command for TtlCommand {
     }
 
     fn parse_response(&self, response: RespValue) -> RedisResult<Self::Output> {
-        let ttl = response.as_int()?;
-        if ttl < 0 {
-            Ok(None) // -2 = key doesn't exist, -1 = no expiration
-        } else {
-            Ok(Some(ttl))
-        }
+        response.as_int().map(Some)
     }
 
     fn keys(&self) -> Vec<&[u8]> {
