@@ -5,6 +5,13 @@ All notable changes to this project are documented in this file.
 The format is based on Keep a Changelog, and this project uses semantic
 versioning while the public API is still stabilizing.
 
+## [0.2.6] - 2026-05-14
+
+### Fixed
+
+- Replaced relative repository links in the crates.io README with absolute
+  GitHub URLs so documentation links resolve from the published crate page.
+
 ## [0.2.5] - 2026-05-14
 
 ### Changed

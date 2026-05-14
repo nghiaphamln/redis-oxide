@@ -190,12 +190,12 @@ cargo deny check
 
 ## Documentation
 
-- [Getting started](docs/getting-started.md)
-- [Architecture](docs/architecture.md)
-- [Performance](docs/performance.md)
-- [Troubleshooting](docs/troubleshooting.md)
-- [Changelog](CHANGELOG.md)
-- [Contributing](CONTRIBUTING.md)
+- [Getting started](https://github.com/nghiaphamln/redis-oxide/blob/main/docs/getting-started.md)
+- [Architecture](https://github.com/nghiaphamln/redis-oxide/blob/main/docs/architecture.md)
+- [Performance](https://github.com/nghiaphamln/redis-oxide/blob/main/docs/performance.md)
+- [Troubleshooting](https://github.com/nghiaphamln/redis-oxide/blob/main/docs/troubleshooting.md)
+- [Changelog](https://github.com/nghiaphamln/redis-oxide/blob/main/CHANGELOG.md)
+- [Contributing](https://github.com/nghiaphamln/redis-oxide/blob/main/CONTRIBUTING.md)
 - [API documentation](https://docs.rs/redis-oxide)
 
 ## Compatibility
@@ -207,4 +207,5 @@ cargo deny check
 
 ## License
 
-This project is licensed under the MIT License. See [LICENSE-MIT](LICENSE-MIT).
+This project is licensed under the MIT License. See
+[LICENSE-MIT](https://github.com/nghiaphamln/redis-oxide/blob/main/LICENSE-MIT).
