@@ -177,7 +177,14 @@ jobs:
       - name: Start Redis Sentinel
         run: |
           docker compose -f redis-oxide/tests/fixtures/redis-topologies.compose.yml up -d redis-master redis-replica sentinel-1 sentinel-2 sentinel-3
-          until docker compose -f redis-oxide/tests/fixtures/redis-topologies.compose.yml exec -T sentinel-1 redis-cli -p 26379 sentinel get-master-addr-by-name mymaster; do sleep 1; done
+          for _ in {1..30}; do
+            if docker compose -f redis-oxide/tests/fixtures/redis-topologies.compose.yml exec -T sentinel-1 redis-cli -p 26379 sentinel get-master-addr-by-name mymaster; then
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "Sentinel did not become ready within 30 seconds" >&2
+          exit 1
       - name: Test Redis Sentinel
         run: |
           cargo test --test test_topology_e2e sentinel_discovers_a_master_for_client_operations -- --ignored

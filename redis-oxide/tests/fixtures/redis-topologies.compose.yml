@@ -43,18 +43,30 @@ services:
   sentinel-1:
     image: redis:7-alpine
     depends_on: [redis-master, redis-replica]
-    command: redis-server /etc/redis/sentinel.conf --sentinel
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - |
+        cp /etc/redis/sentinel.conf /tmp/sentinel.conf
+        exec redis-server /tmp/sentinel.conf --sentinel
     volumes: ["./sentinel/sentinel-1.conf:/etc/redis/sentinel.conf:ro"]
     ports: ["26379:26379"]
   sentinel-2:
     image: redis:7-alpine
     depends_on: [redis-master, redis-replica]
-    command: redis-server /etc/redis/sentinel.conf --sentinel
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - |
+        cp /etc/redis/sentinel.conf /tmp/sentinel.conf
+        exec redis-server /tmp/sentinel.conf --sentinel
     volumes: ["./sentinel/sentinel-2.conf:/etc/redis/sentinel.conf:ro"]
     ports: ["26380:26380"]
   sentinel-3:
     image: redis:7-alpine
     depends_on: [redis-master, redis-replica]
-    command: redis-server /etc/redis/sentinel.conf --sentinel
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - |
+        cp /etc/redis/sentinel.conf /tmp/sentinel.conf
+        exec redis-server /tmp/sentinel.conf --sentinel
     volumes: ["./sentinel/sentinel-3.conf:/etc/redis/sentinel.conf:ro"]
     ports: ["26381:26381"]
