@@ -4,17 +4,17 @@
 //! automatic topology detection, and connection lifecycle management.
 
 use crate::core::{
-    config::{ConnectionConfig, TopologyMode},
+    config::{ConnectionConfig, ProtocolVersion, TopologyMode},
     error::{RedisError, RedisResult},
     value::RespValue,
 };
-use crate::protocol::{ProtocolConnection, RespDecoder, RespEncoder};
+use crate::protocol::{Resp3Decoder, RespDecoder, RespEncoder};
 use bytes::{Buf, BytesMut};
 use std::io::Cursor;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 use tokio::time::timeout;
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 
 /// Type of Redis topology
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -30,6 +30,12 @@ pub struct RedisConnection {
     stream: TcpStream,
     read_buffer: BytesMut,
     config: ConnectionConfig,
+    protocol: ConnectionProtocol,
+}
+
+enum ConnectionProtocol {
+    Resp2,
+    Resp3(Resp3Decoder),
 }
 
 impl RedisConnection {
@@ -39,7 +45,8 @@ impl RedisConnection {
 
     /// Connect to a Redis server
     pub async fn connect(host: &str, port: u16, config: ConnectionConfig) -> RedisResult<Self> {
-        let addr = format!("{}:{}", host, port);
+        config.validate()?;
+        let addr = Self::socket_address(host, port);
         debug!("Connecting to Redis at {}", addr);
 
         let stream = timeout(config.connect_timeout, TcpStream::connect(&addr))
@@ -47,40 +54,63 @@ impl RedisConnection {
             .map_err(|_| RedisError::Timeout)?
             .map_err(|e| RedisError::Connection(format!("Failed to connect to {}: {}", addr, e)))?;
 
-        // Set TCP keepalive if configured
-        if let Some(keepalive_duration) = config.tcp_keepalive {
+        let stream = if let Some(keepalive_duration) = config.tcp_keepalive {
             let socket = socket2::Socket::from(stream.into_std()?);
             let keepalive = socket2::TcpKeepalive::new().with_time(keepalive_duration);
             socket.set_tcp_keepalive(&keepalive).map_err(|e| {
                 RedisError::Connection(format!("Failed to set TCP keepalive: {}", e))
             })?;
-            let stream = TcpStream::from_std(socket.into())?;
-
-            let mut conn = Self {
-                stream,
-                read_buffer: BytesMut::with_capacity(8192),
-                config: config.clone(),
-            };
-
-            // Authenticate if password is provided
-            if let Some(ref password) = config.password {
-                conn.authenticate(password).await?;
-            }
-
-            Ok(conn)
+            TcpStream::from_std(socket.into())?
         } else {
-            let mut conn = Self {
-                stream,
-                read_buffer: BytesMut::with_capacity(8192),
-                config: config.clone(),
-            };
+            stream
+        };
 
-            // Authenticate if password is provided
-            if let Some(ref password) = config.password {
-                conn.authenticate(password).await?;
+        let mut conn = Self {
+            stream,
+            read_buffer: BytesMut::with_capacity(8192),
+            config: config.clone(),
+            protocol: ConnectionProtocol::Resp2,
+        };
+
+        if let Some(ref password) = config.password {
+            conn.authenticate(password).await?;
+        }
+        if config.protocol_version == ProtocolVersion::Resp3 {
+            conn.negotiate_resp3().await?;
+        }
+        if config.database != 0 {
+            conn.select_database(config.database).await?;
+        }
+
+        Ok(conn)
+    }
+
+    fn socket_address(host: &str, port: u16) -> String {
+        if host.contains(':') && !host.starts_with('[') {
+            format!("[{host}]:{port}")
+        } else {
+            format!("{host}:{port}")
+        }
+    }
+
+    async fn negotiate_resp3(&mut self) -> RedisResult<()> {
+        self.send_command(&RespValue::Array(vec![
+            RespValue::from("HELLO"),
+            RespValue::from("3"),
+        ]))
+        .await?;
+        self.protocol = ConnectionProtocol::Resp3(Resp3Decoder::new());
+        match self.read_response_with_timeout().await? {
+            RespValue::Error(message)
+                if message.contains("unknown command")
+                    || message.contains("Unsupported protocol version") =>
+            {
+                self.protocol = ConnectionProtocol::Resp2;
+                debug!("Redis server does not support RESP3; using RESP2");
+                Ok(())
             }
-
-            Ok(conn)
+            RespValue::Error(message) => Err(RedisError::Server(message)),
+            _ => Ok(()),
         }
     }
 
@@ -104,7 +134,13 @@ impl RedisConnection {
     pub async fn send_command(&mut self, command: &RespValue) -> RedisResult<()> {
         let mut buffer = BytesMut::new();
         RespEncoder::encode(command, &mut buffer)?;
-        self.stream.write_all(&buffer).await?;
+        timeout(
+            self.config.operation_timeout,
+            self.stream.write_all(&buffer),
+        )
+        .await
+        .map_err(|_| RedisError::Timeout)?
+        .map_err(RedisError::Io)?;
         Ok(())
     }
 
@@ -114,10 +150,35 @@ impl RedisConnection {
         command: &str,
         args: &[RespValue],
     ) -> RedisResult<RespValue> {
-        // Encode command
-        let encoded = RespEncoder::encode_command(command, args)?;
+        let responses = self
+            .execute_pipeline(&[(command.to_string(), args.to_vec())])
+            .await?;
+        Self::into_command_result(
+            responses
+                .into_iter()
+                .next()
+                .ok_or_else(|| RedisError::Protocol("Missing command response".to_string()))?,
+        )
+    }
 
-        // Send command with timeout
+    /// Execute several commands on this connection without interleaving.
+    ///
+    /// Commands are fully written before responses are read, preserving Redis
+    /// pipeline ordering. Server errors are returned as response values so a
+    /// caller can retain per-command pipeline results.
+    pub async fn execute_pipeline(
+        &mut self,
+        commands: &[(String, Vec<RespValue>)],
+    ) -> RedisResult<Vec<RespValue>> {
+        if commands.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let mut encoded = BytesMut::new();
+        for (command, args) in commands {
+            encoded.extend_from_slice(&RespEncoder::encode_command(command, args)?);
+        }
+
         timeout(
             self.config.operation_timeout,
             self.stream.write_all(&encoded),
@@ -126,24 +187,33 @@ impl RedisConnection {
         .map_err(|_| RedisError::Timeout)?
         .map_err(RedisError::Io)?;
 
-        // Read response with timeout
-        let response = timeout(self.config.operation_timeout, self.read_response())
-            .await
-            .map_err(|_| RedisError::Timeout)??;
+        let mut responses = Vec::with_capacity(commands.len());
+        for _ in commands {
+            let response = timeout(self.config.operation_timeout, self.read_response())
+                .await
+                .map_err(|_| RedisError::Timeout)??;
+            responses.push(response);
+        }
+        Ok(responses)
+    }
 
-        // Check if response is an error and parse redirects
+    /// Turn a raw Redis response into the normal single-command result.
+    pub fn into_command_result(response: RespValue) -> RedisResult<RespValue> {
         if let RespValue::Error(ref msg) = response {
             if let Some(redirect_error) = RedisError::parse_redirect(msg) {
                 return Err(redirect_error);
             }
             return Err(RedisError::Server(msg.clone()));
         }
-
         Ok(response)
     }
 
     /// Read a complete RESP response from the connection
     pub async fn read_response(&mut self) -> RedisResult<RespValue> {
+        if matches!(self.protocol, ConnectionProtocol::Resp3(_)) {
+            return self.read_resp3_response().await;
+        }
+
         loop {
             // Try to decode from existing buffer
             let mut cursor = Cursor::new(&self.read_buffer[..]);
@@ -161,6 +231,40 @@ impl RedisConnection {
                 ));
             }
         }
+    }
+
+    async fn read_resp3_response(&mut self) -> RedisResult<RespValue> {
+        loop {
+            let decoded = match &mut self.protocol {
+                ConnectionProtocol::Resp3(decoder) => decoder.try_decode(&[]),
+                ConnectionProtocol::Resp2 => unreachable!("RESP3 reader requires RESP3 codec"),
+            }?;
+            if let Some(value) = decoded {
+                return Ok(value.into());
+            }
+
+            let mut chunk = BytesMut::with_capacity(8192);
+            let read = self.stream.read_buf(&mut chunk).await?;
+            if read == 0 {
+                return Err(RedisError::Connection(
+                    "Connection closed by server".to_string(),
+                ));
+            }
+            let decoded = match &mut self.protocol {
+                ConnectionProtocol::Resp3(decoder) => decoder.try_decode(&chunk),
+                ConnectionProtocol::Resp2 => unreachable!("RESP3 reader requires RESP3 codec"),
+            }?;
+            if let Some(value) = decoded {
+                return Ok(value.into());
+            }
+        }
+    }
+
+    /// Read a response using the configured operation timeout.
+    pub async fn read_response_with_timeout(&mut self) -> RedisResult<RespValue> {
+        timeout(self.config.operation_timeout, self.read_response())
+            .await
+            .map_err(|_| RedisError::Timeout)?
     }
 
     /// Detect the topology type of the Redis server
@@ -187,15 +291,6 @@ impl RedisConnection {
                 info!("Detected Redis Cluster");
                 return Ok(TopologyType::Cluster);
             }
-            Ok(RespValue::Error(ref e))
-                if e.contains("command not supported")
-                    || e.contains("unknown command")
-                    || e.contains("disabled") =>
-            {
-                // Cluster commands not available - this is standalone
-                info!("Detected Standalone Redis (CLUSTER command not available)");
-                return Ok(TopologyType::Standalone);
-            }
             Err(RedisError::Server(ref e))
                 if e.contains("command not supported")
                     || e.contains("unknown command")
@@ -204,10 +299,7 @@ impl RedisConnection {
                 info!("Detected Standalone Redis (CLUSTER command not available)");
                 return Ok(TopologyType::Standalone);
             }
-            Err(e) => {
-                warn!("Error detecting topology: {:?}, assuming standalone", e);
-                return Ok(TopologyType::Standalone);
-            }
+            Err(e) => return Err(e),
             _ => {}
         }
 
@@ -226,17 +318,6 @@ impl RedisConnection {
             RespValue::Error(e) => Err(RedisError::Server(e)),
             _ => Err(RedisError::UnexpectedResponse(format!("{:?}", response))),
         }
-    }
-}
-
-#[async_trait::async_trait]
-impl ProtocolConnection for RedisConnection {
-    async fn send_command(&mut self, command: &RespValue) -> RedisResult<()> {
-        self.send_command(command).await
-    }
-
-    async fn read_response(&mut self) -> RedisResult<RespValue> {
-        self.read_response().await
     }
 }
 
@@ -261,6 +342,8 @@ impl ConnectionManager {
             return Ok(topology);
         }
 
+        self.config.validate()?;
+
         // Check if topology mode is forced
         match self.config.topology_mode {
             TopologyMode::Standalone => {
@@ -272,17 +355,22 @@ impl ConnectionManager {
                 Ok(TopologyType::Cluster)
             }
             TopologyMode::Auto => {
-                // Auto-detect
-                let endpoints = self.config.parse_endpoints();
-                if endpoints.is_empty() {
-                    return Err(RedisError::Config("No endpoints specified".to_string()));
+                let endpoints = self.config.parse_endpoints()?;
+                let mut last_error = None;
+                for (host, port) in endpoints {
+                    match RedisConnection::connect(&host, port, self.config.clone()).await {
+                        Ok(mut conn) => match conn.detect_topology().await {
+                            Ok(topology) => {
+                                self.topology = Some(topology);
+                                return Ok(topology);
+                            }
+                            Err(error) => last_error = Some(error),
+                        },
+                        Err(error) => last_error = Some(error),
+                    }
                 }
-
-                let (host, port) = &endpoints[0];
-                let mut conn = RedisConnection::connect(host, *port, self.config.clone()).await?;
-                let topology = conn.detect_topology().await?;
-                self.topology = Some(topology);
-                Ok(topology)
+                Err(last_error
+                    .unwrap_or_else(|| RedisError::Config("No endpoints specified".to_string())))
             }
         }
     }

@@ -39,11 +39,11 @@ fn generate_test_array(size: usize) -> Vec<RespValue> {
         .collect()
 }
 
-fn generate_resp3_map(size: usize) -> HashMap<String, Resp3Value> {
+fn generate_resp3_map(size: usize) -> Vec<(Resp3Value, Resp3Value)> {
     (0..size)
         .map(|i| {
             (
-                format!("key_{}", i),
+                Resp3Value::SimpleString(format!("key_{}", i)),
                 Resp3Value::SimpleString(format!("value_{}", i)),
             )
         })

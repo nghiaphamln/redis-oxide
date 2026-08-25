@@ -16,12 +16,12 @@ deployments.
 
 ```toml
 [dependencies]
-redis-oxide = "0.2"
+redis-oxide = "0.3.0-alpha.1"
 tokio = { version = "1", features = ["full"] }
 ```
 
-You can also add the latest compatible 0.2 release with
-`cargo add redis-oxide`.
+This is a breaking alpha release. Read the [0.3 migration guide](docs/migration-0.3.md)
+before upgrading, or use `cargo add redis-oxide` for the latest published release.
 
 ## Quick Start
 
@@ -194,6 +194,7 @@ cargo deny check
 - [Architecture](https://github.com/nghiaphamln/redis-oxide/blob/main/docs/architecture.md)
 - [Performance](https://github.com/nghiaphamln/redis-oxide/blob/main/docs/performance.md)
 - [Troubleshooting](https://github.com/nghiaphamln/redis-oxide/blob/main/docs/troubleshooting.md)
+- [0.3 migration guide](https://github.com/nghiaphamln/redis-oxide/blob/main/docs/migration-0.3.md)
 - [Changelog](https://github.com/nghiaphamln/redis-oxide/blob/main/CHANGELOG.md)
 - [Contributing](https://github.com/nghiaphamln/redis-oxide/blob/main/CONTRIBUTING.md)
 - [API documentation](https://docs.rs/redis-oxide)

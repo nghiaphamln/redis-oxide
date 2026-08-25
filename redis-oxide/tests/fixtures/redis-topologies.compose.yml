@@ -1,0 +1,57 @@
+services:
+  cluster-1:
+    image: redis:7-alpine
+    command: >-
+      redis-server --port 7000 --cluster-enabled yes --cluster-config-file nodes.conf
+      --cluster-node-timeout 5000 --appendonly no --protected-mode no --bind 0.0.0.0
+    ports: ["7000:7000", "17000:17000"]
+  cluster-2:
+    image: redis:7-alpine
+    command: >-
+      redis-server --port 7001 --cluster-enabled yes --cluster-config-file nodes.conf
+      --cluster-node-timeout 5000 --appendonly no --protected-mode no --bind 0.0.0.0
+    ports: ["7001:7001", "17001:17001"]
+  cluster-3:
+    image: redis:7-alpine
+    command: >-
+      redis-server --port 7002 --cluster-enabled yes --cluster-config-file nodes.conf
+      --cluster-node-timeout 5000 --appendonly no --protected-mode no --bind 0.0.0.0
+    ports: ["7002:7002", "17002:17002"]
+  cluster-init:
+    image: redis:7-alpine
+    depends_on: [cluster-1, cluster-2, cluster-3]
+    entrypoint: ["/bin/sh", "-c"]
+    command: >-
+      until redis-cli -h cluster-1 -p 7000 ping; do sleep 1; done;
+      redis-cli --cluster create cluster-1:7000 cluster-2:7001 cluster-3:7002
+      --cluster-replicas 0 --cluster-yes
+
+  redis-master:
+    image: redis:7-alpine
+    command: redis-server --port 6380 --appendonly no --protected-mode no --bind 0.0.0.0
+    ports: ["6380:6380"]
+  redis-replica:
+    image: redis:7-alpine
+    depends_on: [redis-master]
+    command: >-
+      redis-server --port 6381 --replicaof redis-master 6380 --appendonly no
+      --protected-mode no --bind 0.0.0.0
+    ports: ["6381:6381"]
+  sentinel-1:
+    image: redis:7-alpine
+    depends_on: [redis-master, redis-replica]
+    command: redis-server /etc/redis/sentinel.conf --sentinel
+    volumes: ["./sentinel/sentinel-1.conf:/etc/redis/sentinel.conf:ro"]
+    ports: ["26379:26379"]
+  sentinel-2:
+    image: redis:7-alpine
+    depends_on: [redis-master, redis-replica]
+    command: redis-server /etc/redis/sentinel.conf --sentinel
+    volumes: ["./sentinel/sentinel-2.conf:/etc/redis/sentinel.conf:ro"]
+    ports: ["26380:26380"]
+  sentinel-3:
+    image: redis:7-alpine
+    depends_on: [redis-master, redis-replica]
+    command: redis-server /etc/redis/sentinel.conf --sentinel
+    volumes: ["./sentinel/sentinel-3.conf:/etc/redis/sentinel.conf:ro"]
+    ports: ["26381:26381"]

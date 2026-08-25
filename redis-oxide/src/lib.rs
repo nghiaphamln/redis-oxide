@@ -21,7 +21,7 @@
 //! - **Sentinel Support**: High availability with Redis Sentinel
 //! - **Transaction Support**: MULTI/EXEC transaction handling
 //! - **Pipeline Support**: Batch multiple commands for improved performance
-//! - **RESP2/RESP3 Protocol Support**: Full support for both protocol versions
+//! - **RESP2/RESP3 Protocol Support**: Negotiated protocol support for Redis 6+
 //! - **Connection Pooling**: Configurable connection pooling strategies
 //! - **Multiplexed Connections**: Single connection shared across tasks
 //! - **Hash Operations**: Complete set of hash data type operations
@@ -31,8 +31,7 @@
 //! - **String Operations**: Complete set of string data type operations
 //! - **HyperLogLog Operations**: Support for probabilistic data structures
 //! - **Geo Operations**: Support for geospatial data types
-//! - **Performance Optimizations**: Memory pooling and protocol optimizations
-//! - **Monitoring & Metrics**: Built-in observability features
+//! - **Safe pooling lifecycle**: Failed connections are never reused
 //! - **Configurable Timeouts**: Connect, operation, and redirect timeout controls
 //! - **Authentication Support**: Password and access control support
 //!
@@ -42,7 +41,7 @@
 //!
 //! ```toml
 //! [dependencies]
-//! redis-oxide = "0.2.2"
+//! redis-oxide = "0.3.0-alpha.1"
 //! tokio = { version = "1.0", features = ["full"] }
 //! ```
 //!
@@ -519,9 +518,9 @@
 //! # #[tokio::main]
 //! # async fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! let sentinel_config = SentinelConfig::new("mymaster")
-//!     .add_sentinel("127.0.0.1:26379")
-//!     .add_sentinel("127.0.0.1:26380")
-//!     .add_sentinel("127.0.0.1:26381")
+//!     .add_sentinel("127.0.0.1:26379")?
+//!     .add_sentinel("127.0.0.1:26380")?
+//!     .add_sentinel("127.0.0.1:26381")?
 //!     .with_password("sentinel_password");
 //!
 //! let config = ConnectionConfig::new_with_sentinel(sentinel_config);
@@ -579,11 +578,6 @@
 //! ```
 //!
 //! # 📊 Performance Features
-//!
-//! ## Optimized Memory Pooling
-//!
-//! The library includes optimized memory pooling for frequently allocated objects
-//! to reduce allocation overhead and improve performance.
 //!
 //! ## Connection Multiplexing
 //!
@@ -678,7 +672,6 @@ pub mod commands;
 pub mod connection;
 pub mod pipeline;
 pub mod pool;
-pub mod pool_optimized;
 pub mod protocol;
 pub mod pubsub;
 pub mod script;
@@ -706,4 +699,4 @@ pub use crate::core::{
 };
 
 // Re-export protocol types
-pub use crate::protocol::{ProtocolNegotiation, ProtocolNegotiator, Resp3Value};
+pub use crate::protocol::Resp3Value;

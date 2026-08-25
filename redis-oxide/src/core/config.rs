@@ -1,5 +1,6 @@
-//! Configuration types for Redis connections
+//! Configuration types for Redis connections.
 
+use crate::core::error::{RedisError, RedisResult};
 use std::time::Duration;
 
 /// Protocol version preference
@@ -26,9 +27,9 @@ pub enum PoolStrategy {
 pub struct PoolConfig {
     /// Pooling strategy to use
     pub strategy: PoolStrategy,
-    /// Maximum number of connections in pool (only for Pool strategy)
+    /// Maximum number of connections in a connection pool.
     pub max_size: usize,
-    /// Minimum number of connections to maintain (only for Pool strategy)
+    /// Minimum number of idle connections to create for the Pool strategy.
     pub min_idle: usize,
     /// Timeout for acquiring a connection from pool
     pub connection_timeout: Duration,
@@ -211,37 +212,198 @@ impl ConnectionConfig {
         self
     }
 
+    /// Validate configuration before opening a connection.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when a timeout, pool, reconnect, or endpoint setting
+    /// cannot be used safely.
+    pub fn validate(&self) -> RedisResult<()> {
+        if self.connect_timeout.is_zero() {
+            return Err(RedisError::Config(
+                "connect_timeout must be greater than zero".to_string(),
+            ));
+        }
+        if self.operation_timeout.is_zero() {
+            return Err(RedisError::Config(
+                "operation_timeout must be greater than zero".to_string(),
+            ));
+        }
+        if self.pool.max_size == 0 {
+            return Err(RedisError::Config(
+                "pool.max_size must be greater than zero".to_string(),
+            ));
+        }
+        if self.pool.min_idle > self.pool.max_size {
+            return Err(RedisError::Config(
+                "pool.min_idle cannot exceed pool.max_size".to_string(),
+            ));
+        }
+        if self.pool.connection_timeout.is_zero() {
+            return Err(RedisError::Config(
+                "pool.connection_timeout must be greater than zero".to_string(),
+            ));
+        }
+        if self.reconnect.enabled {
+            if self.reconnect.initial_delay.is_zero() || self.reconnect.max_delay.is_zero() {
+                return Err(RedisError::Config(
+                    "reconnect delays must be greater than zero".to_string(),
+                ));
+            }
+            if self.reconnect.initial_delay > self.reconnect.max_delay {
+                return Err(RedisError::Config(
+                    "reconnect.initial_delay cannot exceed reconnect.max_delay".to_string(),
+                ));
+            }
+            if !self.reconnect.backoff_multiplier.is_finite()
+                || self.reconnect.backoff_multiplier < 1.0
+            {
+                return Err(RedisError::Config(
+                    "reconnect.backoff_multiplier must be finite and at least 1.0".to_string(),
+                ));
+            }
+            if self.reconnect.max_attempts == Some(0) {
+                return Err(RedisError::Config(
+                    "reconnect.max_attempts cannot be zero when configured".to_string(),
+                ));
+            }
+        }
+
+        if self.sentinel.is_none() {
+            let endpoints = self.parse_endpoints()?;
+            if endpoints.is_empty() {
+                return Err(RedisError::Config("No endpoints specified".to_string()));
+            }
+        }
+
+        Ok(())
+    }
+
     /// Parse connection endpoints from connection string
-    #[must_use]
-    pub fn parse_endpoints(&self) -> Vec<(String, u16)> {
+    ///
+    /// Only `redis://host[:port]` URIs and comma-separated seed lists are
+    /// supported. TLS URIs are rejected until TLS is implemented rather than
+    /// being silently opened as plaintext TCP connections.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for malformed, ambiguous, or unsupported connection
+    /// strings.
+    pub fn parse_endpoints(&self) -> RedisResult<Vec<(String, u16)>> {
         let conn_str = self.connection_string.trim();
+        if conn_str.is_empty() {
+            return Err(RedisError::Config("Connection string is empty".to_string()));
+        }
+        if conn_str.starts_with("rediss://") {
+            return Err(RedisError::Config(
+                "rediss:// requires TLS, which redis-oxide 0.3 does not implement".to_string(),
+            ));
+        }
 
-        // Strip redis:// prefix if present
-        let addr_part = conn_str
-            .strip_prefix("redis://")
-            .unwrap_or(conn_str)
-            .strip_prefix("rediss://")
-            .unwrap_or_else(|| conn_str.strip_prefix("redis://").unwrap_or(conn_str));
+        let addr_part = conn_str.strip_prefix("redis://").unwrap_or(conn_str);
+        if addr_part.contains('@')
+            || addr_part.contains('/')
+            || addr_part.contains('?')
+            || addr_part.contains('#')
+        {
+            return Err(RedisError::Config(
+                "connection strings only support redis://host[:port] seed lists; configure authentication and database explicitly"
+                    .to_string(),
+            ));
+        }
 
-        // Split by comma for multiple endpoints
         addr_part
             .split(',')
-            .filter_map(|endpoint| {
-                let endpoint = endpoint.trim();
-                if endpoint.is_empty() {
-                    return None;
-                }
-
-                // Parse host:port
-                if let Some((host, port_str)) = endpoint.rsplit_once(':') {
-                    if let Ok(port) = port_str.parse::<u16>() {
-                        return Some((host.to_string(), port));
-                    }
-                }
-
-                // Default port 6379 if not specified
-                Some((endpoint.to_string(), 6379))
-            })
+            .map(str::trim)
+            .map(Self::parse_endpoint)
             .collect()
+    }
+
+    fn parse_endpoint(endpoint: &str) -> RedisResult<(String, u16)> {
+        if endpoint.is_empty() {
+            return Err(RedisError::Config(
+                "Connection endpoint is empty".to_string(),
+            ));
+        }
+
+        if let Some(rest) = endpoint.strip_prefix('[') {
+            let (host, remainder) = rest.split_once(']').ok_or_else(|| {
+                RedisError::Config(format!("Invalid bracketed endpoint: {endpoint}"))
+            })?;
+            if host.is_empty() {
+                return Err(RedisError::Config(format!("Invalid endpoint: {endpoint}")));
+            }
+            let port = match remainder {
+                "" => 6379,
+                value if value.starts_with(':') => value[1..].parse::<u16>().map_err(|_| {
+                    RedisError::Config(format!("Invalid port in endpoint: {endpoint}"))
+                })?,
+                _ => return Err(RedisError::Config(format!("Invalid endpoint: {endpoint}"))),
+            };
+            return Ok((host.to_string(), port));
+        }
+
+        let colon_count = endpoint.matches(':').count();
+        if colon_count > 1 {
+            return Err(RedisError::Config(format!(
+                "IPv6 endpoints must use brackets: {endpoint}"
+            )));
+        }
+
+        if let Some((host, port)) = endpoint.rsplit_once(':') {
+            if host.is_empty() {
+                return Err(RedisError::Config(format!("Invalid endpoint: {endpoint}")));
+            }
+            let port = port
+                .parse::<u16>()
+                .map_err(|_| RedisError::Config(format!("Invalid port in endpoint: {endpoint}")))?;
+            return Ok((host.to_string(), port));
+        }
+
+        Ok((endpoint.to_string(), 6379))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parses_supported_seed_lists() {
+        let config = ConnectionConfig::new("redis://localhost:6379,[::1]:6380,cache");
+        assert_eq!(
+            config.parse_endpoints().unwrap(),
+            vec![
+                ("localhost".to_string(), 6379),
+                ("::1".to_string(), 6380),
+                ("cache".to_string(), 6379),
+            ]
+        );
+    }
+
+    #[test]
+    fn rejects_unsupported_or_ambiguous_uris() {
+        for uri in [
+            "rediss://localhost:6379",
+            "redis://:secret@localhost:6379",
+            "redis://localhost:6379/1",
+            "redis://::1:6379",
+        ] {
+            assert!(
+                ConnectionConfig::new(uri).parse_endpoints().is_err(),
+                "{uri}"
+            );
+        }
+    }
+
+    #[test]
+    fn validates_pool_and_reconnect_settings() {
+        let mut config = ConnectionConfig::default();
+        config.pool.max_size = 0;
+        assert!(config.validate().is_err());
+
+        config.pool.max_size = 1;
+        config.reconnect.backoff_multiplier = 0.5;
+        assert!(config.validate().is_err());
     }
 }

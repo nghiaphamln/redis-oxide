@@ -3,7 +3,7 @@ members = ["redis-oxide"]
 resolver = "2"
 
 [workspace.package]
-version = "0.2.6"
+version = "0.3.0-alpha.1"
 edition = "2021"
 rust-version = "1.82.0"
 authors = ["Nghia Pham <nghiaphamln3@gmail.com>"]
@@ -32,9 +32,6 @@ tracing = "0.1.41"
 
 # Redis cluster support
 crc16 = "0.4.0"
-
-# Connection pooling
-deadpool = "0.12.1"
 
 # Serialization
 serde = { version = "1.0", features = ["derive"] }

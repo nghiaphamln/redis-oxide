@@ -9,6 +9,7 @@
 use crate::core::{
     error::{RedisError, RedisResult},
     types::{NodeInfo, SlotRange},
+    value::RespValue,
 };
 use crc16::{State, XMODEM};
 use std::collections::HashMap;
@@ -17,6 +18,16 @@ use tokio::sync::RwLock;
 
 /// Total number of hash slots in Redis Cluster
 pub const CLUSTER_SLOTS: u16 = 16384;
+
+/// Format a Redis node address without making IPv6 addresses ambiguous.
+#[must_use]
+pub fn node_address_key(host: &str, port: u16) -> String {
+    if host.contains(':') && !host.starts_with('[') {
+        format!("[{host}]:{port}")
+    } else {
+        format!("{host}:{port}")
+    }
+}
 
 /// Calculate the hash slot for a given key
 ///
@@ -98,21 +109,23 @@ impl ClusterTopology {
         &self,
         slots_data: Vec<Vec<(i64, String, i64)>>,
     ) -> RedisResult<()> {
-        let mut slot_map = self.slot_map.write().await;
-        let mut nodes = self.nodes.write().await;
-
-        slot_map.clear();
-        nodes.clear();
-
+        let mut slot_map = HashMap::new();
+        let mut nodes = HashMap::new();
         for slot_info in slots_data {
             if slot_info.len() < 3 {
-                continue;
+                return Err(RedisError::Protocol(
+                    "Invalid CLUSTER SLOTS range".to_string(),
+                ));
             }
-
-            let start_slot = slot_info[0].0 as u16;
-            let end_slot = slot_info[1].0 as u16;
+            let start_slot = Self::parse_slot(slot_info[0].0)?;
+            let end_slot = Self::parse_slot(slot_info[1].0)?;
+            if end_slot < start_slot {
+                return Err(RedisError::Protocol(
+                    "CLUSTER SLOTS range ends before it starts".to_string(),
+                ));
+            }
             let master_host = slot_info[2].1.clone();
-            let master_port = slot_info[2].2 as u16;
+            let master_port = Self::parse_port(slot_info[2].2)?;
 
             // Update slot map for all slots in this range
             for slot in start_slot..=end_slot {
@@ -120,14 +133,93 @@ impl ClusterTopology {
             }
 
             // Update node information
-            let node_key = format!("{}:{}", master_host, master_port);
-            let mut node = NodeInfo::new(node_key.clone(), master_host, master_port);
+            let node_key = node_address_key(&master_host, master_port);
+            let node = nodes
+                .entry(node_key.clone())
+                .or_insert_with(|| NodeInfo::new(node_key, master_host.clone(), master_port));
             node.slots.push(SlotRange::new(start_slot, end_slot));
-            node.is_master = true;
-            nodes.insert(node_key, node);
         }
 
+        *self.slot_map.write().await = slot_map;
+        *self.nodes.write().await = nodes;
+
         Ok(())
+    }
+
+    /// Update topology from the raw RESP2 `CLUSTER SLOTS` response.
+    pub async fn update_from_cluster_slots_response(
+        &self,
+        response: &RespValue,
+    ) -> RedisResult<()> {
+        let RespValue::Array(ranges) = response else {
+            return Err(RedisError::Protocol(
+                "CLUSTER SLOTS did not return an array".to_string(),
+            ));
+        };
+
+        let mut slot_map = HashMap::new();
+        let mut nodes = HashMap::new();
+        for range in ranges {
+            let RespValue::Array(parts) = range else {
+                return Err(RedisError::Protocol(
+                    "Invalid CLUSTER SLOTS range".to_string(),
+                ));
+            };
+            if parts.len() < 3 {
+                return Err(RedisError::Protocol(
+                    "Incomplete CLUSTER SLOTS range".to_string(),
+                ));
+            }
+
+            let start_slot = Self::parse_slot(parts[0].as_int()?)?;
+            let end_slot = Self::parse_slot(parts[1].as_int()?)?;
+            if end_slot < start_slot {
+                return Err(RedisError::Protocol(
+                    "CLUSTER SLOTS range ends before it starts".to_string(),
+                ));
+            }
+
+            let RespValue::Array(master) = &parts[2] else {
+                return Err(RedisError::Protocol(
+                    "Invalid CLUSTER SLOTS master entry".to_string(),
+                ));
+            };
+            if master.len() < 2 {
+                return Err(RedisError::Protocol(
+                    "Incomplete CLUSTER SLOTS master entry".to_string(),
+                ));
+            }
+            let master_host = master[0].as_string()?;
+            let master_port = Self::parse_port(master[1].as_int()?)?;
+
+            for slot in start_slot..=end_slot {
+                slot_map.insert(slot, (master_host.clone(), master_port));
+            }
+
+            let node_key = node_address_key(&master_host, master_port);
+            let node = nodes
+                .entry(node_key.clone())
+                .or_insert_with(|| NodeInfo::new(node_key, master_host.clone(), master_port));
+            node.slots.push(SlotRange::new(start_slot, end_slot));
+        }
+
+        *self.slot_map.write().await = slot_map;
+        *self.nodes.write().await = nodes;
+        Ok(())
+    }
+
+    fn parse_slot(slot: i64) -> RedisResult<u16> {
+        if !(0..i64::from(CLUSTER_SLOTS)).contains(&slot) {
+            return Err(RedisError::Protocol(format!(
+                "Invalid Redis Cluster slot: {slot}"
+            )));
+        }
+        u16::try_from(slot).map_err(|_| RedisError::Protocol("Invalid slot".to_string()))
+    }
+
+    fn parse_port(port: i64) -> RedisResult<u16> {
+        u16::try_from(port)
+            .map_err(|_| RedisError::Protocol(format!("Invalid Redis node port: {port}")))
     }
 
     /// Get all known nodes
@@ -301,5 +393,43 @@ mod tests {
 
         // Verify topology was NOT updated for ASK
         assert!(topology.get_node_for_slot(100).await.is_none());
+    }
+
+    #[tokio::test]
+    async fn cluster_slots_response_preserves_all_ranges_for_a_node() {
+        let topology = ClusterTopology::new();
+        let response = RespValue::Array(vec![
+            RespValue::Array(vec![
+                RespValue::Integer(0),
+                RespValue::Integer(100),
+                RespValue::Array(vec![RespValue::from("127.0.0.1"), RespValue::Integer(7000)]),
+            ]),
+            RespValue::Array(vec![
+                RespValue::Integer(200),
+                RespValue::Integer(300),
+                RespValue::Array(vec![RespValue::from("127.0.0.1"), RespValue::Integer(7000)]),
+            ]),
+        ]);
+
+        topology
+            .update_from_cluster_slots_response(&response)
+            .await
+            .unwrap();
+        assert_eq!(topology.mapped_slots_count().await, 202);
+        assert_eq!(topology.get_all_nodes().await[0].slots.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn rejects_invalid_cluster_slots() {
+        let topology = ClusterTopology::new();
+        let response = RespValue::Array(vec![RespValue::Array(vec![
+            RespValue::Integer(-1),
+            RespValue::Integer(10),
+            RespValue::Array(vec![RespValue::from("127.0.0.1"), RespValue::Integer(7000)]),
+        ])]);
+        assert!(topology
+            .update_from_cluster_slots_response(&response)
+            .await
+            .is_err());
     }
 }

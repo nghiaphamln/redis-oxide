@@ -11,6 +11,8 @@ use bytes::{Buf, BufMut, Bytes, BytesMut};
 use std::io::Cursor;
 
 const CRLF: &[u8] = b"\r\n";
+const MAX_FRAME_ELEMENTS: usize = 16_384;
+const MAX_BULK_STRING_LENGTH: usize = 512 * 1024 * 1024;
 
 /// Encodes a RESP value into bytes
 pub struct RespEncoder;
@@ -194,20 +196,35 @@ impl RespDecoder {
         if len == -1 {
             return Ok(Some(RespValue::Null));
         }
+        if len < -1 {
+            return Err(RedisError::Protocol(
+                "Invalid negative bulk string length".to_string(),
+            ));
+        }
 
-        let len = len as usize;
+        let len = usize::try_from(len)
+            .map_err(|_| RedisError::Protocol("Invalid bulk string length".to_string()))?;
+        if len > MAX_BULK_STRING_LENGTH {
+            return Err(RedisError::Protocol(format!(
+                "Bulk string exceeds maximum size of {MAX_BULK_STRING_LENGTH} bytes"
+            )));
+        }
 
         // Check if we have enough data
-        if buf.remaining() < len + 2 {
+        let required = len
+            .checked_add(2)
+            .ok_or_else(|| RedisError::Protocol("Bulk string length overflow".to_string()))?;
+        if buf.remaining() < required {
             return Ok(None);
         }
 
         let data = buf.chunk()[..len].to_vec();
         buf.advance(len);
 
-        // Skip CRLF
-        if buf.remaining() < 2 {
-            return Ok(None);
+        if &buf.chunk()[..2] != CRLF {
+            return Err(RedisError::Protocol(
+                "Missing CRLF after bulk string".to_string(),
+            ));
         }
         buf.advance(2);
 
@@ -231,8 +248,19 @@ impl RespDecoder {
         if len == -1 {
             return Ok(Some(RespValue::Null));
         }
+        if len < -1 {
+            return Err(RedisError::Protocol(
+                "Invalid negative array length".to_string(),
+            ));
+        }
 
-        let len = len as usize;
+        let len = usize::try_from(len)
+            .map_err(|_| RedisError::Protocol("Invalid array length".to_string()))?;
+        if len > MAX_FRAME_ELEMENTS {
+            return Err(RedisError::Protocol(format!(
+                "Array exceeds maximum element count of {MAX_FRAME_ELEMENTS}"
+            )));
+        }
         let mut arr = Vec::with_capacity(len);
 
         for _ in 0..len {
@@ -403,6 +431,15 @@ mod tests {
         let mut cursor = Cursor::new(&data[..]);
         let result = RespDecoder::decode(&mut cursor).unwrap();
         assert!(result.is_none());
+    }
+
+    #[test]
+    fn rejects_invalid_bulk_lengths_and_terminators() {
+        let mut negative = Cursor::new(&b"$-2\r\n"[..]);
+        assert!(RespDecoder::decode(&mut negative).is_err());
+
+        let mut invalid_terminator = Cursor::new(&b"$3\r\nfooXX"[..]);
+        assert!(RespDecoder::decode(&mut invalid_terminator).is_err());
     }
 
     #[test]

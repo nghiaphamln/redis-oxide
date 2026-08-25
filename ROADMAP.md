@@ -5,7 +5,7 @@ commitment.
 
 ## Current Release Line
 
-The active release line is `0.2`. See `CHANGELOG.md` and crates.io for the
+The active development line is `0.3.0-alpha.1`. See `CHANGELOG.md` and crates.io for the
 latest published patch version.
 
 The current release supports:

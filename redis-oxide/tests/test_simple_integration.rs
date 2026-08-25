@@ -201,8 +201,6 @@ async fn test_error_types() -> Result<(), Box<dyn std::error::Error>> {
 
 #[tokio::test]
 async fn test_resp3_value_types() -> Result<(), Box<dyn std::error::Error>> {
-    use std::collections::HashSet;
-
     // Test basic types
     let bool_val = Resp3Value::Boolean(true);
     assert_eq!(bool_val.type_name(), "boolean");
@@ -217,17 +215,13 @@ async fn test_resp3_value_types() -> Result<(), Box<dyn std::error::Error>> {
     assert_eq!(big_num.as_string()?, "123456789012345678901234567890");
 
     // Test complex types
-    let mut map = HashMap::new();
-    map.insert(
-        "key".to_string(),
-        Resp3Value::SimpleString("value".to_string()),
-    );
-    let map_val = Resp3Value::Map(map);
+    let map_val = Resp3Value::Map(vec![(
+        Resp3Value::SimpleString("key".into()),
+        Resp3Value::SimpleString("value".into()),
+    )]);
     assert_eq!(map_val.type_name(), "map");
 
-    let mut set = HashSet::new();
-    set.insert(Resp3Value::SimpleString("item".to_string()));
-    let set_val = Resp3Value::Set(set);
+    let set_val = Resp3Value::Set(vec![Resp3Value::SimpleString("item".into())]);
     assert_eq!(set_val.type_name(), "set");
 
     // Test null
@@ -324,8 +318,8 @@ async fn test_sentinel_types() -> Result<(), Box<dyn std::error::Error>> {
 
     // Test SentinelConfig
     let config = SentinelConfig::new("mymaster")
-        .add_sentinel("127.0.0.1:26379")
-        .add_sentinel("127.0.0.1:26380")
+        .add_sentinel("127.0.0.1:26379")?
+        .add_sentinel("127.0.0.1:26380")?
         .with_password("secret")
         .with_failover_timeout(Duration::from_secs(30))
         .with_max_retries(5);
