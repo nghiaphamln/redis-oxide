@@ -20,11 +20,14 @@ services:
   cluster-init:
     image: redis:7-alpine
     depends_on: [cluster-1, cluster-2, cluster-3]
-    entrypoint: ["/bin/sh", "-c"]
-    command: >-
-      until redis-cli -h cluster-1 -p 7000 ping; do sleep 1; done;
-      redis-cli --cluster create cluster-1:7000 cluster-2:7001 cluster-3:7002
-      --cluster-replicas 0 --cluster-yes
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - |
+        until redis-cli -h cluster-1 -p 7000 ping; do
+          sleep 1
+        done
+        exec redis-cli --cluster create cluster-1:7000 cluster-2:7001 cluster-3:7002 \
+          --cluster-replicas 0 --cluster-yes
 
   redis-master:
     image: redis:7-alpine
