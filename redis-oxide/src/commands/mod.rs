@@ -5,7 +5,6 @@
 
 pub mod hash;
 pub mod list;
-pub mod optimized;
 pub mod set;
 pub mod sorted_set;
 

@@ -32,7 +32,7 @@ Add dependencies:
 
 ```toml
 [dependencies]
-redis-oxide = "0.2"
+redis-oxide = "0.3.0-alpha.1"
 tokio = { version = "1", features = ["full"] }
 ```
 

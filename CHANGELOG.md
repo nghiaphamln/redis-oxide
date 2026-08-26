@@ -5,6 +5,20 @@ All notable changes to this project are documented in this file.
 The format is based on Keep a Changelog, and this project uses semantic
 versioning while the public API is still stabilizing.
 
+## [0.3.0-alpha.1] - Unreleased
+
+### Breaking changes
+
+- Removed the unfinished optimized pool, command-builder, and RESP2 codec
+  modules. The crate now has one supported transport and pooling path.
+- RESP3 maps, sets, attributes, and blob values now preserve wire-format data
+  without lossy string-only keys or UTF-8 coercion.
+
+### Fixed
+
+- Hardened connection lifecycle, pooling, stateful command isolation, and
+  configuration handling ahead of the 0.3 release.
+
 ## [0.2.6] - 2026-05-14
 
 ### Fixed

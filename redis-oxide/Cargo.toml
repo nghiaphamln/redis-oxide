@@ -42,9 +42,6 @@ tracing.workspace = true
 # Cluster support
 crc16.workspace = true
 
-# Connection pooling
-deadpool.workspace = true
-
 # Serialization
 serde.workspace = true
 
@@ -62,8 +59,9 @@ socket2 = "0.6.1"
 itoa = "1.0"
 
 [dev-dependencies]
-tokio-test = "0.4.4"
 criterion = "0.7.0"
+# Criterion's CLI dependency must remain parseable by Cargo 1.82 (our MSRV).
+clap = "=4.5.53"
 tracing-subscriber = "0.3.18"
 futures = "0.3"
 

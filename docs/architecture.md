@@ -35,13 +35,20 @@ bulk string forms.
 
 ### Connections and Pools
 
-The connection layer owns TCP I/O and command execution. Pooling supports:
+The connection layer owns TCP I/O, RESP negotiation, authentication, database
+selection, and command execution. Pooling supports:
 
-- multiplexed strategy: one shared connection with serialized command handling
-- pool strategy: multiple Redis connections guarded by a semaphore
+- multiplexed strategy: one connected worker with a bounded command queue
+- pool strategy: multiple Redis connections guarded by a permit held for the
+  complete checkout
 
-Cluster mode keeps per-node pools and routes commands by hash slot when a key is
-available.
+Connections that time out or fail protocol decoding are discarded rather than
+returned to the pool. Transactions and subscribers always use dedicated
+connections, so Redis session state cannot leak into unrelated commands.
+
+Cluster mode bootstraps its slot map with `CLUSTER SLOTS`, keeps per-node pools,
+and routes commands by hash slot. `ASKING` and its redirected command share one
+physical connection.
 
 ### Advanced Features
 
@@ -81,7 +88,8 @@ The test suite covers:
 - scripts
 - streams
 - pipelines and transactions
-- RESP3 parsing and negotiation helpers
+- RESP3 negotiation and live client operation
+- Redis Cluster and Sentinel topology fixtures in CI
 
 Integration tests expect Redis on `localhost:6379`, or a compatible `REDIS_URL`
 environment variable.

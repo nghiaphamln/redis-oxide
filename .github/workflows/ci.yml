@@ -81,6 +81,16 @@ jobs:
   test:
     name: Test Suite
     runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
@@ -96,10 +106,8 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-${{ runner.arch }}-cargo-${{ github.job }}-
             ${{ runner.os }}-${{ runner.arch }}-cargo-
-      - name: Run unit tests
-        run: cargo test --lib --all-features
-      # Note: Integration tests require a running Redis instance
-      # They can be run locally with: REDIS_URL=redis://localhost:6379 cargo test --test '*'
+      - name: Run unit and standalone integration tests
+        run: cargo test --workspace --all-targets --all-features
       - name: Run doc tests
         run: cargo test --doc --all-features
 
@@ -134,7 +142,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.82.0
       - uses: actions/cache@v5
         with:
           path: |
@@ -147,8 +157,44 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-${{ runner.arch }}-cargo-${{ github.job }}-
             ${{ runner.os }}-${{ runner.arch }}-cargo-
-      - name: Check with latest stable (ecosystem issue with edition2024)
+      - name: Check minimum supported Rust version
         run: cargo check --all-targets --all-features
+
+  topology-e2e:
+    name: Cluster and Sentinel E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Start Redis Cluster
+        run: |
+          docker compose -f redis-oxide/tests/fixtures/redis-topologies.compose.yml up -d cluster-1 cluster-2 cluster-3
+          docker compose -f redis-oxide/tests/fixtures/redis-topologies.compose.yml run --rm cluster-init
+      - name: Test Redis Cluster
+        run: cargo test --test test_topology_e2e cluster_bootstraps_slots_and_routes_multiple_keys -- --ignored
+        env:
+          REDIS_CLUSTER_URL: redis://127.0.0.1:7000,127.0.0.1:7001,127.0.0.1:7002
+      - name: Start Redis Sentinel
+        run: |
+          docker compose -f redis-oxide/tests/fixtures/redis-topologies.compose.yml up -d redis-master redis-replica sentinel-1 sentinel-2 sentinel-3
+          for _ in {1..30}; do
+            if docker compose -f redis-oxide/tests/fixtures/redis-topologies.compose.yml exec -T sentinel-1 redis-cli -p 26379 sentinel get-master-addr-by-name mymaster; then
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "Sentinel did not become ready within 30 seconds" >&2
+          exit 1
+      - name: Test Redis Sentinel
+        run: |
+          cargo test --test test_topology_e2e sentinel_discovers_a_master_for_client_operations -- --ignored
+          cargo test --test test_topology_e2e sentinel_client_refreshes_after_master_failover -- --ignored
+        env:
+          REDIS_SENTINEL_ENDPOINTS: 127.0.0.1:26379,127.0.0.1:26380,127.0.0.1:26381
+      - name: Stop topology fixtures
+        if: always()
+        run: docker compose -f redis-oxide/tests/fixtures/redis-topologies.compose.yml down -v
 
   security:
     name: Security Audit
@@ -158,8 +204,8 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - name: Install cargo-deny
         run: cargo install cargo-deny
-      - name: Security audit with deny.toml exceptions
-        run: cargo deny check advisories
+      - name: Security and policy audit
+        run: cargo deny check
 
   docs:
     name: Documentation
@@ -218,6 +264,6 @@ jobs:
           cargo build --examples --all-features
       - name: Run basic examples
         run: |
-          timeout 30s cargo run --example basic_usage || true
+          timeout 30s cargo run -p redis-oxide --example basic_usage
         env:
           REDIS_URL: redis://localhost:6379

@@ -14,9 +14,9 @@
 //! # #[tokio::main]
 //! # async fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! let sentinel_config = SentinelConfig::new("mymaster")
-//!     .add_sentinel("127.0.0.1:26379")
-//!     .add_sentinel("127.0.0.1:26380")
-//!     .add_sentinel("127.0.0.1:26381")
+//!     .add_sentinel("127.0.0.1:26379")?
+//!     .add_sentinel("127.0.0.1:26380")?
+//!     .add_sentinel("127.0.0.1:26381")?
 //!     .with_password("sentinel_password");
 //!
 //! let config = ConnectionConfig::new_with_sentinel(sentinel_config);
@@ -37,7 +37,7 @@
 //! # #[tokio::main]
 //! # async fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! let sentinel_config = SentinelConfig::new("mymaster")
-//!     .add_sentinel("127.0.0.1:26379")
+//!     .add_sentinel("127.0.0.1:26379")?
 //!     .with_failover_timeout(Duration::from_secs(30));
 //!
 //! let config = ConnectionConfig::new_with_sentinel(sentinel_config);
@@ -114,18 +114,34 @@ impl SentinelEndpoint {
     ///
     /// Returns an error if the address format is invalid.
     pub fn from_address(addr: &str) -> RedisResult<Self> {
-        let parts: Vec<&str> = addr.split(':').collect();
-        if parts.len() != 2 {
-            return Err(RedisError::Config(format!(
-                "Invalid sentinel address: {}",
-                addr
-            )));
+        if let Some(rest) = addr.strip_prefix('[') {
+            let (host, remainder) = rest
+                .split_once(']')
+                .ok_or_else(|| RedisError::Config(format!("Invalid sentinel address: {addr}")))?;
+            let port = remainder
+                .strip_prefix(':')
+                .ok_or_else(|| RedisError::Config(format!("Invalid sentinel address: {addr}")))?
+                .parse::<u16>()
+                .map_err(|_| RedisError::Config(format!("Invalid sentinel port: {addr}")))?;
+            return Ok(Self::new(host, port));
         }
 
-        let host = parts[0].to_string();
-        let port = parts[1].parse::<u16>().map_err(|_| {
-            RedisError::Config(format!("Invalid port in sentinel address: {}", addr))
-        })?;
+        if addr.matches(':').count() != 1 {
+            return Err(RedisError::Config(format!(
+                "Sentinel IPv6 addresses must use brackets: {addr}"
+            )));
+        }
+        let (host, port) = addr
+            .rsplit_once(':')
+            .ok_or_else(|| RedisError::Config(format!("Invalid sentinel address: {addr}")))?;
+        if host.is_empty() {
+            return Err(RedisError::Config(format!(
+                "Invalid sentinel address: {addr}"
+            )));
+        }
+        let port = port
+            .parse::<u16>()
+            .map_err(|_| RedisError::Config(format!("Invalid sentinel port: {addr}")))?;
 
         Ok(Self::new(host, port))
     }
@@ -133,7 +149,7 @@ impl SentinelEndpoint {
     /// Get the address string
     #[must_use]
     pub fn address(&self) -> String {
-        format!("{}:{}", self.host, self.port)
+        format_address(&self.host, self.port)
     }
 }
 
@@ -152,12 +168,10 @@ impl SentinelConfig {
     }
 
     /// Add a sentinel endpoint
-    #[must_use]
-    pub fn add_sentinel(mut self, addr: impl AsRef<str>) -> Self {
-        if let Ok(endpoint) = SentinelEndpoint::from_address(addr.as_ref()) {
-            self.sentinels.push(endpoint);
-        }
-        self
+    pub fn add_sentinel(mut self, addr: impl AsRef<str>) -> RedisResult<Self> {
+        self.sentinels
+            .push(SentinelEndpoint::from_address(addr.as_ref())?);
+        Ok(self)
     }
 
     /// Set sentinel password
@@ -228,7 +242,15 @@ impl MasterInfo {
     /// Get master address
     #[must_use]
     pub fn address(&self) -> String {
-        format!("{}:{}", self.host, self.port)
+        format_address(&self.host, self.port)
+    }
+}
+
+fn format_address(host: &str, port: u16) -> String {
+    if host.contains(':') && !host.starts_with('[') {
+        format!("[{host}]:{port}")
+    } else {
+        format!("{host}:{port}")
     }
 }
 
@@ -273,19 +295,19 @@ impl SentinelClient {
     ///
     /// Returns an error if no master is available.
     pub async fn get_master(&self) -> RedisResult<MasterInfo> {
-        // Check if we need to refresh master info
-        {
-            let last_check = self.last_check.lock().await;
-            if last_check.elapsed() < self.config.check_interval {
-                if let Some(master) = self.current_master.read().await.clone() {
-                    return Ok(master);
-                }
+        let is_fresh = self.last_check.lock().await.elapsed() < self.config.check_interval;
+        if is_fresh {
+            if let Some(master) = self.current_master.read().await.clone() {
+                return Ok(master);
             }
         }
 
-        // Refresh master info
-        self.discover_master().await?;
+        self.refresh_master().await
+    }
 
+    /// Force discovery of the current Sentinel master.
+    pub async fn refresh_master(&self) -> RedisResult<MasterInfo> {
+        self.discover_master().await?;
         self.current_master
             .read()
             .await
@@ -299,12 +321,19 @@ impl SentinelClient {
     ///
     /// Returns an error if master connection fails.
     pub async fn connect_to_master(&self) -> RedisResult<RedisConnection> {
+        self.connect_to_master_with_config(ConnectionConfig::default())
+            .await
+    }
+
+    /// Create a connection to the current master using caller configuration.
+    pub async fn connect_to_master_with_config(
+        &self,
+        mut config: ConnectionConfig,
+    ) -> RedisResult<RedisConnection> {
         let master = self.get_master().await?;
-
-        let master_config =
-            ConnectionConfig::new(&format!("redis://{}:{}", master.host, master.port));
-
-        RedisConnection::connect(&master.host, master.port, master_config).await
+        config.sentinel = None;
+        config.connection_string = format!("redis://{}", master.address());
+        RedisConnection::connect(&master.host, master.port, config).await
     }
 
     /// Monitor for master changes and failovers
@@ -364,7 +393,7 @@ impl SentinelClient {
             ]);
 
             conn.send_command(&auth_cmd).await?;
-            let _response = conn.read_response().await?;
+            RedisConnection::into_command_result(conn.read_response_with_timeout().await?)?;
         }
 
         Ok(conn)
@@ -581,7 +610,9 @@ mod tests {
     fn test_sentinel_config_builder() {
         let config = SentinelConfig::new("mymaster")
             .add_sentinel("127.0.0.1:26379")
+            .unwrap()
             .add_sentinel("127.0.0.1:26380")
+            .unwrap()
             .with_password("secret")
             .with_failover_timeout(Duration::from_secs(60))
             .with_max_retries(5);
@@ -620,7 +651,9 @@ mod tests {
 
     #[test]
     fn test_connection_config_with_sentinel() {
-        let sentinel_config = SentinelConfig::new("mymaster").add_sentinel("127.0.0.1:26379");
+        let sentinel_config = SentinelConfig::new("mymaster")
+            .add_sentinel("127.0.0.1:26379")
+            .unwrap();
 
         let config = ConnectionConfig::new_with_sentinel(sentinel_config);
         assert!(config.sentinel.is_some());

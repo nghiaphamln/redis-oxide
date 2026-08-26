@@ -6,7 +6,6 @@
 #![allow(clippy::float_cmp)]
 
 use redis_oxide::{Client, ConnectionConfig, ProtocolVersion, Resp3Value};
-use std::collections::{HashMap, HashSet};
 
 fn redis_url() -> String {
     std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://localhost:6379".to_string())
@@ -46,23 +45,23 @@ async fn test_resp3_basic_data_types() -> Result<(), Box<dyn std::error::Error>>
     assert_eq!(double_val, decoded);
 
     // Test Map
-    let mut map = HashMap::new();
-    map.insert(
-        "key1".to_string(),
-        Resp3Value::SimpleString("value1".to_string()),
-    );
-    map.insert("key2".to_string(), Resp3Value::Number(42));
-    let map_val = Resp3Value::Map(map);
+    let map_val = Resp3Value::Map(vec![
+        (
+            Resp3Value::SimpleString("key1".into()),
+            Resp3Value::SimpleString("value1".into()),
+        ),
+        (Resp3Value::Number(2), Resp3Value::Number(42)),
+    ]);
     let encoded = encoder.encode(&map_val)?;
     let decoded = decoder.decode(&encoded)?;
     assert_eq!(map_val, decoded);
 
     // Test Set
-    let mut set = HashSet::new();
-    set.insert(Resp3Value::SimpleString("item1".to_string()));
-    set.insert(Resp3Value::SimpleString("item2".to_string()));
-    set.insert(Resp3Value::Number(123));
-    let set_val = Resp3Value::Set(set);
+    let set_val = Resp3Value::Set(vec![
+        Resp3Value::SimpleString("item1".into()),
+        Resp3Value::SimpleString("item2".into()),
+        Resp3Value::Number(123),
+    ]);
     let encoded = encoder.encode(&set_val)?;
     let decoded = decoder.decode(&encoded)?;
     assert_eq!(set_val, decoded);
@@ -122,16 +121,20 @@ async fn test_resp3_attribute() -> Result<(), Box<dyn std::error::Error>> {
     let mut decoder = Resp3Decoder::new();
 
     // Test Attribute
-    let mut attrs = HashMap::new();
-    attrs.insert("ttl".to_string(), Resp3Value::Number(3600));
-    attrs.insert(
-        "type".to_string(),
-        Resp3Value::SimpleString("string".to_string()),
-    );
+    let attrs = vec![
+        (
+            Resp3Value::SimpleString("ttl".into()),
+            Resp3Value::Number(3600),
+        ),
+        (
+            Resp3Value::SimpleString("type".into()),
+            Resp3Value::SimpleString("string".into()),
+        ),
+    ];
 
     let attr_val = Resp3Value::Attribute {
         attrs,
-        data: Box::new(Resp3Value::BlobString("actual_data".to_string())),
+        data: Box::new(Resp3Value::BlobString("actual_data".into())),
     };
 
     let encoded = encoder.encode(&attr_val)?;
@@ -153,7 +156,7 @@ async fn test_resp3_push_type() -> Result<(), Box<dyn std::error::Error>> {
         Resp3Value::SimpleString("pubsub".to_string()),
         Resp3Value::SimpleString("message".to_string()),
         Resp3Value::SimpleString("channel1".to_string()),
-        Resp3Value::BlobString("Hello from channel!".to_string()),
+        Resp3Value::BlobString("Hello from channel!".into()),
     ]);
 
     let encoded = encoder.encode(&push_val)?;
@@ -183,7 +186,7 @@ async fn test_resp3_null_handling() -> Result<(), Box<dyn std::error::Error>> {
 #[tokio::test]
 async fn test_resp3_value_conversions() -> Result<(), Box<dyn std::error::Error>> {
     // Test string conversion
-    let str_val = Resp3Value::BlobString("hello".to_string());
+    let str_val = Resp3Value::BlobString("hello".into());
     assert_eq!(str_val.as_string()?, "hello");
 
     let simple_str = Resp3Value::SimpleString("world".to_string());
@@ -232,14 +235,10 @@ async fn test_resp3_resp2_compatibility() -> Result<(), Box<dyn std::error::Erro
         _ => panic!("Expected integer 1"),
     }
 
-    let resp3_map = {
-        let mut map = HashMap::new();
-        map.insert(
-            "key".to_string(),
-            Resp3Value::SimpleString("value".to_string()),
-        );
-        Resp3Value::Map(map)
-    };
+    let resp3_map = Resp3Value::Map(vec![(
+        Resp3Value::SimpleString("key".into()),
+        Resp3Value::SimpleString("value".into()),
+    )]);
     let resp2_val: RespValue = resp3_map.into();
     match resp2_val {
         RespValue::Array(arr) => {
@@ -270,11 +269,9 @@ async fn test_resp3_type_names() -> Result<(), Box<dyn std::error::Error>> {
     assert_eq!(Resp3Value::Double(3.14).type_name(), "double");
     assert_eq!(Resp3Value::Null.type_name(), "null");
 
-    let map = HashMap::new();
-    assert_eq!(Resp3Value::Map(map).type_name(), "map");
+    assert_eq!(Resp3Value::Map(vec![]).type_name(), "map");
 
-    let set = HashSet::new();
-    assert_eq!(Resp3Value::Set(set).type_name(), "set");
+    assert_eq!(Resp3Value::Set(vec![]).type_name(), "set");
 
     assert_eq!(
         Resp3Value::BigNumber("123".to_string()).type_name(),
@@ -298,24 +295,36 @@ async fn test_resp3_complex_nested_structures() -> Result<(), Box<dyn std::error
     let mut decoder = Resp3Decoder::new();
 
     // Create a complex nested structure
-    let mut inner_map = HashMap::new();
-    inner_map.insert("nested_key".to_string(), Resp3Value::Boolean(true));
-    inner_map.insert(
-        "nested_number".to_string(),
-        Resp3Value::Double(std::f64::consts::E),
-    );
+    let inner_map = vec![
+        (
+            Resp3Value::SimpleString("nested_key".into()),
+            Resp3Value::Boolean(true),
+        ),
+        (
+            Resp3Value::SimpleString("nested_number".into()),
+            Resp3Value::Double(std::f64::consts::E),
+        ),
+    ];
 
-    let mut inner_set = HashSet::new();
-    inner_set.insert(Resp3Value::SimpleString("set_item1".to_string()));
-    inner_set.insert(Resp3Value::Number(999));
+    let inner_set = vec![
+        Resp3Value::SimpleString("set_item1".into()),
+        Resp3Value::Number(999),
+    ];
 
-    let mut outer_map = HashMap::new();
-    outer_map.insert("inner_map".to_string(), Resp3Value::Map(inner_map));
-    outer_map.insert("inner_set".to_string(), Resp3Value::Set(inner_set));
-    outer_map.insert(
-        "simple_value".to_string(),
-        Resp3Value::BlobString("simple".to_string()),
-    );
+    let outer_map = vec![
+        (
+            Resp3Value::SimpleString("inner_map".into()),
+            Resp3Value::Map(inner_map),
+        ),
+        (
+            Resp3Value::SimpleString("inner_set".into()),
+            Resp3Value::Set(inner_set),
+        ),
+        (
+            Resp3Value::SimpleString("simple_value".into()),
+            Resp3Value::BlobString("simple".into()),
+        ),
+    ];
 
     let complex_val = Resp3Value::Array(vec![
         Resp3Value::Map(outer_map),
@@ -351,7 +360,7 @@ async fn test_resp3_error_types() -> Result<(), Box<dyn std::error::Error>> {
     assert_eq!(simple_error, decoded);
 
     // Test BlobError
-    let blob_error = Resp3Value::BlobError("SYNTAX invalid command syntax".to_string());
+    let blob_error = Resp3Value::BlobError("SYNTAX invalid command syntax".into());
     let encoded = encoder.encode(&blob_error)?;
     let decoded = decoder.decode(&encoded)?;
     assert_eq!(blob_error, decoded);
@@ -389,7 +398,7 @@ async fn test_resp3_encoding_edge_cases() -> Result<(), Box<dyn std::error::Erro
     let mut decoder = Resp3Decoder::new();
 
     // Test empty string
-    let empty_str = Resp3Value::BlobString(String::new());
+    let empty_str = Resp3Value::BlobString(bytes::Bytes::new());
     let encoded = encoder.encode(&empty_str)?;
     let decoded = decoder.decode(&encoded)?;
     assert_eq!(empty_str, decoded);
@@ -401,13 +410,13 @@ async fn test_resp3_encoding_edge_cases() -> Result<(), Box<dyn std::error::Erro
     assert_eq!(empty_array, decoded);
 
     // Test empty map
-    let empty_map = Resp3Value::Map(HashMap::new());
+    let empty_map = Resp3Value::Map(vec![]);
     let encoded = encoder.encode(&empty_map)?;
     let decoded = decoder.decode(&encoded)?;
     assert_eq!(empty_map, decoded);
 
     // Test empty set
-    let empty_set = Resp3Value::Set(HashSet::new());
+    let empty_set = Resp3Value::Set(vec![]);
     let encoded = encoder.encode(&empty_set)?;
     let decoded = decoder.decode(&encoded)?;
     assert_eq!(empty_set, decoded);
@@ -438,23 +447,14 @@ async fn test_resp3_encoding_edge_cases() -> Result<(), Box<dyn std::error::Erro
 }
 
 #[tokio::test]
-async fn test_resp3_hash_and_equality() -> Result<(), Box<dyn std::error::Error>> {
-    use std::collections::HashSet;
-
-    // Test that equal values have the same hash
+async fn test_resp3_equality() -> Result<(), Box<dyn std::error::Error>> {
     let val1 = Resp3Value::SimpleString("test".to_string());
     let val2 = Resp3Value::SimpleString("test".to_string());
     assert_eq!(val1, val2);
 
-    // Test in HashSet
-    let mut set = HashSet::new();
-    set.insert(val1);
-    set.insert(val2); // Should not increase size due to equality
-    assert_eq!(set.len(), 1);
-
     // Test different types with same content
     let simple_str = Resp3Value::SimpleString("hello".to_string());
-    let blob_str = Resp3Value::BlobString("hello".to_string());
+    let blob_str = Resp3Value::BlobString("hello".into());
     assert_ne!(simple_str, blob_str); // Different types should not be equal
 
     // Test boolean values

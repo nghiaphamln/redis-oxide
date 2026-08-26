@@ -60,6 +60,14 @@ pub trait TransactionCommand: Send + Sync {
 /// Trait for executing transactions
 #[async_trait::async_trait]
 pub trait TransactionExecutor {
+    /// Select and reserve the connection that will own this transaction.
+    ///
+    /// Standalone implementations may treat this as a no-op. Cluster
+    /// implementations must reject keys that do not share a slot.
+    async fn prepare(&mut self, _keys: &[String]) -> RedisResult<()> {
+        Ok(())
+    }
+
     /// Start a transaction with MULTI
     async fn multi(&mut self) -> RedisResult<()>;
 
@@ -122,6 +130,7 @@ impl Transaction {
         }
 
         let mut connection = self.connection.lock().await;
+        connection.prepare(&keys).await?;
         connection.watch(keys.clone()).await?;
         self.watched_keys.extend(keys);
         Ok(())
@@ -286,6 +295,10 @@ impl Transaction {
 
         let mut connection = self.connection.lock().await;
 
+        let mut transaction_keys = self.watched_keys.clone();
+        transaction_keys.extend(self.commands.iter().filter_map(|command| command.key()));
+        connection.prepare(&transaction_keys).await?;
+
         // Start transaction if not already started
         if !self.is_started {
             connection.multi().await?;
@@ -295,14 +308,24 @@ impl Transaction {
         // Queue all commands
         let commands: Vec<Box<dyn TransactionCommand>> = self.commands.drain(..).collect();
         for command in commands {
-            connection.queue_command(command).await?;
+            if let Err(error) = connection.queue_command(command).await {
+                let _ = connection.discard().await;
+                self.is_started = false;
+                return Err(error);
+            }
         }
 
         // Execute the transaction
-        let results = connection.exec().await?;
-        self.is_started = false;
-
-        Ok(results)
+        match connection.exec().await {
+            Ok(results) => {
+                self.is_started = false;
+                Ok(results)
+            }
+            Err(error) => {
+                self.is_started = false;
+                Err(error)
+            }
+        }
     }
 
     /// Discard the transaction
