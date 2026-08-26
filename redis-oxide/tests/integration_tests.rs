@@ -3,8 +3,6 @@
 //! These tests require a running Redis instance.
 //! Set `REDIS_URL` environment variable or use default `<redis://localhost:6379>`
 
-#![allow(clippy::uninlined_format_args)]
-
 use redis_oxide::{Client, ConnectionConfig, PoolConfig, PoolStrategy};
 use std::time::Duration;
 
@@ -188,7 +186,7 @@ async fn test_del_multiple() {
     // Set multiple keys
     for i in 1..=5 {
         client
-            .set(format!("test:del:{}", i), format!("value{}", i))
+            .set(format!("test:del:{i}"), format!("value{i}"))
             .await
             .expect("SET failed");
     }
@@ -265,8 +263,8 @@ async fn test_multiplexed_pool() {
     let mut tasks = vec![];
     for i in 0..10 {
         let client_clone = client.clone();
-        let key = format!("test:mux:{}", i);
-        let value = format!("value{}", i);
+        let key = format!("test:mux:{i}");
+        let value = format!("value{i}");
         tasks.push(async move {
             client_clone.set(&key, &value).await?;
             client_clone.get(&key).await
@@ -277,7 +275,7 @@ async fn test_multiplexed_pool() {
     assert_eq!(results.len(), 10);
 
     // Cleanup
-    let keys: Vec<String> = (0..10).map(|i| format!("test:mux:{}", i)).collect();
+    let keys: Vec<String> = (0..10).map(|i| format!("test:mux:{i}")).collect();
     client.del(keys).await.ok();
 }
 
@@ -297,8 +295,8 @@ async fn test_connection_pool() {
     let mut tasks = vec![];
     for i in 0..10 {
         let client_clone = client.clone();
-        let key = format!("test:pool:{}", i);
-        let value = format!("value{}", i);
+        let key = format!("test:pool:{i}");
+        let value = format!("value{i}");
         tasks.push(async move {
             client_clone.set(&key, &value).await?;
             client_clone.get(&key).await
@@ -309,7 +307,7 @@ async fn test_connection_pool() {
     assert_eq!(results.len(), 10);
 
     // Cleanup
-    let keys: Vec<String> = (0..10).map(|i| format!("test:pool:{}", i)).collect();
+    let keys: Vec<String> = (0..10).map(|i| format!("test:pool:{i}")).collect();
     client.del(keys).await.ok();
 }
 
@@ -338,5 +336,5 @@ async fn test_topology_detection() {
 
     // Just verify we can detect topology
     let topology = client.topology_type();
-    println!("Detected topology: {:?}", topology);
+    println!("Detected topology: {topology:?}");
 }

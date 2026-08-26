@@ -76,6 +76,12 @@ use crate::core::{
 use std::collections::HashMap;
 use std::time::Duration;
 
+const STREAM_INFO_LENGTH: &str = "length";
+const STREAM_INFO_GROUPS: &str = "groups";
+const STREAM_INFO_FIRST_ENTRY: &str = "first-entry";
+const STREAM_INFO_LAST_ENTRY: &str = "last-entry";
+const STREAM_INFO_LAST_GENERATED_ID: &str = "last-generated-id";
+
 /// Represents a single entry in a Redis Stream
 #[derive(Debug, Clone)]
 pub struct StreamEntry {
@@ -87,7 +93,8 @@ pub struct StreamEntry {
 
 impl StreamEntry {
     /// Create a new stream entry
-    pub fn new(id: String, fields: HashMap<String, String>) -> Self {
+    #[must_use]
+    pub const fn new(id: String, fields: HashMap<String, String>) -> Self {
         Self { id, fields }
     }
 
@@ -210,12 +217,14 @@ impl StreamRange {
     }
 
     /// Set the maximum number of entries to return
-    pub fn with_count(mut self, count: u64) -> Self {
+    #[must_use]
+    pub const fn with_count(mut self, count: u64) -> Self {
         self.count = Some(count);
         self
     }
 
     /// Create a range for all entries
+    #[must_use]
     pub fn all() -> Self {
         Self::new("-", "+")
     }
@@ -243,7 +252,7 @@ pub struct ReadOptions {
 impl ReadOptions {
     /// Create new read options
     #[must_use]
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self {
             count: None,
             block: None,
@@ -251,24 +260,28 @@ impl ReadOptions {
     }
 
     /// Set the maximum number of entries per stream
-    pub fn with_count(mut self, count: u64) -> Self {
+    #[must_use]
+    pub const fn with_count(mut self, count: u64) -> Self {
         self.count = Some(count);
         self
     }
 
     /// Set the block timeout
-    pub fn with_block(mut self, timeout: Duration) -> Self {
+    #[must_use]
+    pub const fn with_block(mut self, timeout: Duration) -> Self {
         self.block = Some(timeout);
         self
     }
 
     /// Create blocking read options
-    pub fn blocking(timeout: Duration) -> Self {
+    #[must_use]
+    pub const fn blocking(timeout: Duration) -> Self {
         Self::new().with_block(timeout)
     }
 
     /// Create non-blocking read options with count limit
-    pub fn non_blocking(count: u64) -> Self {
+    #[must_use]
+    pub const fn non_blocking(count: u64) -> Self {
         Self::new().with_count(count)
     }
 }
@@ -280,6 +293,10 @@ impl Default for ReadOptions {
 }
 
 /// Parse stream entries from Redis response
+///
+/// # Errors
+///
+/// Returns an error if the operation cannot be completed.
 pub fn parse_stream_entries(response: RespValue) -> RedisResult<Vec<StreamEntry>> {
     match response {
         RespValue::Array(items) => {
@@ -315,8 +332,7 @@ pub fn parse_stream_entries(response: RespValue) -> RedisResult<Vec<StreamEntry>
                     }
                     _ => {
                         return Err(RedisError::Type(format!(
-                            "Invalid stream entry format: {:?}",
-                            item
+                            "Invalid stream entry format: {item:?}"
                         )))
                     }
                 }
@@ -325,13 +341,16 @@ pub fn parse_stream_entries(response: RespValue) -> RedisResult<Vec<StreamEntry>
             Ok(entries)
         }
         _ => Err(RedisError::Type(format!(
-            "Expected array for stream entries, got: {:?}",
-            response
+            "Expected array for stream entries, got: {response:?}"
         ))),
     }
 }
 
 /// Parse XREAD/XREADGROUP response
+///
+/// # Errors
+///
+/// Returns an error if the operation cannot be completed.
 pub fn parse_xread_response(response: RespValue) -> RedisResult<HashMap<String, Vec<StreamEntry>>> {
     match response {
         RespValue::Array(streams) => {
@@ -346,8 +365,7 @@ pub fn parse_xread_response(response: RespValue) -> RedisResult<HashMap<String, 
                     }
                     _ => {
                         return Err(RedisError::Type(format!(
-                            "Invalid XREAD response format: {:?}",
-                            stream
+                            "Invalid XREAD response format: {stream:?}"
                         )))
                     }
                 }
@@ -357,13 +375,16 @@ pub fn parse_xread_response(response: RespValue) -> RedisResult<HashMap<String, 
         }
         RespValue::Null => Ok(HashMap::new()), // No new entries
         _ => Err(RedisError::Type(format!(
-            "Expected array or null for XREAD response, got: {:?}",
-            response
+            "Expected array or null for XREAD response, got: {response:?}"
         ))),
     }
 }
 
 /// Parse stream info from XINFO STREAM response
+///
+/// # Errors
+///
+/// Returns an error if the operation cannot be completed.
 pub fn parse_stream_info(response: RespValue) -> RedisResult<StreamInfo> {
     match response {
         RespValue::Array(items) => {
@@ -378,15 +399,27 @@ pub fn parse_stream_info(response: RespValue) -> RedisResult<StreamInfo> {
                 if chunk.len() == 2 {
                     let key = chunk[0].as_string()?;
                     match key.as_str() {
-                        "length" => length = chunk[1].as_int()? as u64,
-                        "groups" => groups = chunk[1].as_int()? as u64,
-                        "first-entry" => {
+                        STREAM_INFO_LENGTH => {
+                            length = u64::try_from(chunk[1].as_int()?).map_err(|_| {
+                                RedisError::Type("Stream length cannot be negative".to_string())
+                            })?;
+                        }
+                        STREAM_INFO_GROUPS => {
+                            groups = u64::try_from(chunk[1].as_int()?).map_err(|_| {
+                                RedisError::Type(
+                                    "Stream group count cannot be negative".to_string(),
+                                )
+                            })?;
+                        }
+                        STREAM_INFO_FIRST_ENTRY => {
                             first_entry = parse_stream_info_entry_id(&chunk[1])?;
                         }
-                        "last-entry" => {
+                        STREAM_INFO_LAST_ENTRY => {
                             last_entry = parse_stream_info_entry_id(&chunk[1])?;
                         }
-                        "last-generated-id" => last_generated_id = chunk[1].as_string()?,
+                        STREAM_INFO_LAST_GENERATED_ID => {
+                            last_generated_id = chunk[1].as_string()?;
+                        }
                         _ => {} // Ignore unknown fields
                     }
                 }
@@ -401,8 +434,7 @@ pub fn parse_stream_info(response: RespValue) -> RedisResult<StreamInfo> {
             })
         }
         _ => Err(RedisError::Type(format!(
-            "Expected array for stream info, got: {:?}",
-            response
+            "Expected array for stream info, got: {response:?}"
         ))),
     }
 }

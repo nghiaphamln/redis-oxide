@@ -2,7 +2,7 @@
 target/
 **/*.rs.bk
 *.pdb
-Cargo.lock
+# Cargo.lock is intentionally tracked to make CI, MSRV, and package checks reproducible.
 
 # IDE
 .idea/
@@ -25,3 +25,4 @@ book/
 
 redis-oxide-copy/
 redis-oxide/target-local/
+redis-oxide/clippy_*.txt

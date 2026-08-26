@@ -12,17 +12,16 @@ categories.workspace = true
 description = "High-performance async Redis client for Rust with automatic cluster support, multiplexing, and advanced features"
 documentation = "https://docs.rs/redis-oxide"
 readme = "../README.md"
+autobenches = false
 include = [
     "src/**/*",
-    "benches/**/*",
+    "benches/protocol_bench.rs",
     "tests/**/*",
-    "examples/**/*",
+    "examples/basic_usage.rs",
+    "examples/cluster_usage.rs",
+    "examples/pool_strategies.rs",
     "Cargo.toml",
-    "../README.md",
-    "../docs/**/*",
-    "../LICENSE-MIT",
-    "../LICENSE-APACHE",
-    "../CHANGELOG.md"
+    "LICENSE-MIT",
 ]
 
 [dependencies]
@@ -74,9 +73,9 @@ unsafe_code = "forbid"
 missing_docs = "warn"
 
 [lints.clippy]
-all = "warn"
-pedantic = "warn"
-nursery = "warn"
+all = "deny"
+pedantic = "deny"
+nursery = "deny"
 
 [package.metadata.docs.rs]
 all-features = true

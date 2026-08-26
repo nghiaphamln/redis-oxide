@@ -19,6 +19,10 @@ pub struct RespEncoder;
 
 impl RespEncoder {
     /// Encode a RESP value into a buffer
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn encode(value: &RespValue, buf: &mut BytesMut) -> RedisResult<()> {
         match value {
             RespValue::SimpleString(s) => {
@@ -88,6 +92,10 @@ impl RespEncoder {
     }
 
     /// Encode a command with arguments
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn encode_command(command: &str, args: &[RespValue]) -> RedisResult<Bytes> {
         let mut buf = BytesMut::new();
 
@@ -118,6 +126,10 @@ pub struct RespDecoder;
 
 impl RespDecoder {
     /// Decode a RESP value from a buffer
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn decode(buf: &mut Cursor<&[u8]>) -> RedisResult<Option<RespValue>> {
         if !buf.has_remaining() {
             return Ok(None);
@@ -143,8 +155,8 @@ impl RespDecoder {
 
         if let Some(line) = Self::read_line(buf)? {
             Ok(Some(RespValue::SimpleString(
-                String::from_utf8(line.to_vec())
-                    .map_err(|e| RedisError::Protocol(format!("Invalid UTF-8: {}", e)))?,
+                String::from_utf8(line)
+                    .map_err(|e| RedisError::Protocol(format!("Invalid UTF-8: {e}")))?,
             )))
         } else {
             Ok(None)
@@ -155,10 +167,9 @@ impl RespDecoder {
         buf.advance(1); // Skip '-'
 
         if let Some(line) = Self::read_line(buf)? {
-            Ok(Some(RespValue::Error(
-                String::from_utf8(line.to_vec())
-                    .map_err(|e| RedisError::Protocol(format!("Invalid UTF-8: {}", e)))?,
-            )))
+            Ok(Some(RespValue::Error(String::from_utf8(line).map_err(
+                |e| RedisError::Protocol(format!("Invalid UTF-8: {e}")),
+            )?)))
         } else {
             Ok(None)
         }
@@ -168,11 +179,11 @@ impl RespDecoder {
         buf.advance(1); // Skip ':'
 
         if let Some(line) = Self::read_line(buf)? {
-            let num_str = String::from_utf8(line.to_vec())
-                .map_err(|e| RedisError::Protocol(format!("Invalid UTF-8: {}", e)))?;
+            let num_str = String::from_utf8(line)
+                .map_err(|e| RedisError::Protocol(format!("Invalid UTF-8: {e}")))?;
             let num = num_str
                 .parse::<i64>()
-                .map_err(|e| RedisError::Protocol(format!("Invalid integer: {}", e)))?;
+                .map_err(|e| RedisError::Protocol(format!("Invalid integer: {e}")))?;
             Ok(Some(RespValue::Integer(num)))
         } else {
             Ok(None)
@@ -182,16 +193,15 @@ impl RespDecoder {
     fn decode_bulk_string(buf: &mut Cursor<&[u8]>) -> RedisResult<Option<RespValue>> {
         buf.advance(1); // Skip '$'
 
-        let len_line = match Self::read_line(buf)? {
-            Some(line) => line,
-            None => return Ok(None),
+        let Some(len_line) = Self::read_line(buf)? else {
+            return Ok(None);
         };
 
-        let len_str = String::from_utf8(len_line.to_vec())
-            .map_err(|e| RedisError::Protocol(format!("Invalid UTF-8: {}", e)))?;
+        let len_str = String::from_utf8(len_line)
+            .map_err(|e| RedisError::Protocol(format!("Invalid UTF-8: {e}")))?;
         let len = len_str
             .parse::<i64>()
-            .map_err(|e| RedisError::Protocol(format!("Invalid bulk string length: {}", e)))?;
+            .map_err(|e| RedisError::Protocol(format!("Invalid bulk string length: {e}")))?;
 
         if len == -1 {
             return Ok(Some(RespValue::Null));
@@ -234,16 +244,15 @@ impl RespDecoder {
     fn decode_array(buf: &mut Cursor<&[u8]>) -> RedisResult<Option<RespValue>> {
         buf.advance(1); // Skip '*'
 
-        let len_line = match Self::read_line(buf)? {
-            Some(line) => line,
-            None => return Ok(None),
+        let Some(len_line) = Self::read_line(buf)? else {
+            return Ok(None);
         };
 
-        let len_str = String::from_utf8(len_line.to_vec())
-            .map_err(|e| RedisError::Protocol(format!("Invalid UTF-8: {}", e)))?;
+        let len_str = String::from_utf8(len_line)
+            .map_err(|e| RedisError::Protocol(format!("Invalid UTF-8: {e}")))?;
         let len = len_str
             .parse::<i64>()
-            .map_err(|e| RedisError::Protocol(format!("Invalid array length: {}", e)))?;
+            .map_err(|e| RedisError::Protocol(format!("Invalid array length: {e}")))?;
 
         if len == -1 {
             return Ok(Some(RespValue::Null));
@@ -274,7 +283,9 @@ impl RespDecoder {
     }
 
     fn read_line(buf: &mut Cursor<&[u8]>) -> RedisResult<Option<Vec<u8>>> {
-        let start = buf.position() as usize;
+        let start = usize::try_from(buf.position()).map_err(|_| {
+            RedisError::Protocol("RESP cursor position exceeds platform size".to_string())
+        })?;
         let slice = buf.get_ref();
 
         // Find CRLF

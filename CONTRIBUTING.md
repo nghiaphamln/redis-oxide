@@ -1,56 +1,42 @@
 # Contributing
 
-Contributions should keep the crate reliable, documented, and easy to verify.
+Contributions should preserve documented behavior, keep public APIs coherent,
+and include focused verification.
 
-## Development Setup
+## Development setup
 
-Install Rust 1.82.0 or newer and run Redis locally for integration tests:
+Install Rust 1.82 or newer and run Redis locally:
 
 ```bash
 docker run --rm -p 6379:6379 redis:7
 ```
 
-Build and test:
+## Required checks
 
-```bash
-cargo check --workspace --all-targets
-cargo test --workspace --all-targets
-```
-
-## Quality Gates
-
-Run these before opening a pull request:
+Run these from the workspace root before opening a pull request:
 
 ```bash
 cargo fmt --all --check
-cargo check --workspace --all-targets
-cargo clippy --workspace --all-targets -- -D warnings
-cargo test --workspace --all-targets
-cargo doc --workspace --no-deps --document-private-items
-cargo audit
-cargo deny check
+cargo check --locked --workspace --all-targets --all-features
+cargo clippy --locked --workspace --all-targets --all-features -- -D clippy::all -D clippy::pedantic -D clippy::nursery -D warnings
+cargo test --locked --workspace --all-targets --all-features
+cargo test --locked --doc --workspace --all-features
+RUSTDOCFLAGS="-D warnings" cargo doc --locked --workspace --no-deps --document-private-items
+cargo deny --locked check
+cargo package --locked -p redis-oxide --allow-dirty
 ```
 
-## Code Guidelines
+## Guidelines
 
-- Keep public APIs consistent with existing naming and return types.
-- Prefer typed command builders over ad hoc command construction.
-- Preserve Redis server semantics unless the public API documents otherwise.
-- Add focused tests for behavior changes.
-- Avoid broad refactors in feature or bugfix patches.
+- Keep feature and fix patches scoped to the reported behavior.
+- Preserve Redis server semantics unless a public API documents a deliberate
+  conversion.
+- Add focused tests for changed command, protocol, timeout, or routing behavior.
+- Keep prose concise, use no emoji in source code, and link to canonical
+  examples instead of duplicating long tutorials.
+- Update the changelog when a user-visible change is planned for release.
 
-## Documentation Guidelines
+## Pull requests
 
-- Keep docs professional and concise.
-- Do not use emoji in headings, status labels, or prose.
-- Verify examples against the current public API.
-- Update `CHANGELOG.md` for user-visible changes.
-
-## Pull Requests
-
-Include:
-
-- the problem being solved
-- the behavior change
-- tests or verification commands run
-- any compatibility notes
+Include the problem, behavior change, compatibility impact, and verification
+commands. Release commits also require package verification and a version tag.

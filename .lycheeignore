@@ -1,0 +1,4 @@
+^https://img\.shields\.io/
+# This guide is introduced by this branch and is checked locally by Lychee.
+# The canonical `main` URL becomes available when the pull request merges.
+^https://github\.com/nghiaphamln/redis-oxide/blob/main/docs/deployment\.md$

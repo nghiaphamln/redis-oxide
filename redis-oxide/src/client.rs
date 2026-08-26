@@ -104,6 +104,10 @@ impl Client {
     ///     Ok(())
     /// }
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub async fn connect(config: ConnectionConfig) -> RedisResult<Self> {
         info!("Connecting to Redis...");
 
@@ -250,7 +254,10 @@ impl Client {
     }
 
     /// Execute a command with automatic redirect handling
-    async fn execute_with_redirects<C: Command>(&self, command: C) -> RedisResult<C::Output> {
+    async fn execute_with_redirects<C: Command + Send + Sync>(
+        &self,
+        command: C,
+    ) -> RedisResult<C::Output> {
         let mut retries = 0;
         let max_retries = self.config.max_redirects;
         let mut ask_target: Option<(String, u16)> = None;
@@ -322,7 +329,10 @@ impl Client {
         }
     }
 
-    async fn execute_command_internal<C: Command>(&self, command: &C) -> RedisResult<RespValue> {
+    async fn execute_command_internal<C: Command + Sync>(
+        &self,
+        command: &C,
+    ) -> RedisResult<RespValue> {
         match self.topology_type {
             TopologyType::Standalone => {
                 let result = self
@@ -397,7 +407,7 @@ impl Client {
         Ok(())
     }
 
-    fn should_refresh_sentinel(error: &RedisError) -> bool {
+    const fn should_refresh_sentinel(error: &RedisError) -> bool {
         matches!(
             error,
             RedisError::Io(_) | RedisError::Connection(_) | RedisError::Timeout
@@ -426,6 +436,7 @@ impl Client {
         // Insert into pools after all network I/O has completed.
         let mut pools = self.cluster_pools.write().await;
         pools.entry(node_key).or_insert_with(|| Arc::new(pool));
+        drop(pools);
 
         Ok(())
     }
@@ -451,18 +462,30 @@ impl Client {
     // High-level command methods
 
     /// Get the value of a key
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub async fn get(&self, key: impl Into<String>) -> RedisResult<Option<String>> {
         let command = GetCommand::new(key);
         self.execute_with_redirects(command).await
     }
 
     /// Set the value of a key
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub async fn set(&self, key: impl Into<String>, value: impl Into<String>) -> RedisResult<bool> {
         let command = SetCommand::new(key, value);
         self.execute_with_redirects(command).await
     }
 
     /// Set the value of a key with expiration
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub async fn set_ex(
         &self,
         key: impl Into<String>,
@@ -474,6 +497,10 @@ impl Client {
     }
 
     /// Set the value of a key only if it doesn't exist
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub async fn set_nx(
         &self,
         key: impl Into<String>,
@@ -484,48 +511,80 @@ impl Client {
     }
 
     /// Delete one or more keys
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub async fn del(&self, keys: Vec<String>) -> RedisResult<i64> {
         let command = DelCommand::new(keys);
         self.execute_with_redirects(command).await
     }
 
     /// Check if one or more keys exist
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub async fn exists(&self, keys: Vec<String>) -> RedisResult<i64> {
         let command = ExistsCommand::new(keys);
         self.execute_with_redirects(command).await
     }
 
     /// Set a key's time to live in seconds
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub async fn expire(&self, key: impl Into<String>, duration: Duration) -> RedisResult<bool> {
         let command = ExpireCommand::new(key, duration);
         self.execute_with_redirects(command).await
     }
 
     /// Get the time to live for a key
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub async fn ttl(&self, key: impl Into<String>) -> RedisResult<Option<i64>> {
         let command = TtlCommand::new(key);
         self.execute_with_redirects(command).await
     }
 
     /// Increment the integer value of a key by one
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub async fn incr(&self, key: impl Into<String>) -> RedisResult<i64> {
         let command = IncrCommand::new(key);
         self.execute_with_redirects(command).await
     }
 
     /// Decrement the integer value of a key by one
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub async fn decr(&self, key: impl Into<String>) -> RedisResult<i64> {
         let command = DecrCommand::new(key);
         self.execute_with_redirects(command).await
     }
 
     /// Increment the integer value of a key by the given amount
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub async fn incr_by(&self, key: impl Into<String>, increment: i64) -> RedisResult<i64> {
         let command = IncrByCommand::new(key, increment);
         self.execute_with_redirects(command).await
     }
 
     /// Decrement the integer value of a key by the given amount
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub async fn decr_by(&self, key: impl Into<String>, decrement: i64) -> RedisResult<i64> {
         let command = DecrByCommand::new(key, decrement);
         self.execute_with_redirects(command).await
@@ -534,6 +593,10 @@ impl Client {
     // Hash operations
 
     /// Get the value of a hash field
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub async fn hget(
         &self,
         key: impl Into<String>,
@@ -544,6 +607,10 @@ impl Client {
     }
 
     /// Set the value of a hash field
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub async fn hset(
         &self,
         key: impl Into<String>,
@@ -555,12 +622,20 @@ impl Client {
     }
 
     /// Delete one or more hash fields
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub async fn hdel(&self, key: impl Into<String>, fields: Vec<String>) -> RedisResult<i64> {
         let command = HDelCommand::new(key, fields);
         self.execute_with_redirects(command).await
     }
 
     /// Get all fields and values in a hash
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub async fn hgetall(
         &self,
         key: impl Into<String>,
@@ -570,6 +645,10 @@ impl Client {
     }
 
     /// Get the values of multiple hash fields
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub async fn hmget(
         &self,
         key: impl Into<String>,
@@ -580,6 +659,10 @@ impl Client {
     }
 
     /// Set multiple hash fields to multiple values
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub async fn hmset(
         &self,
         key: impl Into<String>,
@@ -590,12 +673,20 @@ impl Client {
     }
 
     /// Get the number of fields in a hash
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub async fn hlen(&self, key: impl Into<String>) -> RedisResult<i64> {
         let command = HLenCommand::new(key);
         self.execute_with_redirects(command).await
     }
 
     /// Determine if a hash field exists
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub async fn hexists(
         &self,
         key: impl Into<String>,
@@ -608,30 +699,50 @@ impl Client {
     // List operations
 
     /// Push one or more values to the head of a list
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub async fn lpush(&self, key: impl Into<String>, values: Vec<String>) -> RedisResult<i64> {
         let command = LPushCommand::new(key, values);
         self.execute_with_redirects(command).await
     }
 
     /// Push one or more values to the tail of a list
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub async fn rpush(&self, key: impl Into<String>, values: Vec<String>) -> RedisResult<i64> {
         let command = RPushCommand::new(key, values);
         self.execute_with_redirects(command).await
     }
 
     /// Remove and return the first element of a list
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub async fn lpop(&self, key: impl Into<String>) -> RedisResult<Option<String>> {
         let command = LPopCommand::new(key);
         self.execute_with_redirects(command).await
     }
 
     /// Remove and return the last element of a list
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub async fn rpop(&self, key: impl Into<String>) -> RedisResult<Option<String>> {
         let command = RPopCommand::new(key);
         self.execute_with_redirects(command).await
     }
 
     /// Get a range of elements from a list
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub async fn lrange(
         &self,
         key: impl Into<String>,
@@ -643,18 +754,30 @@ impl Client {
     }
 
     /// Get the length of a list
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub async fn llen(&self, key: impl Into<String>) -> RedisResult<i64> {
         let command = LLenCommand::new(key);
         self.execute_with_redirects(command).await
     }
 
     /// Get an element from a list by its index
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub async fn lindex(&self, key: impl Into<String>, index: i64) -> RedisResult<Option<String>> {
         let command = LIndexCommand::new(key, index);
         self.execute_with_redirects(command).await
     }
 
     /// Set the value of an element in a list by its index
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub async fn lset(
         &self,
         key: impl Into<String>,
@@ -669,18 +792,30 @@ impl Client {
     // Set operations
 
     /// Add one or more members to a set
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub async fn sadd(&self, key: impl Into<String>, members: Vec<String>) -> RedisResult<i64> {
         let command = SAddCommand::new(key, members);
         self.execute_with_redirects(command).await
     }
 
     /// Remove one or more members from a set
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub async fn srem(&self, key: impl Into<String>, members: Vec<String>) -> RedisResult<i64> {
         let command = SRemCommand::new(key, members);
         self.execute_with_redirects(command).await
     }
 
     /// Get all members of a set
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub async fn smembers(
         &self,
         key: impl Into<String>,
@@ -690,6 +825,10 @@ impl Client {
     }
 
     /// Determine if a member is in a set
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub async fn sismember(
         &self,
         key: impl Into<String>,
@@ -700,18 +839,30 @@ impl Client {
     }
 
     /// Get the number of members in a set
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub async fn scard(&self, key: impl Into<String>) -> RedisResult<i64> {
         let command = SCardCommand::new(key);
         self.execute_with_redirects(command).await
     }
 
     /// Remove and return a random member from a set
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub async fn spop(&self, key: impl Into<String>) -> RedisResult<Option<String>> {
         let command = SPopCommand::new(key);
         self.execute_with_redirects(command).await
     }
 
     /// Get a random member from a set
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub async fn srandmember(&self, key: impl Into<String>) -> RedisResult<Option<String>> {
         let command = SRandMemberCommand::new(key);
         self.execute_with_redirects(command).await
@@ -720,6 +871,10 @@ impl Client {
     // Sorted Set operations
 
     /// Add one or more members to a sorted set
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub async fn zadd(
         &self,
         key: impl Into<String>,
@@ -730,12 +885,20 @@ impl Client {
     }
 
     /// Remove one or more members from a sorted set
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub async fn zrem(&self, key: impl Into<String>, members: Vec<String>) -> RedisResult<i64> {
         let command = ZRemCommand::new(key, members);
         self.execute_with_redirects(command).await
     }
 
     /// Get a range of members from a sorted set by index
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub async fn zrange(
         &self,
         key: impl Into<String>,
@@ -747,6 +910,10 @@ impl Client {
     }
 
     /// Get the score of a member in a sorted set
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub async fn zscore(
         &self,
         key: impl Into<String>,
@@ -757,12 +924,20 @@ impl Client {
     }
 
     /// Get the number of members in a sorted set
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub async fn zcard(&self, key: impl Into<String>) -> RedisResult<i64> {
         let command = ZCardCommand::new(key);
         self.execute_with_redirects(command).await
     }
 
     /// Get the rank of a member in a sorted set (lowest to highest)
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub async fn zrank(
         &self,
         key: impl Into<String>,
@@ -773,6 +948,10 @@ impl Client {
     }
 
     /// Get the rank of a member in a sorted set (highest to lowest)
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub async fn zrevrank(
         &self,
         key: impl Into<String>,
@@ -807,6 +986,7 @@ impl Client {
     /// # Ok(())
     /// # }
     /// ```
+    #[must_use]
     pub fn pipeline(&self) -> Pipeline {
         let client_executor = ClientPipelineExecutor {
             client: self.clone(),
@@ -839,6 +1019,10 @@ impl Client {
     /// # Ok(())
     /// # }
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub async fn transaction(&self) -> RedisResult<Transaction> {
         let connection = match self.topology_type {
             TopologyType::Standalone => Some(self.dedicated_connection().await?),
@@ -872,6 +1056,10 @@ impl Client {
     /// # Ok(())
     /// # }
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub async fn publish(
         &self,
         channel: impl Into<String>,
@@ -929,6 +1117,10 @@ impl Client {
     /// # Ok(())
     /// # }
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub async fn subscriber(&self) -> RedisResult<Subscriber> {
         Ok(Subscriber::from_connection(
             self.dedicated_connection().await?,
@@ -953,6 +1145,10 @@ impl Client {
     /// # Ok(())
     /// # }
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub async fn publisher(&self) -> RedisResult<Publisher> {
         Ok(Publisher::from_connection(
             self.dedicated_connection().await?,
@@ -989,6 +1185,10 @@ impl Client {
     /// # Ok(())
     /// # }
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub async fn eval<T>(
         &self,
         script: &str,
@@ -1069,6 +1269,10 @@ impl Client {
     /// # Ok(())
     /// # }
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub async fn evalsha<T>(
         &self,
         sha: &str,
@@ -1138,6 +1342,10 @@ impl Client {
     /// # Ok(())
     /// # }
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub async fn script_load(&self, script: &str) -> RedisResult<String> {
         let result = match self.topology_type {
             TopologyType::Standalone => {
@@ -1151,10 +1359,10 @@ impl Client {
             }
             TopologyType::Cluster => {
                 // For cluster, load script on all nodes
-                let pools = self.cluster_pools.read().await;
+                let pools: Vec<_> = self.cluster_pools.read().await.values().cloned().collect();
                 let mut sha = String::new();
 
-                for pool in pools.values() {
+                for pool in pools {
                     let result = pool
                         .execute_command(
                             "SCRIPT".to_string(),
@@ -1197,6 +1405,10 @@ impl Client {
     /// # Ok(())
     /// # }
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub async fn script_exists(&self, shas: Vec<String>) -> RedisResult<Vec<bool>> {
         let mut cmd_args = vec![RespValue::from("EXISTS")];
         for sha in shas {
@@ -1232,8 +1444,7 @@ impl Client {
                         RespValue::Integer(0) => exists.push(false),
                         _ => {
                             return Err(RedisError::Type(format!(
-                                "Unexpected response in SCRIPT EXISTS: {:?}",
-                                item
+                                "Unexpected response in SCRIPT EXISTS: {item:?}"
                             )))
                         }
                     }
@@ -1241,8 +1452,7 @@ impl Client {
                 Ok(exists)
             }
             _ => Err(RedisError::Type(format!(
-                "Unexpected response type for SCRIPT EXISTS: {:?}",
-                result
+                "Unexpected response type for SCRIPT EXISTS: {result:?}"
             ))),
         }
     }
@@ -1264,6 +1474,10 @@ impl Client {
     /// # Ok(())
     /// # }
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub async fn script_flush(&self) -> RedisResult<()> {
         let cmd_args = vec![RespValue::from("FLUSH")];
 
@@ -1277,8 +1491,8 @@ impl Client {
             }
             TopologyType::Cluster => {
                 // For cluster, flush scripts on all nodes
-                let pools = self.cluster_pools.read().await;
-                for pool in pools.values() {
+                let pools: Vec<_> = self.cluster_pools.read().await.values().cloned().collect();
+                for pool in pools {
                     let _result = pool
                         .execute_command("SCRIPT".to_string(), cmd_args.clone())
                         .await?;
@@ -1318,6 +1532,10 @@ impl Client {
     /// # Ok(())
     /// # }
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub async fn xadd(
         &self,
         stream: impl Into<String>,
@@ -1357,7 +1575,7 @@ impl Client {
     ///
     /// # Arguments
     ///
-    /// * `streams` - Vector of (stream_name, last_id) pairs
+    /// * `streams` - Vector of (`stream_name`, `last_id`) pairs
     /// * `count` - Maximum number of entries per stream (None for no limit)
     /// * `block` - Block timeout (None for non-blocking)
     ///
@@ -1383,6 +1601,10 @@ impl Client {
     /// # Ok(())
     /// # }
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub async fn xread(
         &self,
         streams: Vec<(String, String)>,
@@ -1476,6 +1698,10 @@ impl Client {
     /// # Ok(())
     /// # }
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub async fn xrange(
         &self,
         stream: impl Into<String>,
@@ -1530,6 +1756,10 @@ impl Client {
     /// # Ok(())
     /// # }
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub async fn xlen(&self, stream: impl Into<String>) -> RedisResult<u64> {
         let stream = stream.into();
         let cmd_args = vec![RespValue::from(stream.clone())];
@@ -1549,7 +1779,8 @@ impl Client {
             }
         };
 
-        Ok(result.as_int()? as u64)
+        u64::try_from(result.as_int()?)
+            .map_err(|_| RedisError::Type("XLEN returned a negative value".to_string()))
     }
 
     /// Create a consumer group using XGROUP CREATE
@@ -1577,6 +1808,10 @@ impl Client {
     /// # Ok(())
     /// # }
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub async fn xgroup_create(
         &self,
         stream: impl Into<String>,
@@ -1615,8 +1850,7 @@ impl Client {
         match result.as_string()?.as_str() {
             "OK" => Ok(()),
             other => Err(RedisError::Protocol(format!(
-                "Unexpected XGROUP CREATE response: {}",
-                other
+                "Unexpected XGROUP CREATE response: {other}"
             ))),
         }
     }
@@ -1627,7 +1861,7 @@ impl Client {
     ///
     /// * `group` - The consumer group name
     /// * `consumer` - The consumer name
-    /// * `streams` - Vector of (stream_name, id) pairs (">" for new messages)
+    /// * `streams` - Vector of (`stream_name`, id) pairs (">" for new messages)
     /// * `count` - Maximum number of entries per stream
     /// * `block` - Block timeout
     ///
@@ -1661,6 +1895,10 @@ impl Client {
     /// # Ok(())
     /// # }
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub async fn xreadgroup(
         &self,
         group: impl Into<String>,
@@ -1757,6 +1995,10 @@ impl Client {
     /// # Ok(())
     /// # }
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub async fn xack(
         &self,
         stream: impl Into<String>,
@@ -1788,11 +2030,13 @@ impl Client {
             }
         };
 
-        Ok(result.as_int()? as u64)
+        u64::try_from(result.as_int()?)
+            .map_err(|_| RedisError::Type("XACK returned a negative value".to_string()))
     }
 
     /// Get the topology type
-    pub fn topology_type(&self) -> TopologyType {
+    #[must_use]
+    pub const fn topology_type(&self) -> TopologyType {
         self.topology_type
     }
 }

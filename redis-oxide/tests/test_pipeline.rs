@@ -3,8 +3,6 @@
 //! These tests require a running Redis instance.
 //! Set `REDIS_URL` environment variable or use default `redis://localhost:6379`
 
-#![allow(clippy::uninlined_format_args)]
-
 use redis_oxide::{Client, ConnectionConfig, PoolConfig, PoolStrategy};
 use std::time::Duration;
 

@@ -4,8 +4,6 @@
 //! with both standalone and cluster configurations.
 //! Set `REDIS_URL` environment variable or use default `redis://localhost:6379`
 
-#![allow(clippy::uninlined_format_args)]
-
 use redis_oxide::{Client, ConnectionConfig, PoolConfig, PoolStrategy, RedisError, RedisResult};
 use std::collections::{HashMap, HashSet};
 use std::time::Duration;
@@ -346,8 +344,8 @@ async fn test_operations_with_connection_pool() -> Result<(), Box<dyn std::error
     for i in 0..10 {
         let client_clone = client.clone();
         let handle = tokio::spawn(async move {
-            let key = format!("concurrent:{}", i);
-            let value = format!("value{}", i);
+            let key = format!("concurrent:{i}");
+            let value = format!("value{i}");
             client_clone.set(&key, &value).await?;
             let retrieved: Option<String> = client_clone.get(&key).await?;
             assert_eq!(retrieved, Some(value));
@@ -393,8 +391,8 @@ async fn test_operations_with_multiplexed_connection() -> Result<(), Box<dyn std
     for i in 0..5 {
         let client_clone = client.clone();
         let handle = tokio::spawn(async move {
-            let key = format!("mux:{}", i);
-            let value = format!("value{}", i);
+            let key = format!("mux:{i}");
+            let value = format!("value{i}");
             client_clone.set(&key, &value).await?;
             let retrieved: Option<String> = client_clone.get(&key).await?;
             assert_eq!(retrieved, Some(value));

@@ -1,11 +1,5 @@
 //! Integration tests for Transactions and Pipelines
 
-#![allow(clippy::uninlined_format_args)]
-#![allow(clippy::bool_assert_comparison)]
-#![allow(clippy::manual_assert)]
-#![allow(clippy::needless_borrows_for_generic_args)]
-#![allow(clippy::needless_range_loop)]
-
 use redis_oxide::{Client, ConnectionConfig};
 
 fn redis_url() -> String {
@@ -41,8 +35,8 @@ async fn test_basic_pipeline() -> Result<(), Box<dyn std::error::Error>> {
 
     // Verify the results
     // SET commands return OK (true)
-    assert_eq!(results[0].as_bool()?, true);
-    assert_eq!(results[1].as_bool()?, true);
+    assert!(results[0].as_bool()?);
+    assert!(results[1].as_bool()?);
 
     // GET commands return the values
     assert_eq!(results[2].as_string()?, "value1");
@@ -121,8 +115,8 @@ async fn test_basic_transaction() -> Result<(), Box<dyn std::error::Error>> {
     assert_eq!(results[0].as_string()?, "100");
     assert_eq!(results[1].as_string()?, "50");
     // SET results
-    assert_eq!(results[2].as_bool()?, true);
-    assert_eq!(results[3].as_bool()?, true);
+    assert!(results[2].as_bool()?);
+    assert!(results[3].as_bool()?);
 
     // Verify final values
     let account1: Option<String> = client.get("tx:account1").await?;
@@ -163,9 +157,10 @@ async fn test_transaction_with_watch() -> Result<(), Box<dyn std::error::Error>>
     let results = transaction.exec().await?;
 
     // If transaction is aborted, Redis returns an empty array
-    if !results.is_empty() {
-        panic!("Transaction should be aborted due to watched key modification");
-    }
+    assert!(
+        results.is_empty(),
+        "Transaction should be aborted due to watched key modification"
+    );
     // An empty result vector indicates the transaction was aborted
 
     // Verify the key was not modified by the transaction
@@ -257,7 +252,7 @@ async fn test_complex_pipeline_with_different_data_types() -> Result<(), Box<dyn
     assert_eq!(results.len(), 12);
 
     // Verify string operations
-    assert_eq!(results[0].as_bool()?, true); // SET
+    assert!(results[0].as_bool()?); // SET
     assert_eq!(results[1].as_int()?, 1); // INCR
 
     // Verify hash operations
@@ -301,7 +296,7 @@ async fn test_pipeline_error_handling() -> Result<(), Box<dyn std::error::Error>
     assert_eq!(results.len(), 4);
 
     // First command should succeed
-    assert_eq!(results[0].as_bool()?, true);
+    assert!(results[0].as_bool()?);
 
     // Second command should return nil (Redis handles type errors gracefully in some cases)
     // The exact behavior depends on Redis version and command
@@ -334,8 +329,8 @@ async fn test_nested_transactions_not_allowed() -> Result<(), Box<dyn std::error
     // Both transactions should succeed and return their results
     assert_eq!(results1.len(), 1);
     assert_eq!(results2.len(), 1);
-    assert_eq!(results1[0].as_bool()?, true);
-    assert_eq!(results2[0].as_bool()?, true);
+    assert!(results1[0].as_bool()?);
+    assert!(results2[0].as_bool()?);
 
     // Verify both keys were set
     let value1: Option<String> = client.get("nested:key1").await?;
@@ -349,7 +344,7 @@ async fn test_nested_transactions_not_allowed() -> Result<(), Box<dyn std::error
 #[tokio::test]
 async fn test_large_pipeline() -> Result<(), Box<dyn std::error::Error>> {
     let client = setup_client().await?;
-    let keys: Vec<String> = (0..100).map(|i| format!("large:key{}", i)).collect();
+    let keys: Vec<String> = (0..100).map(|i| format!("large:key{i}")).collect();
     client.del(keys).await?;
 
     let mut pipeline = client.pipeline();
@@ -357,29 +352,25 @@ async fn test_large_pipeline() -> Result<(), Box<dyn std::error::Error>> {
 
     // Add many SET operations
     for i in 0..num_operations {
-        pipeline.set(&format!("large:key{}", i), &format!("value{}", i));
+        pipeline.set(format!("large:key{i}"), format!("value{i}"));
     }
 
     // Add many GET operations
     for i in 0..num_operations {
-        pipeline.get(&format!("large:key{}", i));
+        pipeline.get(format!("large:key{i}"));
     }
 
     let results = pipeline.execute().await?;
     assert_eq!(results.len(), num_operations * 2);
 
     // Verify SET results
-    for i in 0..num_operations {
-        assert_eq!(results[i].as_bool()?, true);
+    for result in results.iter().take(num_operations) {
+        assert!(result.as_bool()?);
     }
 
     // Verify GET results
-    for i in 0..num_operations {
-        let get_result_index = num_operations + i;
-        assert_eq!(
-            results[get_result_index].as_string()?,
-            format!("value{}", i)
-        );
+    for (index, result) in results.iter().skip(num_operations).enumerate() {
+        assert_eq!(result.as_string()?, format!("value{index}"));
     }
 
     Ok(())
@@ -391,7 +382,7 @@ async fn test_concurrent_pipelines() -> Result<(), Box<dyn std::error::Error>> {
 
     let num_concurrent = 10;
     let keys: Vec<String> = (0..num_concurrent)
-        .flat_map(|task_id| (0..5).map(move |i| format!("concurrent:task{}:key{}", task_id, i)))
+        .flat_map(|task_id| (0..5).map(move |i| format!("concurrent:task{task_id}:key{i}")))
         .collect();
     client.del(keys).await?;
     let mut handles = Vec::new();
@@ -404,8 +395,8 @@ async fn test_concurrent_pipelines() -> Result<(), Box<dyn std::error::Error>> {
 
             // Each task sets and gets its own keys
             for i in 0..5 {
-                let key = format!("concurrent:task{}:key{}", task_id, i);
-                let value = format!("task{}_value{}", task_id, i);
+                let key = format!("concurrent:task{task_id}:key{i}");
+                let value = format!("task{task_id}_value{i}");
                 pipeline.set(&key, &value);
                 pipeline.get(&key);
             }
@@ -424,7 +415,7 @@ async fn test_concurrent_pipelines() -> Result<(), Box<dyn std::error::Error>> {
         for i in 0..5 {
             let set_index = i * 2;
             let get_index = i * 2 + 1;
-            assert_eq!(results[set_index].as_bool()?, true);
+            assert!(results[set_index].as_bool()?);
             // GET result should match the expected value pattern
             let get_result = results[get_index].as_string()?;
             assert!(get_result.contains("value"));
@@ -461,8 +452,8 @@ async fn test_transaction_with_conditional_logic() -> Result<(), Box<dyn std::er
     assert_eq!(results.len(), 4);
     assert_eq!(results[0].as_string()?, "100"); // Original balance
     assert_eq!(results[1].as_string()?, "10"); // Min balance
-    assert_eq!(results[2].as_bool()?, true); // SET balance
-    assert_eq!(results[3].as_bool()?, true); // SET last_transaction
+    assert!(results[2].as_bool()?); // SET balance
+    assert!(results[3].as_bool()?); // SET last_transaction
 
     // Verify final state
     let final_balance: Option<String> = client.get("conditional:balance").await?;

@@ -325,6 +325,7 @@ impl Pipeline {
         // Execute the pipeline
         let mut connection = self.connection.lock().await;
         let results = connection.execute_pipeline(commands).await?;
+        drop(connection);
 
         Ok(results)
     }
@@ -364,16 +365,16 @@ pub struct PipelineResult {
 impl PipelineResult {
     /// Create a new pipeline result
     #[must_use]
-    pub fn new(results: Vec<RespValue>) -> Self {
+    pub const fn new(results: Vec<RespValue>) -> Self {
         Self { results, index: 0 }
     }
 
-    /// Get the next result from the pipeline
+    /// Decode the next result from the pipeline.
     ///
     /// # Errors
     ///
     /// Returns an error if there are no more results or type conversion fails.
-    pub fn next<T>(&mut self) -> RedisResult<T>
+    pub fn next_result<T>(&mut self) -> RedisResult<T>
     where
         T: TryFrom<RespValue>,
         T::Error: Into<RedisError>,
@@ -401,10 +402,7 @@ impl PipelineResult {
         T::Error: Into<RedisError>,
     {
         if index >= self.results.len() {
-            return Err(RedisError::Protocol(format!(
-                "Index {} out of bounds",
-                index
-            )));
+            return Err(RedisError::Protocol(format!("Index {index} out of bounds")));
         }
 
         let result = self.results[index].clone();
@@ -526,7 +524,7 @@ mod tests {
         assert_eq!(pipeline_result.len(), 3);
         assert!(!pipeline_result.is_empty());
 
-        let first: String = pipeline_result.next().unwrap();
+        let first: String = pipeline_result.next_result().unwrap();
         assert_eq!(first, "OK");
 
         let second: String = pipeline_result.get(1).unwrap();

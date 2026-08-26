@@ -1,4 +1,3 @@
-#![allow(clippy::items_after_test_module)]
 //! Command builders for Redis operations
 //!
 //! This module provides type-safe command builders for Redis commands.
@@ -48,6 +47,10 @@ pub trait Command {
     fn args(&self) -> Vec<RespValue>;
 
     /// Parse the response into the output type
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     fn parse_response(&self, response: RespValue) -> RedisResult<Self::Output>;
 
     /// Get the key(s) involved in this command (for cluster routing)
@@ -69,7 +72,7 @@ impl GetCommand {
 impl Command for GetCommand {
     type Output = Option<String>;
 
-    fn command_name(&self) -> &str {
+    fn command_name(&self) -> &'static str {
         "GET"
     }
 
@@ -112,19 +115,22 @@ impl SetCommand {
     }
 
     /// Set expiration time (EX seconds)
-    pub fn expire(mut self, duration: Duration) -> Self {
+    #[must_use]
+    pub const fn expire(mut self, duration: Duration) -> Self {
         self.expiration = Some(duration);
         self
     }
 
     /// Only set if key doesn't exist (NX)
-    pub fn only_if_not_exists(mut self) -> Self {
+    #[must_use]
+    pub const fn only_if_not_exists(mut self) -> Self {
         self.nx = true;
         self
     }
 
     /// Only set if key exists (XX)
-    pub fn only_if_exists(mut self) -> Self {
+    #[must_use]
+    pub const fn only_if_exists(mut self) -> Self {
         self.xx = true;
         self
     }
@@ -133,7 +139,7 @@ impl SetCommand {
 impl Command for SetCommand {
     type Output = bool;
 
-    fn command_name(&self) -> &str {
+    fn command_name(&self) -> &'static str {
         "SET"
     }
 
@@ -179,7 +185,8 @@ pub struct DelCommand {
 
 impl DelCommand {
     /// Create a new DEL command
-    pub fn new(keys: Vec<String>) -> Self {
+    #[must_use]
+    pub const fn new(keys: Vec<String>) -> Self {
         Self { keys }
     }
 }
@@ -187,7 +194,7 @@ impl DelCommand {
 impl Command for DelCommand {
     type Output = i64;
 
-    fn command_name(&self) -> &str {
+    fn command_name(&self) -> &'static str {
         "DEL"
     }
 
@@ -214,7 +221,8 @@ pub struct ExistsCommand {
 
 impl ExistsCommand {
     /// Create a new EXISTS command
-    pub fn new(keys: Vec<String>) -> Self {
+    #[must_use]
+    pub const fn new(keys: Vec<String>) -> Self {
         Self { keys }
     }
 }
@@ -222,7 +230,7 @@ impl ExistsCommand {
 impl Command for ExistsCommand {
     type Output = i64;
 
-    fn command_name(&self) -> &str {
+    fn command_name(&self) -> &'static str {
         "EXISTS"
     }
 
@@ -245,16 +253,15 @@ impl Command for ExistsCommand {
 /// EXPIRE command builder
 pub struct ExpireCommand {
     key: String,
-    seconds: i64,
+    seconds: u64,
 }
 
 impl ExpireCommand {
     /// Create a new EXPIRE command
     pub fn new(key: impl Into<String>, duration: Duration) -> Self {
-        #[allow(clippy::cast_possible_wrap)]
         Self {
             key: key.into(),
-            seconds: duration.as_secs() as i64,
+            seconds: duration.as_secs(),
         }
     }
 }
@@ -262,7 +269,7 @@ impl ExpireCommand {
 impl Command for ExpireCommand {
     type Output = bool;
 
-    fn command_name(&self) -> &str {
+    fn command_name(&self) -> &'static str {
         "EXPIRE"
     }
 
@@ -297,7 +304,7 @@ impl TtlCommand {
 impl Command for TtlCommand {
     type Output = Option<i64>;
 
-    fn command_name(&self) -> &str {
+    fn command_name(&self) -> &'static str {
         "TTL"
     }
 
@@ -329,7 +336,7 @@ impl IncrCommand {
 impl Command for IncrCommand {
     type Output = i64;
 
-    fn command_name(&self) -> &str {
+    fn command_name(&self) -> &'static str {
         "INCR"
     }
 
@@ -361,7 +368,7 @@ impl DecrCommand {
 impl Command for DecrCommand {
     type Output = i64;
 
-    fn command_name(&self) -> &str {
+    fn command_name(&self) -> &'static str {
         "DECR"
     }
 
@@ -397,7 +404,7 @@ impl IncrByCommand {
 impl Command for IncrByCommand {
     type Output = i64;
 
-    fn command_name(&self) -> &str {
+    fn command_name(&self) -> &'static str {
         "INCRBY"
     }
 
@@ -436,7 +443,7 @@ impl DecrByCommand {
 impl Command for DecrByCommand {
     type Output = i64;
 
-    fn command_name(&self) -> &str {
+    fn command_name(&self) -> &'static str {
         "DECRBY"
     }
 
@@ -453,54 +460,6 @@ impl Command for DecrByCommand {
 
     fn keys(&self) -> Vec<&[u8]> {
         vec![self.key.as_bytes()]
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_get_command() {
-        let cmd = GetCommand::new("mykey");
-        assert_eq!(cmd.command_name(), "GET");
-        assert_eq!(cmd.keys(), vec![b"mykey"]);
-    }
-
-    #[test]
-    fn test_set_command_basic() {
-        let cmd = SetCommand::new("key", "value");
-        assert_eq!(cmd.command_name(), "SET");
-        let args = <SetCommand as Command>::args(&cmd);
-        assert_eq!(args.len(), 2);
-    }
-
-    #[test]
-    fn test_set_command_with_expiration() {
-        let cmd = SetCommand::new("key", "value").expire(Duration::from_secs(60));
-        let args = <SetCommand as Command>::args(&cmd);
-        assert_eq!(args.len(), 4); // key, value, EX, 60
-    }
-
-    #[test]
-    fn test_set_command_nx() {
-        let cmd = SetCommand::new("key", "value").only_if_not_exists();
-        let args = <SetCommand as Command>::args(&cmd);
-        assert!(args.len() >= 3); // key, value, NX
-    }
-
-    #[test]
-    fn test_del_command() {
-        let cmd = DelCommand::new(vec!["key1".to_string(), "key2".to_string()]);
-        assert_eq!(cmd.command_name(), "DEL");
-        assert_eq!(cmd.keys().len(), 2);
-    }
-
-    #[test]
-    fn test_incr_command() {
-        let cmd = IncrCommand::new("counter");
-        assert_eq!(cmd.command_name(), "INCR");
-        assert_eq!(cmd.keys(), vec![b"counter"]);
     }
 }
 
@@ -642,5 +601,53 @@ impl PipelineCommand for TtlCommand {
 
     fn key(&self) -> Option<String> {
         Some(self.key.clone())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_get_command() {
+        let cmd = GetCommand::new("mykey");
+        assert_eq!(cmd.command_name(), "GET");
+        assert_eq!(cmd.keys(), vec![b"mykey"]);
+    }
+
+    #[test]
+    fn test_set_command_basic() {
+        let cmd = SetCommand::new("key", "value");
+        assert_eq!(cmd.command_name(), "SET");
+        let args = <SetCommand as Command>::args(&cmd);
+        assert_eq!(args.len(), 2);
+    }
+
+    #[test]
+    fn test_set_command_with_expiration() {
+        let cmd = SetCommand::new("key", "value").expire(Duration::from_secs(60));
+        let args = <SetCommand as Command>::args(&cmd);
+        assert_eq!(args.len(), 4); // key, value, EX, 60
+    }
+
+    #[test]
+    fn test_set_command_nx() {
+        let cmd = SetCommand::new("key", "value").only_if_not_exists();
+        let args = <SetCommand as Command>::args(&cmd);
+        assert!(args.len() >= 3); // key, value, NX
+    }
+
+    #[test]
+    fn test_del_command() {
+        let cmd = DelCommand::new(vec!["key1".to_string(), "key2".to_string()]);
+        assert_eq!(cmd.command_name(), "DEL");
+        assert_eq!(cmd.keys().len(), 2);
+    }
+
+    #[test]
+    fn test_incr_command() {
+        let cmd = IncrCommand::new("counter");
+        assert_eq!(cmd.command_name(), "INCR");
+        assert_eq!(cmd.keys(), vec![b"counter"]);
     }
 }
