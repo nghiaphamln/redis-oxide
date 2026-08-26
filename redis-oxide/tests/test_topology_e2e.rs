@@ -28,6 +28,32 @@ fn sentinel_config() -> Result<SentinelConfig, redis_oxide::RedisError> {
         })
 }
 
+async fn wait_for_replica_sync() -> Result<(), Box<dyn std::error::Error>> {
+    let deadline = Instant::now() + Duration::from_secs(20);
+    while Instant::now() < deadline {
+        if let Ok(mut replica) = redis_oxide::connection::RedisConnection::connect(
+            "127.0.0.1",
+            6381,
+            ConnectionConfig::new("redis://127.0.0.1:6381"),
+        )
+        .await
+        {
+            let info = replica
+                .execute_command("INFO", &[redis_oxide::RespValue::from("replication")])
+                .await;
+            if let Ok(value) = info {
+                if let Ok(info) = value.as_string() {
+                    if info.contains("master_link_status:up") {
+                        return Ok(());
+                    }
+                }
+            }
+        }
+        tokio::time::sleep(Duration::from_millis(250)).await;
+    }
+    Err("Redis replica did not synchronize before failover".into())
+}
+
 #[tokio::test]
 #[ignore = "requires the Redis Cluster Docker topology"]
 async fn cluster_bootstraps_slots_and_routes_multiple_keys(
@@ -103,7 +129,7 @@ async fn sentinel_client_refreshes_after_master_failover() -> Result<(), Box<dyn
     .await?;
     let key = "redis_oxide:sentinel:failover";
     client.set(key, "replicated").await?;
-    tokio::time::sleep(Duration::from_millis(500)).await;
+    wait_for_replica_sync().await?;
 
     let mut master = redis_oxide::connection::RedisConnection::connect(
         "127.0.0.1",
@@ -119,7 +145,7 @@ async fn sentinel_client_refreshes_after_master_failover() -> Result<(), Box<dyn
         .await?;
 
     let sentinel = redis_oxide::SentinelClient::new(sentinel_config()?).await?;
-    let failover_deadline = Instant::now() + Duration::from_secs(20);
+    let failover_deadline = Instant::now() + Duration::from_secs(60);
     loop {
         match sentinel.refresh_master().await {
             Ok(master) if master.port == 6381 => break,
@@ -135,7 +161,7 @@ async fn sentinel_client_refreshes_after_master_failover() -> Result<(), Box<dyn
         }
     }
 
-    let deadline = Instant::now() + Duration::from_secs(20);
+    let deadline = Instant::now() + Duration::from_secs(60);
     loop {
         match client.get(key).await {
             Ok(Some(value)) if value == "replicated" => break,

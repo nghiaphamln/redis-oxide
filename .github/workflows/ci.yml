@@ -163,6 +163,7 @@ jobs:
   topology-e2e:
     name: Cluster and Sentinel E2E
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
