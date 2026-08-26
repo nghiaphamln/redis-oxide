@@ -131,17 +131,20 @@ async fn sentinel_client_refreshes_after_master_failover() -> Result<(), Box<dyn
     client.set(key, "replicated").await?;
     wait_for_replica_sync().await?;
 
-    let mut master = redis_oxide::connection::RedisConnection::connect(
+    let mut sentinel_connection = redis_oxide::connection::RedisConnection::connect(
         "127.0.0.1",
-        6380,
-        ConnectionConfig::new("redis://127.0.0.1:6380"),
+        26379,
+        ConnectionConfig::new("redis://127.0.0.1:26379"),
     )
     .await?;
-    master
-        .send_command(&redis_oxide::RespValue::Array(vec![
-            redis_oxide::RespValue::from("SHUTDOWN"),
-            redis_oxide::RespValue::from("NOSAVE"),
-        ]))
+    sentinel_connection
+        .execute_command(
+            "SENTINEL",
+            &[
+                redis_oxide::RespValue::from("FAILOVER"),
+                redis_oxide::RespValue::from("mymaster"),
+            ],
+        )
         .await?;
 
     let sentinel = redis_oxide::SentinelClient::new(sentinel_config()?).await?;
@@ -160,6 +163,19 @@ async fn sentinel_client_refreshes_after_master_failover() -> Result<(), Box<dyn
             Err(error) => return Err(Box::<dyn std::error::Error>::from(error)),
         }
     }
+
+    let mut previous_master = redis_oxide::connection::RedisConnection::connect(
+        "127.0.0.1",
+        6380,
+        ConnectionConfig::new("redis://127.0.0.1:6380"),
+    )
+    .await?;
+    previous_master
+        .send_command(&redis_oxide::RespValue::Array(vec![
+            redis_oxide::RespValue::from("SHUTDOWN"),
+            redis_oxide::RespValue::from("NOSAVE"),
+        ]))
+        .await?;
 
     let deadline = Instant::now() + Duration::from_secs(60);
     loop {
