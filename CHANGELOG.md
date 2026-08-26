@@ -5,7 +5,19 @@ All notable changes to this project are documented in this file.
 The format is based on Keep a Changelog, and this project uses semantic
 versioning while the public API is still stabilizing.
 
-## [0.3.0-alpha.1] - Unreleased
+## [Unreleased]
+
+### Breaking changes
+
+- Renamed `PipelineResult::next` and `TransactionResult::next` to
+  `next_result` to distinguish typed result decoding from iterator APIs.
+
+### Changed
+
+- Consolidated repository documentation, package metadata, examples, and
+  benchmarks ahead of the 0.3 beta release.
+
+## [0.3.0-alpha.1] - 2026-08-26
 
 ### Breaking changes
 

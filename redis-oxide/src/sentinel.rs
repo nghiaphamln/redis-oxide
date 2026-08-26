@@ -168,6 +168,10 @@ impl SentinelConfig {
     }
 
     /// Add a sentinel endpoint
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn add_sentinel(mut self, addr: impl AsRef<str>) -> RedisResult<Self> {
         self.sentinels
             .push(SentinelEndpoint::from_address(addr.as_ref())?);
@@ -296,8 +300,9 @@ impl SentinelClient {
     /// Returns an error if no master is available.
     pub async fn get_master(&self) -> RedisResult<MasterInfo> {
         let is_fresh = self.last_check.lock().await.elapsed() < self.config.check_interval;
+        let cached_master = self.current_master.read().await.clone();
         if is_fresh {
-            if let Some(master) = self.current_master.read().await.clone() {
+            if let Some(master) = cached_master {
                 return Ok(master);
             }
         }
@@ -306,6 +311,10 @@ impl SentinelClient {
     }
 
     /// Force discovery of the current Sentinel master.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub async fn refresh_master(&self) -> RedisResult<MasterInfo> {
         self.discover_master().await?;
         self.current_master
@@ -326,6 +335,10 @@ impl SentinelClient {
     }
 
     /// Create a connection to the current master using caller configuration.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub async fn connect_to_master_with_config(
         &self,
         mut config: ConnectionConfig,
@@ -337,6 +350,10 @@ impl SentinelClient {
     }
 
     /// Monitor for master changes and failovers
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub async fn monitor(&self) -> RedisResult<()> {
         let mut interval = tokio::time::interval(self.config.check_interval);
 
@@ -350,12 +367,12 @@ impl SentinelClient {
     }
 
     async fn initialize_sentinels(&self) -> RedisResult<()> {
-        let mut sentinels = self.sentinels.write().await;
+        let mut connections = Vec::new();
 
         for endpoint in &self.config.sentinels {
             match self.connect_to_sentinel(endpoint).await {
                 Ok(conn) => {
-                    sentinels.push(Arc::new(Mutex::new(conn)));
+                    connections.push(Arc::new(Mutex::new(conn)));
                     info!("Connected to sentinel: {}", endpoint.address());
                 }
                 Err(e) => {
@@ -368,9 +385,11 @@ impl SentinelClient {
             }
         }
 
-        if sentinels.is_empty() {
+        if connections.is_empty() {
             return Err(RedisError::Sentinel("No sentinels available".to_string()));
         }
+
+        self.sentinels.write().await.extend(connections);
 
         Ok(())
     }
@@ -380,7 +399,7 @@ impl SentinelClient {
         endpoint: &SentinelEndpoint,
     ) -> RedisResult<RedisConnection> {
         let sentinel_config =
-            ConnectionConfig::new(&format!("redis://{}:{}", endpoint.host, endpoint.port));
+            ConnectionConfig::new(format!("redis://{}:{}", endpoint.host, endpoint.port));
 
         let mut conn =
             RedisConnection::connect(&endpoint.host, endpoint.port, sentinel_config).await?;
@@ -400,9 +419,9 @@ impl SentinelClient {
     }
 
     async fn discover_master(&self) -> RedisResult<()> {
-        let sentinels = self.sentinels.read().await;
+        let sentinels: Vec<_> = self.sentinels.read().await.iter().cloned().collect();
 
-        for sentinel in sentinels.iter() {
+        for sentinel in &sentinels {
             match self.query_master_info(sentinel).await {
                 Ok(master_info) => {
                     info!("Discovered master: {}", master_info.address());
@@ -425,16 +444,15 @@ impl SentinelClient {
         &self,
         sentinel: &Arc<Mutex<RedisConnection>>,
     ) -> RedisResult<MasterInfo> {
-        let mut conn = sentinel.lock().await;
-
-        // Send SENTINEL masters command
-        let cmd = RespValue::Array(vec![
-            RespValue::BulkString(bytes::Bytes::from("SENTINEL")),
-            RespValue::BulkString(bytes::Bytes::from("masters")),
-        ]);
-
-        conn.send_command(&cmd).await?;
-        let response = conn.read_response().await?;
+        let response = {
+            let mut conn = sentinel.lock().await;
+            let cmd = RespValue::Array(vec![
+                RespValue::BulkString(bytes::Bytes::from("SENTINEL")),
+                RespValue::BulkString(bytes::Bytes::from("masters")),
+            ]);
+            conn.send_command(&cmd).await?;
+            conn.read_response().await?
+        };
 
         self.parse_master_info(response)
     }
@@ -444,7 +462,7 @@ impl SentinelClient {
             RespValue::Array(masters) => {
                 for master in masters {
                     if let RespValue::Array(master_data) = master {
-                        let master_info = self.parse_single_master(master_data)?;
+                        let master_info = Self::parse_single_master(&master_data)?;
                         if master_info.name == self.config.master_name {
                             return Ok(master_info);
                         }
@@ -459,7 +477,7 @@ impl SentinelClient {
         }
     }
 
-    fn parse_single_master(&self, master_data: Vec<RespValue>) -> RedisResult<MasterInfo> {
+    fn parse_single_master(master_data: &[RespValue]) -> RedisResult<MasterInfo> {
         let mut info = HashMap::new();
 
         // Parse key-value pairs
@@ -507,8 +525,7 @@ impl SentinelClient {
         let failover_timeout = info
             .get("failover-timeout")
             .and_then(|s| s.parse().ok())
-            .map(Duration::from_millis)
-            .unwrap_or(Duration::from_secs(60));
+            .map_or(Duration::from_secs(60), Duration::from_millis);
 
         let parallel_syncs = info
             .get("parallel-syncs")
@@ -533,17 +550,14 @@ impl SentinelClient {
 
         if let Some(master) = current_master {
             // Try to connect to current master
-            match self.test_master_connection(&master).await {
-                Ok(_) => {
-                    debug!("Master {} is healthy", master.address());
-                }
-                Err(_) => {
-                    warn!(
-                        "Master {} is not responding, discovering new master",
-                        master.address()
-                    );
-                    self.discover_master().await?;
-                }
+            if matches!(self.test_master_connection(&master).await, Ok(())) {
+                debug!("Master {} is healthy", master.address());
+            } else {
+                warn!(
+                    "Master {} is not responding, discovering new master",
+                    master.address()
+                );
+                self.discover_master().await?;
             }
         } else {
             // No current master, try to discover
@@ -555,7 +569,7 @@ impl SentinelClient {
 
     async fn test_master_connection(&self, master: &MasterInfo) -> RedisResult<()> {
         let master_config =
-            ConnectionConfig::new(&format!("redis://{}:{}", master.host, master.port));
+            ConnectionConfig::new(format!("redis://{}:{}", master.host, master.port));
         let mut conn = RedisConnection::connect(&master.host, master.port, master_config).await?;
 
         // Send PING command
@@ -573,7 +587,7 @@ impl SentinelClient {
     }
 }
 
-/// Extension trait for ConnectionConfig to support Sentinel
+/// Extension trait for `ConnectionConfig` to support Sentinel
 impl ConnectionConfig {
     /// Create a new connection config with Sentinel
     #[must_use]

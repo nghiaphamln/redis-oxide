@@ -30,7 +30,15 @@ jobs:
             ${{ runner.os }}-${{ runner.arch }}-cargo-${{ github.job }}-
             ${{ runner.os }}-${{ runner.arch }}-cargo-
       - name: Check
-        run: cargo check --all-targets --all-features
+        run: cargo check --locked --all-targets --all-features
+      - name: Enforce repository hygiene
+        shell: bash
+        run: |
+          ! git ls-files | rg '^redis-oxide/clippy_.*\.txt$'
+          ! rg --pcre2 '[\x{1F000}-\x{1FAFF}]' redis-oxide --glob '*.rs'
+          ! rg 'allow\(clippy' redis-oxide --glob '*.rs'
+      - name: Verify publishable package
+        run: cargo package --locked -p redis-oxide
 
   fmt:
     name: Rustfmt
@@ -76,7 +84,7 @@ jobs:
             ${{ runner.os }}-${{ runner.arch }}-cargo-${{ github.job }}-
             ${{ runner.os }}-${{ runner.arch }}-cargo-
       - name: Linting
-        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+        run: cargo clippy --locked --workspace --all-targets --all-features -- -D clippy::all -D clippy::pedantic -D clippy::nursery -D warnings
 
   test:
     name: Test Suite
@@ -107,9 +115,9 @@ jobs:
             ${{ runner.os }}-${{ runner.arch }}-cargo-${{ github.job }}-
             ${{ runner.os }}-${{ runner.arch }}-cargo-
       - name: Run unit and standalone integration tests
-        run: cargo test --workspace --all-targets --all-features
+        run: cargo test --locked --workspace --all-targets --all-features
       - name: Run doc tests
-        run: cargo test --doc --all-features
+        run: cargo test --locked --doc --all-features
 
   cross-platform:
     name: Cross Platform
@@ -133,9 +141,9 @@ jobs:
             ${{ runner.os }}-${{ runner.arch }}-cargo-${{ github.job }}-
             ${{ runner.os }}-${{ runner.arch }}-cargo-
       - name: Build
-        run: cargo build --release --all-features
+        run: cargo build --locked --release --all-features
       - name: Run unit tests
-        run: cargo test --lib --all-features
+        run: cargo test --locked --lib --all-features
 
   msrv:
     name: Minimum Supported Rust Version
@@ -158,7 +166,7 @@ jobs:
             ${{ runner.os }}-${{ runner.arch }}-cargo-${{ github.job }}-
             ${{ runner.os }}-${{ runner.arch }}-cargo-
       - name: Check minimum supported Rust version
-        run: cargo check --all-targets --all-features
+        run: cargo check --locked --all-targets --all-features
 
   topology-e2e:
     name: Cluster and Sentinel E2E
@@ -172,7 +180,7 @@ jobs:
           docker compose -f redis-oxide/tests/fixtures/redis-topologies.compose.yml up -d cluster-1 cluster-2 cluster-3
           docker compose -f redis-oxide/tests/fixtures/redis-topologies.compose.yml run --rm cluster-init
       - name: Test Redis Cluster
-        run: cargo test --test test_topology_e2e cluster_bootstraps_slots_and_routes_multiple_keys -- --ignored
+        run: cargo test --locked --test test_topology_e2e cluster_bootstraps_slots_and_routes_multiple_keys -- --ignored
         env:
           REDIS_CLUSTER_URL: redis://127.0.0.1:7000,127.0.0.1:7001,127.0.0.1:7002
       - name: Start Redis Sentinel
@@ -188,8 +196,8 @@ jobs:
           exit 1
       - name: Test Redis Sentinel
         run: |
-          cargo test --test test_topology_e2e sentinel_discovers_a_master_for_client_operations -- --ignored
-          cargo test --test test_topology_e2e sentinel_client_refreshes_after_master_failover -- --ignored
+          cargo test --locked --test test_topology_e2e sentinel_discovers_a_master_for_client_operations -- --ignored
+          cargo test --locked --test test_topology_e2e sentinel_client_refreshes_after_master_failover -- --ignored
         env:
           REDIS_SENTINEL_ENDPOINTS: 127.0.0.1:26379,127.0.0.1:26380,127.0.0.1:26381
       - name: Stop topology fixtures
@@ -205,7 +213,7 @@ jobs:
       - name: Install cargo-deny
         run: cargo install cargo-deny
       - name: Security and policy audit
-        run: cargo deny check
+        run: cargo deny --locked check
 
   docs:
     name: Documentation
@@ -226,9 +234,20 @@ jobs:
             ${{ runner.os }}-${{ runner.arch }}-cargo-${{ github.job }}-
             ${{ runner.os }}-${{ runner.arch }}-cargo-
       - name: Check documentation
-        run: cargo doc --no-deps --all-features
+        run: cargo doc --locked --workspace --no-deps --document-private-items --all-features
         env:
           RUSTDOCFLAGS: "-D warnings"
+
+  docs-links:
+    name: Documentation Links
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Check Markdown links
+        uses: lycheeverse/lychee-action@v2
+        with:
+          args: --verbose --no-progress --root-dir . './README.md' './CONTRIBUTING.md' './CHANGELOG.md' './docs/**/*.md'
+          fail: true
 
   examples:
     name: Examples
@@ -260,10 +279,10 @@ jobs:
             ${{ runner.os }}-${{ runner.arch }}-cargo-
       - name: Check examples compile
         run: |
-          cargo check --examples --all-features
-          cargo build --examples --all-features
+          cargo check --locked --examples --all-features
+          cargo build --locked --examples --all-features
       - name: Run basic examples
         run: |
-          timeout 30s cargo run -p redis-oxide --example basic_usage
+          timeout 30s cargo run --locked -p redis-oxide --example basic_usage
         env:
           REDIS_URL: redis://localhost:6379

@@ -124,6 +124,10 @@ impl Transaction {
     /// # Ok(())
     /// # }
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub async fn watch(&mut self, keys: Vec<String>) -> RedisResult<()> {
         if self.is_started {
             return Err(RedisError::Protocol("Cannot WATCH after MULTI".to_string()));
@@ -132,14 +136,20 @@ impl Transaction {
         let mut connection = self.connection.lock().await;
         connection.prepare(&keys).await?;
         connection.watch(keys.clone()).await?;
+        drop(connection);
         self.watched_keys.extend(keys);
         Ok(())
     }
 
     /// Unwatch all previously watched keys
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub async fn unwatch(&mut self) -> RedisResult<()> {
         let mut connection = self.connection.lock().await;
         connection.unwatch().await?;
+        drop(connection);
         self.watched_keys.clear();
         Ok(())
     }
@@ -349,6 +359,10 @@ impl Transaction {
     /// # Ok(())
     /// # }
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub async fn discard(&mut self) -> RedisResult<()> {
         let mut connection = self.connection.lock().await;
         if self.is_started {
@@ -356,6 +370,7 @@ impl Transaction {
         } else if !self.watched_keys.is_empty() {
             connection.unwatch().await?;
         }
+        drop(connection);
         self.commands.clear();
         self.watched_keys.clear();
         self.is_started = false;
@@ -373,16 +388,16 @@ pub struct TransactionResult {
 impl TransactionResult {
     /// Create a new transaction result
     #[must_use]
-    pub fn new(results: Vec<RespValue>) -> Self {
+    pub const fn new(results: Vec<RespValue>) -> Self {
         Self { results, index: 0 }
     }
 
-    /// Get the next result from the transaction
+    /// Decode the next result from the transaction.
     ///
     /// # Errors
     ///
     /// Returns an error if there are no more results or type conversion fails.
-    pub fn next<T>(&mut self) -> RedisResult<T>
+    pub fn next_result<T>(&mut self) -> RedisResult<T>
     where
         T: TryFrom<RespValue>,
         T::Error: Into<RedisError>,
@@ -410,10 +425,7 @@ impl TransactionResult {
         T::Error: Into<RedisError>,
     {
         if index >= self.results.len() {
-            return Err(RedisError::Protocol(format!(
-                "Index {} out of bounds",
-                index
-            )));
+            return Err(RedisError::Protocol(format!("Index {index} out of bounds")));
         }
 
         let result = self.results[index].clone();
@@ -478,11 +490,9 @@ impl TransactionCommand for crate::commands::DelCommand {
     }
 
     fn key(&self) -> Option<String> {
-        if let Some(first_key) = self.keys().first() {
-            Some(first_key.iter().map(|&b| b as char).collect())
-        } else {
-            None
-        }
+        self.keys()
+            .first()
+            .map(|first_key| first_key.iter().map(|&b| b as char).collect())
     }
 }
 
@@ -552,11 +562,9 @@ impl TransactionCommand for crate::commands::ExistsCommand {
     }
 
     fn key(&self) -> Option<String> {
-        if let Some(first_key) = self.keys().first() {
-            Some(first_key.iter().map(|&b| b as char).collect())
-        } else {
-            None
-        }
+        self.keys()
+            .first()
+            .map(|first_key| first_key.iter().map(|&b| b as char).collect())
     }
 }
 
@@ -734,7 +742,7 @@ mod tests {
         assert_eq!(transaction_result.len(), 3);
         assert!(!transaction_result.is_empty());
 
-        let first: String = transaction_result.next().unwrap();
+        let first: String = transaction_result.next_result().unwrap();
         assert_eq!(first, "OK");
 
         let second: String = transaction_result.get(1).unwrap();

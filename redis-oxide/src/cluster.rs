@@ -35,6 +35,7 @@ pub fn node_address_key(host: &str, port: u16) -> String {
 /// - If the key contains {...}, only the part between the first { and first } is hashed
 /// - Otherwise, the entire key is hashed
 /// - The hash is CRC16 mod 16384
+#[must_use]
 pub fn calculate_slot(key: &[u8]) -> u16 {
     let hash_key = extract_hash_tag(key);
     State::<XMODEM>::calculate(hash_key) % CLUSTER_SLOTS
@@ -70,6 +71,7 @@ pub struct ClusterTopology {
 
 impl ClusterTopology {
     /// Create a new cluster topology
+    #[must_use]
     pub fn new() -> Self {
         Self {
             slot_map: Arc::new(RwLock::new(HashMap::new())),
@@ -104,7 +106,11 @@ impl ClusterTopology {
     /// Update the topology from CLUSTER SLOTS response
     ///
     /// The response is an array of slot ranges, where each range is:
-    /// [start_slot, end_slot, [master_host, master_port], [replica_host, replica_port], ...]
+    /// [`start_slot`, `end_slot`, [`master_host`, `master_port`], [`replica_host`, `replica_port`], ...]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub async fn update_from_cluster_slots(
         &self,
         slots_data: Vec<Vec<(i64, String, i64)>>,
@@ -147,6 +153,10 @@ impl ClusterTopology {
     }
 
     /// Update topology from the raw RESP2 `CLUSTER SLOTS` response.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub async fn update_from_cluster_slots_response(
         &self,
         response: &RespValue,
@@ -250,7 +260,8 @@ pub struct RedirectHandler {
 
 impl RedirectHandler {
     /// Create a new redirect handler
-    pub fn new(topology: ClusterTopology, max_redirects: usize) -> Self {
+    #[must_use]
+    pub const fn new(topology: ClusterTopology, max_redirects: usize) -> Self {
         Self {
             topology,
             max_redirects,
@@ -258,6 +269,10 @@ impl RedirectHandler {
     }
 
     /// Handle a redirect error and update topology
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub async fn handle_redirect(&self, error: &RedisError) -> RedisResult<(String, u16, bool)> {
         match error {
             RedisError::Moved { slot, host, port } => {
@@ -272,14 +287,14 @@ impl RedirectHandler {
                 Ok((host.clone(), *port, true))
             }
             _ => Err(RedisError::Cluster(format!(
-                "Not a redirect error: {:?}",
-                error
+                "Not a redirect error: {error:?}"
             ))),
         }
     }
 
     /// Get max redirects allowed
-    pub fn max_redirects(&self) -> usize {
+    #[must_use]
+    pub const fn max_redirects(&self) -> usize {
         self.max_redirects
     }
 }

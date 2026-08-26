@@ -12,8 +12,8 @@
 //! - **Push**: Server-initiated messages (pub/sub, monitoring)
 //! - **Boolean**: True/false values
 //! - **Double**: IEEE 754 floating point numbers
-//! - **BigNumber**: Arbitrary precision numbers
-//! - **VerbatimString**: Strings with encoding information
+//! - **`BigNumber`**: Arbitrary precision numbers
+//! - **`VerbatimString`**: Strings with encoding information
 //! - **Null**: Explicit null value
 //!
 //! # Examples
@@ -108,18 +108,16 @@ impl Resp3Value {
     /// Returns an error if the value cannot be converted to a string.
     pub fn as_string(&self) -> RedisResult<String> {
         match self {
-            Self::SimpleString(s) => Ok(s.clone()),
+            Self::SimpleString(s) | Self::BigNumber(s) => Ok(s.clone()),
             Self::BlobString(bytes) => String::from_utf8(bytes.to_vec())
                 .map_err(|error| RedisError::Type(format!("Invalid UTF-8: {error}"))),
             Self::VerbatimString { data, .. } => Ok(data.clone()),
             Self::Number(n) => Ok(n.to_string()),
             Self::Double(f) => Ok(f.to_string()),
             Self::Boolean(b) => Ok(b.to_string()),
-            Self::BigNumber(s) => Ok(s.clone()),
             Self::Null => Err(RedisError::Type("Value is null".to_string())),
             _ => Err(RedisError::Type(format!(
-                "Cannot convert {:?} to string",
-                self
+                "Cannot convert {self:?} to string"
             ))),
         }
     }
@@ -134,17 +132,20 @@ impl Resp3Value {
             Self::Number(n) => Ok(*n),
             Self::SimpleString(s) => s
                 .parse::<i64>()
-                .map_err(|e| RedisError::Type(format!("Cannot parse '{}' to i64: {}", s, e))),
+                .map_err(|e| RedisError::Type(format!("Cannot parse '{s}' to i64: {e}"))),
             Self::BlobString(bytes) => String::from_utf8(bytes.to_vec())
                 .map_err(|error| RedisError::Type(format!("Invalid UTF-8: {error}")))?
                 .parse::<i64>()
                 .map_err(|error| RedisError::Type(format!("Cannot parse blob to i64: {error}"))),
-            Self::Double(f) => Ok(*f as i64),
+            Self::Double(f) => {
+                f.trunc().to_string().parse::<i64>().map_err(|error| {
+                    RedisError::Type(format!("Cannot convert {f} to i64: {error}"))
+                })
+            }
             Self::Boolean(true) => Ok(1),
             Self::Boolean(false) => Ok(0),
             _ => Err(RedisError::Type(format!(
-                "Cannot convert {:?} to integer",
-                self
+                "Cannot convert {self:?} to integer"
             ))),
         }
     }
@@ -157,17 +158,19 @@ impl Resp3Value {
     pub fn as_float(&self) -> RedisResult<f64> {
         match self {
             Self::Double(f) => Ok(*f),
-            Self::Number(n) => Ok(*n as f64),
+            Self::Number(n) => n
+                .to_string()
+                .parse::<f64>()
+                .map_err(|error| RedisError::Type(format!("Cannot convert {n} to f64: {error}"))),
             Self::SimpleString(s) => s
                 .parse::<f64>()
-                .map_err(|e| RedisError::Type(format!("Cannot parse '{}' to f64: {}", s, e))),
+                .map_err(|e| RedisError::Type(format!("Cannot parse '{s}' to f64: {e}"))),
             Self::BlobString(bytes) => String::from_utf8(bytes.to_vec())
                 .map_err(|error| RedisError::Type(format!("Invalid UTF-8: {error}")))?
                 .parse::<f64>()
                 .map_err(|error| RedisError::Type(format!("Cannot parse blob to f64: {error}"))),
             _ => Err(RedisError::Type(format!(
-                "Cannot convert {:?} to float",
-                self
+                "Cannot convert {self:?} to float"
             ))),
         }
     }
@@ -183,10 +186,7 @@ impl Resp3Value {
             Self::Number(1) => Ok(true),
             Self::Number(0) => Ok(false),
             Self::SimpleString(s) if s == "OK" => Ok(true),
-            _ => Err(RedisError::Type(format!(
-                "Cannot convert {:?} to bool",
-                self
-            ))),
+            _ => Err(RedisError::Type(format!("Cannot convert {self:?} to bool"))),
         }
     }
 
@@ -227,7 +227,9 @@ impl From<Resp3Value> for RespValue {
             Resp3Value::SimpleError(s) => Self::Error(s),
             Resp3Value::Number(n) => Self::Integer(n),
             Resp3Value::BlobString(bytes) => Self::BulkString(bytes),
-            Resp3Value::Array(arr) => Self::Array(arr.into_iter().map(Into::into).collect()),
+            Resp3Value::Array(values) | Resp3Value::Set(values) | Resp3Value::Push(values) => {
+                Self::Array(values.into_iter().map(Into::into).collect())
+            }
             Resp3Value::Null => Self::Null,
             Resp3Value::Boolean(true) => Self::Integer(1),
             Resp3Value::Boolean(false) => Self::Integer(0),
@@ -247,9 +249,7 @@ impl From<Resp3Value> for RespValue {
                 }
                 Self::Array(arr)
             }
-            Resp3Value::Set(set) => Self::Array(set.into_iter().map(Into::into).collect()),
             Resp3Value::Attribute { data, .. } => (*data).into(),
-            Resp3Value::Push(arr) => Self::Array(arr.into_iter().map(Into::into).collect()),
         }
     }
 }
@@ -293,114 +293,67 @@ impl Resp3Encoder {
         Ok(self.buffer.split().freeze())
     }
 
+    fn write_line(&mut self, type_byte: u8, data: &[u8]) {
+        self.buffer.put_u8(type_byte);
+        self.buffer.extend_from_slice(data);
+        self.buffer.extend_from_slice(b"\r\n");
+    }
+
+    fn write_blob(&mut self, type_byte: u8, data: &[u8]) {
+        self.buffer.put_u8(type_byte);
+        self.buffer
+            .extend_from_slice(data.len().to_string().as_bytes());
+        self.buffer.extend_from_slice(b"\r\n");
+        self.buffer.extend_from_slice(data);
+        self.buffer.extend_from_slice(b"\r\n");
+    }
+
+    fn encode_sequence(&mut self, type_byte: u8, values: &[Resp3Value]) -> RedisResult<()> {
+        self.write_line(type_byte, values.len().to_string().as_bytes());
+        for value in values {
+            self.encode_value(value)?;
+        }
+        Ok(())
+    }
+
+    fn encode_pairs(
+        &mut self,
+        type_byte: u8,
+        pairs: &[(Resp3Value, Resp3Value)],
+    ) -> RedisResult<()> {
+        self.write_line(type_byte, pairs.len().to_string().as_bytes());
+        for (key, value) in pairs {
+            self.encode_value(key)?;
+            self.encode_value(value)?;
+        }
+        Ok(())
+    }
+
     fn encode_value(&mut self, value: &Resp3Value) -> RedisResult<()> {
         match value {
-            Resp3Value::SimpleString(s) => {
-                self.buffer.put_u8(b'+');
-                self.buffer.extend_from_slice(s.as_bytes());
-                self.buffer.extend_from_slice(b"\r\n");
-            }
-            Resp3Value::SimpleError(s) => {
-                self.buffer.put_u8(b'-');
-                self.buffer.extend_from_slice(s.as_bytes());
-                self.buffer.extend_from_slice(b"\r\n");
-            }
-            Resp3Value::Number(n) => {
-                self.buffer.put_u8(b':');
-                self.buffer.extend_from_slice(n.to_string().as_bytes());
-                self.buffer.extend_from_slice(b"\r\n");
-            }
-            Resp3Value::BlobString(s) => {
-                self.buffer.put_u8(b'$');
-                self.buffer
-                    .extend_from_slice(s.len().to_string().as_bytes());
-                self.buffer.extend_from_slice(b"\r\n");
-                self.buffer.extend_from_slice(s);
-                self.buffer.extend_from_slice(b"\r\n");
-            }
-            Resp3Value::Array(arr) => {
-                self.buffer.put_u8(b'*');
-                self.buffer
-                    .extend_from_slice(arr.len().to_string().as_bytes());
-                self.buffer.extend_from_slice(b"\r\n");
-                for item in arr {
-                    self.encode_value(item)?;
-                }
-            }
+            Resp3Value::SimpleString(s) => self.write_line(b'+', s.as_bytes()),
+            Resp3Value::SimpleError(s) => self.write_line(b'-', s.as_bytes()),
+            Resp3Value::Number(n) => self.write_line(b':', n.to_string().as_bytes()),
+            Resp3Value::BlobString(bytes) => self.write_blob(b'$', bytes),
+            Resp3Value::Array(values) => self.encode_sequence(b'*', values)?,
             Resp3Value::Null => {
                 self.buffer.extend_from_slice(b"_\r\n");
             }
-            Resp3Value::Boolean(b) => {
-                self.buffer.put_u8(b'#');
-                self.buffer.put_u8(if *b { b't' } else { b'f' });
-                self.buffer.extend_from_slice(b"\r\n");
-            }
-            Resp3Value::Double(f) => {
-                self.buffer.put_u8(b',');
-                self.buffer.extend_from_slice(f.to_string().as_bytes());
-                self.buffer.extend_from_slice(b"\r\n");
-            }
-            Resp3Value::BigNumber(s) => {
-                self.buffer.put_u8(b'(');
-                self.buffer.extend_from_slice(s.as_bytes());
-                self.buffer.extend_from_slice(b"\r\n");
-            }
-            Resp3Value::BlobError(s) => {
-                self.buffer.put_u8(b'!');
-                self.buffer
-                    .extend_from_slice(s.len().to_string().as_bytes());
-                self.buffer.extend_from_slice(b"\r\n");
-                self.buffer.extend_from_slice(s);
-                self.buffer.extend_from_slice(b"\r\n");
-            }
+            Resp3Value::Boolean(flag) => self.write_line(b'#', if *flag { b"t" } else { b"f" }),
+            Resp3Value::Double(float) => self.write_line(b',', float.to_string().as_bytes()),
+            Resp3Value::BigNumber(s) => self.write_line(b'(', s.as_bytes()),
+            Resp3Value::BlobError(bytes) => self.write_blob(b'!', bytes),
             Resp3Value::VerbatimString { encoding, data } => {
-                let content = format!("{}:{}", encoding, data);
-                self.buffer.put_u8(b'=');
-                self.buffer
-                    .extend_from_slice(content.len().to_string().as_bytes());
-                self.buffer.extend_from_slice(b"\r\n");
-                self.buffer.extend_from_slice(content.as_bytes());
-                self.buffer.extend_from_slice(b"\r\n");
+                let content = format!("{encoding}:{data}");
+                self.write_blob(b'=', content.as_bytes());
             }
-            Resp3Value::Map(map) => {
-                self.buffer.put_u8(b'%');
-                self.buffer
-                    .extend_from_slice(map.len().to_string().as_bytes());
-                self.buffer.extend_from_slice(b"\r\n");
-                for (k, v) in map {
-                    self.encode_value(k)?;
-                    self.encode_value(v)?;
-                }
-            }
-            Resp3Value::Set(set) => {
-                self.buffer.put_u8(b'~');
-                self.buffer
-                    .extend_from_slice(set.len().to_string().as_bytes());
-                self.buffer.extend_from_slice(b"\r\n");
-                for item in set {
-                    self.encode_value(item)?;
-                }
-            }
+            Resp3Value::Map(pairs) => self.encode_pairs(b'%', pairs)?,
+            Resp3Value::Set(values) => self.encode_sequence(b'~', values)?,
             Resp3Value::Attribute { attrs, data } => {
-                self.buffer.put_u8(b'|');
-                self.buffer
-                    .extend_from_slice(attrs.len().to_string().as_bytes());
-                self.buffer.extend_from_slice(b"\r\n");
-                for (k, v) in attrs {
-                    self.encode_value(k)?;
-                    self.encode_value(v)?;
-                }
+                self.encode_pairs(b'|', attrs)?;
                 self.encode_value(data)?;
             }
-            Resp3Value::Push(arr) => {
-                self.buffer.put_u8(b'>');
-                self.buffer
-                    .extend_from_slice(arr.len().to_string().as_bytes());
-                self.buffer.extend_from_slice(b"\r\n");
-                for item in arr {
-                    self.encode_value(item)?;
-                }
-            }
+            Resp3Value::Push(values) => self.encode_sequence(b'>', values)?,
         }
         Ok(())
     }
@@ -439,12 +392,18 @@ impl Resp3Decoder {
     /// Feed a response fragment and decode one complete RESP3 value when ready.
     ///
     /// Additional complete values remain buffered for the next call.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub fn try_decode(&mut self, data: &[u8]) -> RedisResult<Option<Resp3Value>> {
         self.buffer.extend_from_slice(data);
         let mut cursor = Cursor::new(&self.buffer[..]);
-        match self.decode_value(&mut cursor) {
+        match Self::decode_value(&mut cursor) {
             Ok(value) => {
-                let consumed = cursor.position() as usize;
+                let consumed = usize::try_from(cursor.position()).map_err(|_| {
+                    RedisError::Protocol("RESP cursor position exceeds platform size".to_string())
+                })?;
                 self.buffer.advance(consumed);
                 Ok(Some(value))
             }
@@ -453,28 +412,28 @@ impl Resp3Decoder {
         }
     }
 
-    fn decode_value(&self, cursor: &mut Cursor<&[u8]>) -> RedisResult<Resp3Value> {
+    fn decode_value(cursor: &mut Cursor<&[u8]>) -> RedisResult<Resp3Value> {
         if !cursor.has_remaining() {
             return Err(RedisError::Protocol("Incomplete data".to_string()));
         }
 
         let type_byte = cursor.get_u8();
         match type_byte {
-            b'+' => self.decode_simple_string(cursor),
-            b'-' => self.decode_simple_error(cursor),
-            b':' => self.decode_number(cursor),
-            b'$' => self.decode_blob_string(cursor),
-            b'*' => self.decode_array(cursor),
-            b'_' => self.decode_null(cursor),
-            b'#' => self.decode_boolean(cursor),
-            b',' => self.decode_double(cursor),
-            b'(' => self.decode_big_number(cursor),
-            b'!' => self.decode_blob_error(cursor),
-            b'=' => self.decode_verbatim_string(cursor),
-            b'%' => self.decode_map(cursor),
-            b'~' => self.decode_set(cursor),
-            b'|' => self.decode_attribute(cursor),
-            b'>' => self.decode_push(cursor),
+            b'+' => Self::decode_simple_string(cursor),
+            b'-' => Self::decode_simple_error(cursor),
+            b':' => Self::decode_number(cursor),
+            b'$' => Self::decode_blob_string(cursor),
+            b'*' => Self::decode_array(cursor),
+            b'_' => Self::decode_null(cursor),
+            b'#' => Self::decode_boolean(cursor),
+            b',' => Self::decode_double(cursor),
+            b'(' => Self::decode_big_number(cursor),
+            b'!' => Self::decode_blob_error(cursor),
+            b'=' => Self::decode_verbatim_string(cursor),
+            b'%' => Self::decode_map(cursor),
+            b'~' => Self::decode_set(cursor),
+            b'|' => Self::decode_attribute(cursor),
+            b'>' => Self::decode_push(cursor),
             _ => Err(RedisError::Protocol(format!(
                 "Unknown RESP3 type byte: {}",
                 type_byte as char
@@ -482,29 +441,29 @@ impl Resp3Decoder {
         }
     }
 
-    fn decode_simple_string(&self, cursor: &mut Cursor<&[u8]>) -> RedisResult<Resp3Value> {
-        let line = self.read_line(cursor)?;
+    fn decode_simple_string(cursor: &mut Cursor<&[u8]>) -> RedisResult<Resp3Value> {
+        let line = Self::read_line(cursor)?;
         Ok(Resp3Value::SimpleString(line))
     }
 
-    fn decode_simple_error(&self, cursor: &mut Cursor<&[u8]>) -> RedisResult<Resp3Value> {
-        let line = self.read_line(cursor)?;
+    fn decode_simple_error(cursor: &mut Cursor<&[u8]>) -> RedisResult<Resp3Value> {
+        let line = Self::read_line(cursor)?;
         Ok(Resp3Value::SimpleError(line))
     }
 
-    fn decode_number(&self, cursor: &mut Cursor<&[u8]>) -> RedisResult<Resp3Value> {
-        let line = self.read_line(cursor)?;
+    fn decode_number(cursor: &mut Cursor<&[u8]>) -> RedisResult<Resp3Value> {
+        let line = Self::read_line(cursor)?;
         let num = line
             .parse::<i64>()
-            .map_err(|e| RedisError::Protocol(format!("Invalid number: {}", e)))?;
+            .map_err(|e| RedisError::Protocol(format!("Invalid number: {e}")))?;
         Ok(Resp3Value::Number(num))
     }
 
-    fn decode_blob_string(&self, cursor: &mut Cursor<&[u8]>) -> RedisResult<Resp3Value> {
-        let len_line = self.read_line(cursor)?;
+    fn decode_blob_string(cursor: &mut Cursor<&[u8]>) -> RedisResult<Resp3Value> {
+        let len_line = Self::read_line(cursor)?;
         let len = len_line
             .parse::<i64>()
-            .map_err(|e| RedisError::Protocol(format!("Invalid blob string length: {}", e)))?;
+            .map_err(|e| RedisError::Protocol(format!("Invalid blob string length: {e}")))?;
 
         if len == -1 {
             return Ok(Resp3Value::Null);
@@ -516,7 +475,8 @@ impl Resp3Decoder {
             ));
         }
 
-        let len = len as usize;
+        let len = usize::try_from(len)
+            .map_err(|_| RedisError::Protocol("Invalid blob string length".to_string()))?;
         if len > MAX_BLOB_LENGTH {
             return Err(RedisError::Protocol(format!(
                 "Blob string exceeds maximum size of {MAX_BLOB_LENGTH} bytes"
@@ -539,11 +499,11 @@ impl Resp3Decoder {
         Ok(Resp3Value::BlobString(Bytes::from(data)))
     }
 
-    fn decode_array(&self, cursor: &mut Cursor<&[u8]>) -> RedisResult<Resp3Value> {
-        let len_line = self.read_line(cursor)?;
+    fn decode_array(cursor: &mut Cursor<&[u8]>) -> RedisResult<Resp3Value> {
+        let len_line = Self::read_line(cursor)?;
         let len = len_line
             .parse::<i64>()
-            .map_err(|e| RedisError::Protocol(format!("Invalid array length: {}", e)))?;
+            .map_err(|e| RedisError::Protocol(format!("Invalid array length: {e}")))?;
 
         if len == -1 {
             return Ok(Resp3Value::Null);
@@ -553,7 +513,8 @@ impl Resp3Decoder {
             return Err(RedisError::Protocol("Invalid array length".to_string()));
         }
 
-        let len = len as usize;
+        let len = usize::try_from(len)
+            .map_err(|_| RedisError::Protocol("Invalid array length".to_string()))?;
         if len > MAX_COLLECTION_ELEMENTS {
             return Err(RedisError::Protocol(format!(
                 "Array exceeds maximum element count of {MAX_COLLECTION_ELEMENTS}"
@@ -561,14 +522,14 @@ impl Resp3Decoder {
         }
         let mut array = Vec::with_capacity(len);
         for _ in 0..len {
-            array.push(self.decode_value(cursor)?);
+            array.push(Self::decode_value(cursor)?);
         }
 
         Ok(Resp3Value::Array(array))
     }
 
-    fn decode_null(&self, cursor: &mut Cursor<&[u8]>) -> RedisResult<Resp3Value> {
-        let line = self.read_line(cursor)?;
+    fn decode_null(cursor: &mut Cursor<&[u8]>) -> RedisResult<Resp3Value> {
+        let line = Self::read_line(cursor)?;
         if line.is_empty() {
             Ok(Resp3Value::Null)
         } else {
@@ -576,33 +537,33 @@ impl Resp3Decoder {
         }
     }
 
-    fn decode_boolean(&self, cursor: &mut Cursor<&[u8]>) -> RedisResult<Resp3Value> {
-        let line = self.read_line(cursor)?;
+    fn decode_boolean(cursor: &mut Cursor<&[u8]>) -> RedisResult<Resp3Value> {
+        let line = Self::read_line(cursor)?;
         match line.as_str() {
             "t" => Ok(Resp3Value::Boolean(true)),
             "f" => Ok(Resp3Value::Boolean(false)),
-            _ => Err(RedisError::Protocol(format!("Invalid boolean: {}", line))),
+            _ => Err(RedisError::Protocol(format!("Invalid boolean: {line}"))),
         }
     }
 
-    fn decode_double(&self, cursor: &mut Cursor<&[u8]>) -> RedisResult<Resp3Value> {
-        let line = self.read_line(cursor)?;
+    fn decode_double(cursor: &mut Cursor<&[u8]>) -> RedisResult<Resp3Value> {
+        let line = Self::read_line(cursor)?;
         let num = line
             .parse::<f64>()
-            .map_err(|e| RedisError::Protocol(format!("Invalid double: {}", e)))?;
+            .map_err(|e| RedisError::Protocol(format!("Invalid double: {e}")))?;
         Ok(Resp3Value::Double(num))
     }
 
-    fn decode_big_number(&self, cursor: &mut Cursor<&[u8]>) -> RedisResult<Resp3Value> {
-        let line = self.read_line(cursor)?;
+    fn decode_big_number(cursor: &mut Cursor<&[u8]>) -> RedisResult<Resp3Value> {
+        let line = Self::read_line(cursor)?;
         Ok(Resp3Value::BigNumber(line))
     }
 
-    fn decode_blob_error(&self, cursor: &mut Cursor<&[u8]>) -> RedisResult<Resp3Value> {
-        let len_line = self.read_line(cursor)?;
+    fn decode_blob_error(cursor: &mut Cursor<&[u8]>) -> RedisResult<Resp3Value> {
+        let len_line = Self::read_line(cursor)?;
         let len = len_line
             .parse::<usize>()
-            .map_err(|e| RedisError::Protocol(format!("Invalid blob error length: {}", e)))?;
+            .map_err(|e| RedisError::Protocol(format!("Invalid blob error length: {e}")))?;
 
         if len > MAX_BLOB_LENGTH {
             return Err(RedisError::Protocol(format!(
@@ -627,11 +588,11 @@ impl Resp3Decoder {
         Ok(Resp3Value::BlobError(Bytes::from(data)))
     }
 
-    fn decode_verbatim_string(&self, cursor: &mut Cursor<&[u8]>) -> RedisResult<Resp3Value> {
-        let len_line = self.read_line(cursor)?;
+    fn decode_verbatim_string(cursor: &mut Cursor<&[u8]>) -> RedisResult<Resp3Value> {
+        let len_line = Self::read_line(cursor)?;
         let len = len_line
             .parse::<usize>()
-            .map_err(|e| RedisError::Protocol(format!("Invalid verbatim string length: {}", e)))?;
+            .map_err(|e| RedisError::Protocol(format!("Invalid verbatim string length: {e}")))?;
 
         if len > MAX_BLOB_LENGTH {
             return Err(RedisError::Protocol(format!(
@@ -655,27 +616,25 @@ impl Resp3Decoder {
             ));
         }
 
-        let content = String::from_utf8(data).map_err(|e| {
-            RedisError::Protocol(format!("Invalid UTF-8 in verbatim string: {}", e))
-        })?;
+        let content = String::from_utf8(data)
+            .map_err(|e| RedisError::Protocol(format!("Invalid UTF-8 in verbatim string: {e}")))?;
 
-        // Parse encoding:data format
-        if let Some(colon_pos) = content.find(':') {
-            let encoding = content[..colon_pos].to_string();
-            let data = content[colon_pos + 1..].to_string();
-            Ok(Resp3Value::VerbatimString { encoding, data })
-        } else {
-            Err(RedisError::Protocol(
+        let Some(colon_pos) = content.find(':') else {
+            return Err(RedisError::Protocol(
                 "Invalid verbatim string format".to_string(),
-            ))
-        }
+            ));
+        };
+
+        let encoding = content[..colon_pos].to_string();
+        let data = content[colon_pos + 1..].to_string();
+        Ok(Resp3Value::VerbatimString { encoding, data })
     }
 
-    fn decode_map(&self, cursor: &mut Cursor<&[u8]>) -> RedisResult<Resp3Value> {
-        let len_line = self.read_line(cursor)?;
+    fn decode_map(cursor: &mut Cursor<&[u8]>) -> RedisResult<Resp3Value> {
+        let len_line = Self::read_line(cursor)?;
         let len = len_line
             .parse::<usize>()
-            .map_err(|e| RedisError::Protocol(format!("Invalid map length: {}", e)))?;
+            .map_err(|e| RedisError::Protocol(format!("Invalid map length: {e}")))?;
 
         if len > MAX_COLLECTION_ELEMENTS {
             return Err(RedisError::Protocol(format!(
@@ -685,19 +644,19 @@ impl Resp3Decoder {
 
         let mut map = Vec::with_capacity(len);
         for _ in 0..len {
-            let key = self.decode_value(cursor)?;
-            let value = self.decode_value(cursor)?;
+            let key = Self::decode_value(cursor)?;
+            let value = Self::decode_value(cursor)?;
             map.push((key, value));
         }
 
         Ok(Resp3Value::Map(map))
     }
 
-    fn decode_set(&self, cursor: &mut Cursor<&[u8]>) -> RedisResult<Resp3Value> {
-        let len_line = self.read_line(cursor)?;
+    fn decode_set(cursor: &mut Cursor<&[u8]>) -> RedisResult<Resp3Value> {
+        let len_line = Self::read_line(cursor)?;
         let len = len_line
             .parse::<usize>()
-            .map_err(|e| RedisError::Protocol(format!("Invalid set length: {}", e)))?;
+            .map_err(|e| RedisError::Protocol(format!("Invalid set length: {e}")))?;
 
         if len > MAX_COLLECTION_ELEMENTS {
             return Err(RedisError::Protocol(format!(
@@ -707,18 +666,18 @@ impl Resp3Decoder {
 
         let mut set = Vec::with_capacity(len);
         for _ in 0..len {
-            let value = self.decode_value(cursor)?;
+            let value = Self::decode_value(cursor)?;
             set.push(value);
         }
 
         Ok(Resp3Value::Set(set))
     }
 
-    fn decode_attribute(&self, cursor: &mut Cursor<&[u8]>) -> RedisResult<Resp3Value> {
-        let len_line = self.read_line(cursor)?;
+    fn decode_attribute(cursor: &mut Cursor<&[u8]>) -> RedisResult<Resp3Value> {
+        let len_line = Self::read_line(cursor)?;
         let len = len_line
             .parse::<usize>()
-            .map_err(|e| RedisError::Protocol(format!("Invalid attribute length: {}", e)))?;
+            .map_err(|e| RedisError::Protocol(format!("Invalid attribute length: {e}")))?;
 
         if len > MAX_COLLECTION_ELEMENTS {
             return Err(RedisError::Protocol(format!(
@@ -728,20 +687,20 @@ impl Resp3Decoder {
 
         let mut attrs = Vec::with_capacity(len);
         for _ in 0..len {
-            let key = self.decode_value(cursor)?;
-            let value = self.decode_value(cursor)?;
+            let key = Self::decode_value(cursor)?;
+            let value = Self::decode_value(cursor)?;
             attrs.push((key, value));
         }
 
-        let data = Box::new(self.decode_value(cursor)?);
+        let data = Box::new(Self::decode_value(cursor)?);
         Ok(Resp3Value::Attribute { attrs, data })
     }
 
-    fn decode_push(&self, cursor: &mut Cursor<&[u8]>) -> RedisResult<Resp3Value> {
-        let len_line = self.read_line(cursor)?;
+    fn decode_push(cursor: &mut Cursor<&[u8]>) -> RedisResult<Resp3Value> {
+        let len_line = Self::read_line(cursor)?;
         let len = len_line
             .parse::<usize>()
-            .map_err(|e| RedisError::Protocol(format!("Invalid push length: {}", e)))?;
+            .map_err(|e| RedisError::Protocol(format!("Invalid push length: {e}")))?;
 
         if len > MAX_COLLECTION_ELEMENTS {
             return Err(RedisError::Protocol(format!(
@@ -751,14 +710,16 @@ impl Resp3Decoder {
 
         let mut array = Vec::with_capacity(len);
         for _ in 0..len {
-            array.push(self.decode_value(cursor)?);
+            array.push(Self::decode_value(cursor)?);
         }
 
         Ok(Resp3Value::Push(array))
     }
 
-    fn read_line(&self, cursor: &mut Cursor<&[u8]>) -> RedisResult<String> {
-        let start = cursor.position() as usize;
+    fn read_line(cursor: &mut Cursor<&[u8]>) -> RedisResult<String> {
+        let start = usize::try_from(cursor.position()).map_err(|_| {
+            RedisError::Protocol("RESP cursor position exceeds platform size".to_string())
+        })?;
         let data = cursor.get_ref();
 
         if start >= data.len() {
@@ -768,7 +729,7 @@ impl Resp3Decoder {
             if window == b"\r\n" {
                 let end = start + offset;
                 let line = String::from_utf8(data[start..end].to_vec())
-                    .map_err(|e| RedisError::Protocol(format!("Invalid UTF-8 in line: {}", e)))?;
+                    .map_err(|e| RedisError::Protocol(format!("Invalid UTF-8 in line: {e}")))?;
                 cursor.set_position((end + 2) as u64);
                 return Ok(line);
             }
@@ -788,16 +749,18 @@ impl Default for Resp3Decoder {
 mod tests {
     use super::*;
 
+    fn assert_round_trip(expected: &Resp3Value) {
+        let mut serializer = Resp3Encoder::new();
+        let wire_data = serializer.encode(expected).unwrap();
+        let mut parser = Resp3Decoder::new();
+        let actual = parser.decode(&wire_data).unwrap();
+
+        assert_eq!(expected, &actual);
+    }
+
     #[test]
     fn test_encode_decode_simple_string() {
-        let mut encoder = Resp3Encoder::new();
-        let value = Resp3Value::SimpleString("OK".to_string());
-        let encoded = encoder.encode(&value).unwrap();
-
-        let mut decoder = Resp3Decoder::new();
-        let decoded = decoder.decode(&encoded).unwrap();
-
-        assert_eq!(value, decoded);
+        assert_round_trip(&Resp3Value::SimpleString("OK".to_string()));
     }
 
     #[test]
@@ -812,44 +775,22 @@ mod tests {
 
     #[test]
     fn test_encode_decode_number() {
-        let mut encoder = Resp3Encoder::new();
-        let value = Resp3Value::Number(42);
-        let encoded = encoder.encode(&value).unwrap();
-
-        let mut decoder = Resp3Decoder::new();
-        let decoded = decoder.decode(&encoded).unwrap();
-
-        assert_eq!(value, decoded);
+        assert_round_trip(&Resp3Value::Number(42));
     }
 
     #[test]
     fn test_encode_decode_boolean() {
-        let mut encoder = Resp3Encoder::new();
-        let value = Resp3Value::Boolean(true);
-        let encoded = encoder.encode(&value).unwrap();
-
-        let mut decoder = Resp3Decoder::new();
-        let decoded = decoder.decode(&encoded).unwrap();
-
-        assert_eq!(value, decoded);
+        assert_round_trip(&Resp3Value::Boolean(true));
     }
 
     #[test]
     fn test_encode_decode_double() {
-        let mut encoder = Resp3Encoder::new();
-        let value = Resp3Value::Double(3.14);
-        let encoded = encoder.encode(&value).unwrap();
-
-        let mut decoder = Resp3Decoder::new();
-        let decoded = decoder.decode(&encoded).unwrap();
-
-        assert_eq!(value, decoded);
+        assert_round_trip(&Resp3Value::Double(std::f64::consts::PI));
     }
 
     #[test]
     fn test_encode_decode_map() {
-        let mut encoder = Resp3Encoder::new();
-        let value = Resp3Value::Map(vec![
+        assert_round_trip(&Resp3Value::Map(vec![
             (
                 Resp3Value::SimpleString("key1".into()),
                 Resp3Value::Number(1),
@@ -858,44 +799,24 @@ mod tests {
                 Resp3Value::SimpleString("key2".into()),
                 Resp3Value::SimpleString("value2".into()),
             ),
-        ]);
-        let encoded = encoder.encode(&value).unwrap();
-
-        let mut decoder = Resp3Decoder::new();
-        let decoded = decoder.decode(&encoded).unwrap();
-
-        assert_eq!(value, decoded);
+        ]));
     }
 
     #[test]
     fn test_encode_decode_set() {
-        let mut encoder = Resp3Encoder::new();
-        let value = Resp3Value::Set(vec![
+        assert_round_trip(&Resp3Value::Set(vec![
             Resp3Value::SimpleString("apple".into()),
             Resp3Value::SimpleString("banana".into()),
-        ]);
-        let encoded = encoder.encode(&value).unwrap();
-
-        let mut decoder = Resp3Decoder::new();
-        let decoded = decoder.decode(&encoded).unwrap();
-
-        assert_eq!(value, decoded);
+        ]));
     }
 
     #[test]
     fn test_encode_decode_array() {
-        let mut encoder = Resp3Encoder::new();
-        let value = Resp3Value::Array(vec![
+        assert_round_trip(&Resp3Value::Array(vec![
             Resp3Value::SimpleString("hello".to_string()),
             Resp3Value::Number(42),
             Resp3Value::Boolean(true),
-        ]);
-        let encoded = encoder.encode(&value).unwrap();
-
-        let mut decoder = Resp3Decoder::new();
-        let decoded = decoder.decode(&encoded).unwrap();
-
-        assert_eq!(value, decoded);
+        ]));
     }
 
     #[test]

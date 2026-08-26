@@ -1,16 +1,8 @@
 //! Integration tests for Redis Streams functionality
 
-#![allow(clippy::similar_names)]
-#![allow(clippy::uninlined_format_args)]
-#![allow(clippy::collection_is_never_read)]
-#![allow(clippy::manual_string_new)]
-#![allow(clippy::absurd_extreme_comparisons)]
-#![allow(clippy::items_after_statements)]
-#![allow(clippy::cast_possible_truncation)]
-
 use redis_oxide::{Client, ConnectionConfig};
 use std::collections::HashMap;
-use std::time::Duration;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 fn redis_url() -> String {
     std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://localhost:6379".to_string())
@@ -64,7 +56,7 @@ async fn test_xrange_operations() -> Result<(), Box<dyn std::error::Error>> {
     for i in 0..5 {
         let mut fields = HashMap::new();
         fields.insert("index".to_string(), i.to_string());
-        fields.insert("data".to_string(), format!("value_{}", i));
+        fields.insert("data".to_string(), format!("value_{i}"));
         client.xadd(stream_name, "*", fields).await?;
     }
 
@@ -75,7 +67,7 @@ async fn test_xrange_operations() -> Result<(), Box<dyn std::error::Error>> {
     // Verify entries are in order
     for (i, entry) in all_entries.iter().enumerate() {
         assert_eq!(entry.get_field("index"), Some(&i.to_string()));
-        assert_eq!(entry.get_field("data"), Some(&format!("value_{}", i)));
+        assert_eq!(entry.get_field("data"), Some(&format!("value_{i}")));
     }
 
     // Get limited entries
@@ -118,7 +110,7 @@ async fn test_xread_operations() -> Result<(), Box<dyn std::error::Error>> {
     // Add more entries
     for i in 1..=3 {
         let mut fields = HashMap::new();
-        fields.insert("message".to_string(), format!("message_{}", i));
+        fields.insert("message".to_string(), format!("message_{i}"));
         client.xadd(stream_name, "*", fields).await?;
     }
 
@@ -145,7 +137,7 @@ async fn test_consumer_groups() -> Result<(), Box<dyn std::error::Error>> {
     // Add some entries first
     for i in 0..3 {
         let mut fields = HashMap::new();
-        fields.insert("order_id".to_string(), format!("order_{}", i));
+        fields.insert("order_id".to_string(), format!("order_{i}"));
         fields.insert("amount".to_string(), format!("{}.00", (i + 1) * 100));
         client.xadd(stream_name, "*", fields).await?;
     }
@@ -192,13 +184,11 @@ async fn test_consumer_group_with_new_messages() -> Result<(), Box<dyn std::erro
         .await?;
 
     // Add new messages after group creation
-    let mut message_ids = Vec::new();
     for i in 0..2 {
         let mut fields = HashMap::new();
-        fields.insert("task_id".to_string(), format!("task_{}", i));
+        fields.insert("task_id".to_string(), format!("task_{i}"));
         fields.insert("priority".to_string(), "high".to_string());
-        let id = client.xadd(stream_name, "*", fields).await?;
-        message_ids.push(id);
+        client.xadd(stream_name, "*", fields).await?;
     }
 
     // Read new messages from group
@@ -213,7 +203,7 @@ async fn test_consumer_group_with_new_messages() -> Result<(), Box<dyn std::erro
 
     // Verify message content
     for (i, entry) in entries.iter().enumerate() {
-        assert_eq!(entry.get_field("task_id"), Some(&format!("task_{}", i)));
+        assert_eq!(entry.get_field("task_id"), Some(&format!("task_{i}")));
         assert_eq!(entry.get_field("priority"), Some(&"high".to_string()));
     }
 
@@ -285,11 +275,11 @@ async fn test_multiple_streams() -> Result<(), Box<dyn std::error::Error>> {
     client.xadd(stream2, "*", fields2).await?;
 
     // Read from both streams
-    let streams = vec![
+    let start_ids = vec![
         (stream1.to_string(), "0".to_string()),
         (stream2.to_string(), "0".to_string()),
     ];
-    let messages = client.xread(streams, Some(10), None).await?;
+    let messages = client.xread(start_ids, Some(10), None).await?;
 
     assert_eq!(messages.len(), 2);
     assert!(messages.contains_key(stream1));
@@ -324,7 +314,7 @@ async fn test_stream_entry_parsing() -> Result<(), Box<dyn std::error::Error>> {
     fields.insert("string_field".to_string(), "hello world".to_string());
     fields.insert("number_field".to_string(), "42".to_string());
     fields.insert("json_field".to_string(), r#"{"key":"value"}"#.to_string());
-    fields.insert("empty_field".to_string(), "".to_string());
+    fields.insert("empty_field".to_string(), String::new());
 
     let entry_id = client.xadd(stream_name, "*", fields).await?;
 
@@ -345,7 +335,7 @@ async fn test_stream_entry_parsing() -> Result<(), Box<dyn std::error::Error>> {
         entry.get_field("json_field"),
         Some(&r#"{"key":"value"}"#.to_string())
     );
-    assert_eq!(entry.get_field("empty_field"), Some(&"".to_string()));
+    assert_eq!(entry.get_field("empty_field"), Some(&String::new()));
     assert_eq!(entry.get_field("nonexistent"), None);
 
     // Test entry methods
@@ -413,12 +403,13 @@ async fn test_stream_with_specific_ids() -> Result<(), Box<dyn std::error::Error
     client.del(vec![stream_name.to_string()]).await?;
 
     // Add entry with specific timestamp-based ID
-    use std::time::{SystemTime, UNIX_EPOCH};
-    let timestamp = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_millis() as u64;
-    let specific_id = format!("{}-0", timestamp);
+    let timestamp = u64::try_from(
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_millis(),
+    )?;
+    let specific_id = format!("{timestamp}-0");
 
     let mut fields = HashMap::new();
     fields.insert("message".to_string(), "specific_id_message".to_string());
@@ -456,7 +447,7 @@ async fn test_concurrent_stream_operations() -> Result<(), Box<dyn std::error::E
         let handle = tokio::spawn(async move {
             let mut fields = HashMap::new();
             fields.insert("task_id".to_string(), i.to_string());
-            fields.insert("data".to_string(), format!("data_from_task_{}", i));
+            fields.insert("data".to_string(), format!("data_from_task_{i}"));
             client_clone.xadd(&stream_name_clone, "*", fields).await
         });
         handles.push(handle);

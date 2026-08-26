@@ -27,8 +27,8 @@ bytes = "1.8"
 # Error handling
 thiserror = "2.0"
 
-# Logging and tracing
-tracing = "0.1.41"
+# Logging and tracing. Attribute macros are not used by this workspace.
+tracing = { version = "0.1.41", default-features = false, features = ["std"] }
 
 # Redis cluster support
 crc16 = "0.4.0"

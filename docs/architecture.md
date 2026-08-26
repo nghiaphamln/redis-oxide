@@ -1,95 +1,33 @@
 # Architecture
 
-`redis-oxide` is structured around a typed client API, command builders, Redis
-protocol encoders and decoders, and connection abstractions that support
-standalone Redis and Redis Cluster.
+`redis-oxide` separates the public client API, command encoding, transport,
+and topology routing.
 
-## Main Layers
+- `Client` owns configuration and routes commands to standalone, Cluster, or
+  Sentinel-backed pools.
+- Command modules define typed command arguments, response parsing, and keys
+  for Cluster routing.
+- RESP2 and RESP3 codecs handle wire values; command arguments are encoded as
+  bulk strings.
+- The connection layer owns TCP I/O, authentication, database selection,
+  protocol negotiation, and timeouts.
+- Pools use either one bounded multiplexed worker or permit-guarded dedicated
+  connections.
 
-### Client
+Transactions and subscribers receive dedicated connections so session state
+cannot leak into unrelated requests. Cluster mode keeps slot-to-node pools;
+`ASKING` and redirected commands share one physical connection.
 
-`Client` is the public entrypoint. It owns the connection configuration,
-detected topology, standalone pool, and cluster pools. Public methods build
-command objects or RESP argument lists, route the command, and convert Redis
-responses into Rust types.
+## Request flow
 
-### Commands
+1. A `Client` method builds command arguments and routing keys.
+2. The client selects a standalone or slot-specific pool.
+3. A connection encodes the command and waits for the RESP response.
+4. The command parser converts that response into the public return type.
 
-Command modules under `redis-oxide/src/commands/` define command builders and
-response parsers for Redis data structures. Commands expose:
+Redis server errors inside pipelines remain per-command `RespValue::Error`
+values. Connection, timeout, and protocol failures fail the operation and make
+the affected pooled connection ineligible for reuse.
 
-- command name
-- encoded arguments
-- keys used for cluster routing
-- typed response parsing
-
-Pipelines and transactions reuse these command builders through their own
-command traits.
-
-### Protocol
-
-RESP2 and RESP3 implementations live under `redis-oxide/src/protocol/`.
-Command encoding treats Redis command arguments as bulk strings, while normal
-RESP value encoding still preserves standalone RESP integer, array, error, and
-bulk string forms.
-
-### Connections and Pools
-
-The connection layer owns TCP I/O, RESP negotiation, authentication, database
-selection, and command execution. Pooling supports:
-
-- multiplexed strategy: one connected worker with a bounded command queue
-- pool strategy: multiple Redis connections guarded by a permit held for the
-  complete checkout
-
-Connections that time out or fail protocol decoding are discarded rather than
-returned to the pool. Transactions and subscribers always use dedicated
-connections, so Redis session state cannot leak into unrelated commands.
-
-Cluster mode bootstraps its slot map with `CLUSTER SLOTS`, keeps per-node pools,
-and routes commands by hash slot. `ASKING` and its redirected command share one
-physical connection.
-
-### Advanced Features
-
-The crate includes dedicated modules for:
-
-- Pub/Sub with `Subscriber` and `Publisher`
-- Lua scripting with `Script` and `ScriptManager`
-- Streams helpers and response parsing
-- Sentinel discovery and failover configuration
-- Transactions and pipelines
-
-## Request Flow
-
-1. User calls a `Client` method.
-2. The method builds a command name and arguments.
-3. The client chooses a standalone pool or cluster pool.
-4. The connection encodes the command as RESP.
-5. Redis returns a RESP response.
-6. The command parser converts the response into the public return type.
-
-## Error Model
-
-`RedisError` separates transport, protocol, server, authentication, cluster,
-Sentinel, pool, timeout, and type conversion failures.
-
-Pipeline execution keeps Redis server errors as per-command `RespValue::Error`
-entries. Connection-level failures still fail the entire pipeline. Lua
-`Script::execute` falls back from `EVALSHA` to `EVAL` on `NOSCRIPT`.
-
-## Testing Strategy
-
-The test suite covers:
-
-- protocol encoding and decoding
-- standalone integration behavior against Redis
-- data types
-- scripts
-- streams
-- pipelines and transactions
-- RESP3 negotiation and live client operation
-- Redis Cluster and Sentinel topology fixtures in CI
-
-Integration tests expect Redis on `localhost:6379`, or a compatible `REDIS_URL`
-environment variable.
+The test suite covers protocol parsing, standalone integration behavior,
+commands, stateful connections, Cluster, and Sentinel topology fixtures.

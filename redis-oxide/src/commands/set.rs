@@ -29,7 +29,7 @@ impl SAddCommand {
 impl Command for SAddCommand {
     type Output = i64;
 
-    fn command_name(&self) -> &str {
+    fn command_name(&self) -> &'static str {
         "SADD"
     }
 
@@ -85,7 +85,7 @@ impl SRemCommand {
 impl Command for SRemCommand {
     type Output = i64;
 
-    fn command_name(&self) -> &str {
+    fn command_name(&self) -> &'static str {
         "SREM"
     }
 
@@ -137,7 +137,7 @@ impl SMembersCommand {
 impl Command for SMembersCommand {
     type Output = HashSet<String>;
 
-    fn command_name(&self) -> &str {
+    fn command_name(&self) -> &'static str {
         "SMEMBERS"
     }
 
@@ -161,8 +161,7 @@ impl Command for SMembersCommand {
                         }
                         _ => {
                             return Err(RedisError::Type(format!(
-                                "Unexpected item type in SMEMBERS response: {:?}",
-                                item
+                                "Unexpected item type in SMEMBERS response: {item:?}"
                             )))
                         }
                     }
@@ -170,8 +169,7 @@ impl Command for SMembersCommand {
                 Ok(result)
             }
             _ => Err(RedisError::Type(format!(
-                "Unexpected response type for SMEMBERS: {:?}",
-                response
+                "Unexpected response type for SMEMBERS: {response:?}"
             ))),
         }
     }
@@ -216,7 +214,7 @@ impl SIsMemberCommand {
 impl Command for SIsMemberCommand {
     type Output = bool;
 
-    fn command_name(&self) -> &str {
+    fn command_name(&self) -> &'static str {
         "SISMEMBER"
     }
 
@@ -232,8 +230,7 @@ impl Command for SIsMemberCommand {
             RespValue::Integer(1) => Ok(true),
             RespValue::Integer(0) => Ok(false),
             _ => Err(RedisError::Type(format!(
-                "Unexpected response type for SISMEMBER: {:?}",
-                response
+                "Unexpected response type for SISMEMBER: {response:?}"
             ))),
         }
     }
@@ -274,7 +271,7 @@ impl SCardCommand {
 impl Command for SCardCommand {
     type Output = i64;
 
-    fn command_name(&self) -> &str {
+    fn command_name(&self) -> &'static str {
         "SCARD"
     }
 
@@ -322,7 +319,7 @@ impl SPopCommand {
 impl Command for SPopCommand {
     type Output = Option<String>;
 
-    fn command_name(&self) -> &str {
+    fn command_name(&self) -> &'static str {
         "SPOP"
     }
 
@@ -337,8 +334,7 @@ impl Command for SPopCommand {
                 .map_err(|e| RedisError::Type(format!("Invalid UTF-8: {e}"))),
             RespValue::Null => Ok(None),
             _ => Err(RedisError::Type(format!(
-                "Unexpected response type for SPOP: {:?}",
-                response
+                "Unexpected response type for SPOP: {response:?}"
             ))),
         }
     }
@@ -379,7 +375,7 @@ impl SRandMemberCommand {
 impl Command for SRandMemberCommand {
     type Output = Option<String>;
 
-    fn command_name(&self) -> &str {
+    fn command_name(&self) -> &'static str {
         "SRANDMEMBER"
     }
 
@@ -394,8 +390,7 @@ impl Command for SRandMemberCommand {
                 .map_err(|e| RedisError::Type(format!("Invalid UTF-8: {e}"))),
             RespValue::Null => Ok(None),
             _ => Err(RedisError::Type(format!(
-                "Unexpected response type for SRANDMEMBER: {:?}",
-                response
+                "Unexpected response type for SRANDMEMBER: {response:?}"
             ))),
         }
     }

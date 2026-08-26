@@ -192,6 +192,10 @@ impl Subscriber {
     }
 
     /// Subscribe to one or more channels.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub async fn subscribe(&mut self, channels: Vec<String>) -> RedisResult<()> {
         let (response_tx, response_rx) = oneshot::channel();
         self.send_control(SubscriptionCommand::Subscribe {
@@ -209,6 +213,10 @@ impl Subscriber {
     }
 
     /// Unsubscribe from channels, or all channels when the list is empty.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub async fn unsubscribe(&mut self, channels: Vec<String>) -> RedisResult<()> {
         let (response_tx, response_rx) = oneshot::channel();
         self.send_control(SubscriptionCommand::Unsubscribe {
@@ -230,6 +238,10 @@ impl Subscriber {
     }
 
     /// Subscribe to one or more glob-style patterns.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub async fn psubscribe(&mut self, patterns: Vec<String>) -> RedisResult<()> {
         let (response_tx, response_rx) = oneshot::channel();
         self.send_control(SubscriptionCommand::PSubscribe {
@@ -247,6 +259,10 @@ impl Subscriber {
     }
 
     /// Unsubscribe from patterns, or all patterns when the list is empty.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub async fn punsubscribe(&mut self, patterns: Vec<String>) -> RedisResult<()> {
         let (response_tx, response_rx) = oneshot::channel();
         self.send_control(SubscriptionCommand::PUnsubscribe {
@@ -268,6 +284,10 @@ impl Subscriber {
     }
 
     /// Receive the next message or listener error.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub async fn next_message(&mut self) -> RedisResult<Option<PubSubMessage>> {
         match self.message_rx.recv().await {
             Some(Ok(message)) => Ok(Some(message)),
@@ -277,6 +297,10 @@ impl Subscriber {
     }
 
     /// Receive the next message until the supplied timeout expires.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub async fn next_message_timeout(
         &mut self,
         duration: Duration,
@@ -339,6 +363,10 @@ impl Publisher {
     }
 
     /// Publish a message to a channel and return the number of receivers.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub async fn publish(
         &self,
         channel: impl Into<String>,
@@ -357,6 +385,10 @@ impl Publisher {
     }
 
     /// Publish multiple messages sequentially on the dedicated connection.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub async fn publish_multiple(
         &self,
         messages: HashMap<String, String>,
@@ -371,6 +403,10 @@ impl Publisher {
 }
 
 /// Parse a Pub/Sub response from Redis.
+///
+/// # Errors
+///
+/// Returns an error if the operation cannot be completed.
 pub fn parse_pubsub_message(response: RespValue) -> RedisResult<Option<PubSubMessage>> {
     let RespValue::Array(items) = response else {
         return Err(RedisError::Protocol(

@@ -27,7 +27,7 @@ impl HGetCommand {
 impl Command for HGetCommand {
     type Output = Option<String>;
 
-    fn command_name(&self) -> &str {
+    fn command_name(&self) -> &'static str {
         "HGET"
     }
 
@@ -46,8 +46,7 @@ impl Command for HGetCommand {
                 Ok(Some(s))
             }
             _ => Err(crate::core::error::RedisError::Type(format!(
-                "Unexpected response type for HGET: {:?}",
-                response
+                "Unexpected response type for HGET: {response:?}"
             ))),
         }
     }
@@ -93,7 +92,7 @@ impl HSetCommand {
 impl Command for HSetCommand {
     type Output = i64;
 
-    fn command_name(&self) -> &str {
+    fn command_name(&self) -> &'static str {
         "HSET"
     }
 
@@ -148,7 +147,7 @@ impl HDelCommand {
 impl Command for HDelCommand {
     type Output = i64;
 
-    fn command_name(&self) -> &str {
+    fn command_name(&self) -> &'static str {
         "HDEL"
     }
 
@@ -199,7 +198,7 @@ impl HGetAllCommand {
 impl Command for HGetAllCommand {
     type Output = HashMap<String, String>;
 
-    fn command_name(&self) -> &str {
+    fn command_name(&self) -> &'static str {
         "HGETALL"
     }
 
@@ -222,8 +221,7 @@ impl Command for HGetAllCommand {
                 Ok(result)
             }
             _ => Err(crate::core::error::RedisError::Type(format!(
-                "Unexpected response type for HGETALL: {:?}",
-                response
+                "Unexpected response type for HGETALL: {response:?}"
             ))),
         }
     }
@@ -267,7 +265,7 @@ impl HMGetCommand {
 impl Command for HMGetCommand {
     type Output = Vec<Option<String>>;
 
-    fn command_name(&self) -> &str {
+    fn command_name(&self) -> &'static str {
         "HMGET"
     }
 
@@ -292,8 +290,7 @@ impl Command for HMGetCommand {
                         }
                         _ => {
                             return Err(crate::core::error::RedisError::Type(format!(
-                                "Unexpected item type in HMGET response: {:?}",
-                                item
+                                "Unexpected item type in HMGET response: {item:?}"
                             )))
                         }
                     }
@@ -301,8 +298,7 @@ impl Command for HMGetCommand {
                 Ok(result)
             }
             _ => Err(crate::core::error::RedisError::Type(format!(
-                "Unexpected response type for HMGET: {:?}",
-                response
+                "Unexpected response type for HMGET: {response:?}"
             ))),
         }
     }
@@ -346,7 +342,7 @@ impl HMSetCommand {
 impl Command for HMSetCommand {
     type Output = String;
 
-    fn command_name(&self) -> &str {
+    fn command_name(&self) -> &'static str {
         "HMSET"
     }
 
@@ -398,7 +394,7 @@ impl HLenCommand {
 impl Command for HLenCommand {
     type Output = i64;
 
-    fn command_name(&self) -> &str {
+    fn command_name(&self) -> &'static str {
         "HLEN"
     }
 
@@ -449,7 +445,7 @@ impl HExistsCommand {
 impl Command for HExistsCommand {
     type Output = bool;
 
-    fn command_name(&self) -> &str {
+    fn command_name(&self) -> &'static str {
         "HEXISTS"
     }
 
@@ -465,8 +461,7 @@ impl Command for HExistsCommand {
             RespValue::Integer(1) => Ok(true),
             RespValue::Integer(0) => Ok(false),
             _ => Err(crate::core::error::RedisError::Type(format!(
-                "Unexpected response type for HEXISTS: {:?}",
-                response
+                "Unexpected response type for HEXISTS: {response:?}"
             ))),
         }
     }

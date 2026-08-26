@@ -1,8 +1,5 @@
 //! Integration tests for Lua scripting functionality
 
-#![allow(clippy::needless_raw_string_hashes)]
-#![allow(clippy::uninlined_format_args)]
-
 use redis_oxide::{Client, ConnectionConfig, Script, ScriptManager};
 use std::sync::OnceLock;
 use tokio::sync::{Mutex, MutexGuard};
@@ -62,10 +59,10 @@ async fn test_script_with_redis_operations() -> Result<(), Box<dyn std::error::E
     client.del(vec!["script_key".to_string()]).await?;
 
     // Script that performs SET and GET operations
-    let script = r#"
+    let script = r"
         redis.call('SET', KEYS[1], ARGV[1])
         return redis.call('GET', KEYS[1])
-    "#;
+    ";
 
     let result: String = client
         .eval(
@@ -198,7 +195,7 @@ async fn test_atomic_increment_script() -> Result<(), Box<dyn std::error::Error>
     client.del(vec!["counter".to_string()]).await?;
 
     // Atomic increment with expiration script
-    let script = r#"
+    let script = r"
         local key = KEYS[1]
         local increment = tonumber(ARGV[1])
         local expiration = tonumber(ARGV[2])
@@ -209,7 +206,7 @@ async fn test_atomic_increment_script() -> Result<(), Box<dyn std::error::Error>
         redis.call('EXPIRE', key, expiration)
         
         return new_value
-    "#;
+    ";
 
     // First increment
     let result1: i64 = client
@@ -250,7 +247,7 @@ async fn test_conditional_set_script() -> Result<(), Box<dyn std::error::Error>>
     client.del(vec!["conditional_key".to_string()]).await?;
 
     // Conditional set script
-    let script = r#"
+    let script = r"
         local key = KEYS[1]
         local expected = ARGV[1]
         local new_value = ARGV[2]
@@ -263,7 +260,7 @@ async fn test_conditional_set_script() -> Result<(), Box<dyn std::error::Error>>
         else
             return 0
         end
-    "#;
+    ";
 
     // Set initial value
     client.set("conditional_key", "initial").await?;
@@ -308,7 +305,7 @@ async fn test_script_with_multiple_keys() -> Result<(), Box<dyn std::error::Erro
         .await?;
 
     // Script that operates on multiple keys
-    let script = r#"
+    let script = r"
         local key1 = KEYS[1]
         local key2 = KEYS[2]
         local value = ARGV[1]
@@ -317,7 +314,7 @@ async fn test_script_with_multiple_keys() -> Result<(), Box<dyn std::error::Erro
         redis.call('SET', key2, value)
         
         return redis.call('MGET', key1, key2)
-    "#;
+    ";
 
     let result: Vec<String> = client
         .eval(
@@ -390,7 +387,7 @@ async fn test_script_pattern_examples() -> Result<(), Box<dyn std::error::Error>
     client.del(vec!["rate_limit:user1".to_string()]).await?;
 
     // Test rate limiting pattern
-    let rate_limit_script = r#"
+    let rate_limit_script = r"
         local key = KEYS[1]
         local window = tonumber(ARGV[1])
         local limit = tonumber(ARGV[2])
@@ -410,7 +407,7 @@ async fn test_script_pattern_examples() -> Result<(), Box<dyn std::error::Error>
         else
             return {0, 0}
         end
-    "#;
+    ";
 
     // Test rate limiting
     let result: Vec<i64> = client

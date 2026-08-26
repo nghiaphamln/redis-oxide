@@ -164,6 +164,10 @@ impl Script {
     /// # Ok(())
     /// # }
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub async fn execute<T>(
         &self,
         client: &crate::Client,
@@ -208,6 +212,10 @@ impl Script {
     /// # Ok(())
     /// # }
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub async fn load(&self, client: &crate::Client) -> RedisResult<String> {
         client.script_load(&self.source).await
     }
@@ -293,6 +301,10 @@ impl ScriptManager {
     /// # Ok(())
     /// # }
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub async fn execute<T>(
         &self,
         name: &str,
@@ -307,7 +319,7 @@ impl ScriptManager {
         let script = self
             .get(name)
             .await
-            .ok_or_else(|| RedisError::Protocol(format!("Script '{}' not found", name)))?;
+            .ok_or_else(|| RedisError::Protocol(format!("Script '{name}' not found")))?;
 
         script.execute(client, keys, args).await
     }
@@ -334,13 +346,23 @@ impl ScriptManager {
     /// # Ok(())
     /// # }
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub async fn load_all(&self, client: &crate::Client) -> RedisResult<HashMap<String, String>> {
-        let scripts = self.scripts.read().await;
+        let scripts: Vec<_> = self
+            .scripts
+            .read()
+            .await
+            .iter()
+            .map(|(name, script)| (name.clone(), script.clone()))
+            .collect();
         let mut results = HashMap::new();
 
-        for (name, script) in scripts.iter() {
+        for (name, script) in scripts {
             let sha = script.load(client).await?;
-            results.insert(name.clone(), sha);
+            results.insert(name, sha);
         }
 
         Ok(results)
@@ -400,9 +422,10 @@ pub mod patterns {
     /// Atomic increment with expiration
     ///
     /// # Arguments
-    /// - KEYS[1]: The key to increment
+    /// - KEYS\[1\]: The key to increment
     /// - ARGV\[1\]: Increment amount
     /// - ARGV\[2\]: Expiration time in seconds
+    #[must_use]
     pub fn atomic_increment_with_expiration() -> Script {
         Script::new(
             r"
@@ -433,6 +456,7 @@ pub mod patterns {
     /// - KEYS\[1\]: The key to set
     /// - ARGV\[1\]: Expected current value
     /// - ARGV\[2\]: New value to set
+    #[must_use]
     pub fn conditional_set() -> Script {
         Script::new(
             r"
@@ -458,9 +482,10 @@ pub mod patterns {
     /// - KEYS\[1\]: The rate limit key
     /// - ARGV\[1\]: Window size in seconds
     /// - ARGV\[2\]: Maximum requests per window
+    #[must_use]
     pub fn sliding_window_rate_limit() -> Script {
         Script::new(
-            r#"
+            r"
             local key = KEYS[1]
             local window = tonumber(ARGV[1])
             local limit = tonumber(ARGV[2])
@@ -480,7 +505,7 @@ pub mod patterns {
             else
                 return { 0, 0 }
             end
-        "#,
+        ",
         )
     }
 
@@ -490,9 +515,10 @@ pub mod patterns {
     /// - KEYS\[1\]: The lock key
     /// - ARGV\[1\]: Lock identifier (unique per client)
     /// - ARGV\[2\]: Lock expiration in seconds
+    #[must_use]
     pub fn distributed_lock() -> Script {
         Script::new(
-            r#"
+            r"
             local key = KEYS[1]
             local identifier = ARGV[1]
             local expiration = tonumber(ARGV[2])
@@ -502,7 +528,7 @@ pub mod patterns {
             else
                 return 0
             end
-        "#,
+        ",
         )
     }
 
@@ -511,9 +537,10 @@ pub mod patterns {
     /// # Arguments
     /// - KEYS\[1\]: The lock key
     /// - ARGV\[1\]: Lock identifier (must match)
+    #[must_use]
     pub fn release_lock() -> Script {
         Script::new(
-            r#"
+            r"
             local key = KEYS[1]
             local identifier = ARGV[1]
             
@@ -522,7 +549,7 @@ pub mod patterns {
             else
                 return 0
             end
-        "#,
+        ",
         )
     }
 }

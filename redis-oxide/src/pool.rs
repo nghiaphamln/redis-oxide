@@ -35,6 +35,10 @@ pub struct MultiplexedPool {
 
 impl MultiplexedPool {
     /// Create a multiplexed pool after its first connection is ready.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub async fn new(config: ConnectionConfig, host: String, port: u16) -> RedisResult<Self> {
         config.validate()?;
         let connection = RedisConnection::connect(&host, port, config.clone()).await?;
@@ -127,7 +131,7 @@ impl MultiplexedPool {
         }
     }
 
-    fn invalidates_connection(error: &RedisError) -> bool {
+    const fn invalidates_connection(error: &RedisError) -> bool {
         matches!(
             error,
             RedisError::Io(_)
@@ -138,6 +142,10 @@ impl MultiplexedPool {
     }
 
     /// Execute a single command through the multiplexed connection.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub async fn execute_command(
         &self,
         command: String,
@@ -153,6 +161,10 @@ impl MultiplexedPool {
     }
 
     /// Execute a contiguous batch and retain server errors per response.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub async fn execute_batch(&self, commands: CommandBatch) -> RedisResult<Vec<RespValue>> {
         let (response_tx, response_rx) = oneshot::channel();
         let request = CommandRequest {
@@ -172,6 +184,10 @@ impl MultiplexedPool {
     }
 
     /// Open an isolated connection for stateful Redis commands.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub async fn dedicated_connection(&self) -> RedisResult<RedisConnection> {
         RedisConnection::connect(&self.host, self.port, self.config.clone()).await
     }
@@ -188,6 +204,10 @@ pub struct ConnectionPool {
 
 impl ConnectionPool {
     /// Create a connection pool with its configured minimum number of idle connections.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub async fn new(
         config: ConnectionConfig,
         host: String,
@@ -239,6 +259,10 @@ impl ConnectionPool {
     }
 
     /// Execute a single command using one checked-out connection.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub async fn execute_command(
         &self,
         command: String,
@@ -254,6 +278,10 @@ impl ConnectionPool {
     }
 
     /// Execute a contiguous batch using one checked-out connection.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub async fn execute_batch(&self, commands: CommandBatch) -> RedisResult<Vec<RespValue>> {
         let (mut connection, permit) = self.get_connection().await?;
         let result = connection.execute_pipeline(&commands).await;
@@ -269,6 +297,10 @@ impl ConnectionPool {
     }
 
     /// Open an isolated connection for stateful Redis commands.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub async fn dedicated_connection(&self) -> RedisResult<RedisConnection> {
         RedisConnection::connect(&self.host, self.port, self.config.clone()).await
     }
@@ -277,19 +309,23 @@ impl ConnectionPool {
 /// Unified pool abstraction for a multiplexed or bounded connection pool.
 pub enum Pool {
     /// Multiplexed connection.
-    Multiplexed(MultiplexedPool),
+    Multiplexed(Box<MultiplexedPool>),
     /// Traditional connection pool.
     Pool(Box<ConnectionPool>),
 }
 
 impl Pool {
     /// Create a pool based on connection configuration.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub async fn new(config: ConnectionConfig, host: String, port: u16) -> RedisResult<Self> {
         config.validate()?;
         match config.pool.strategy {
-            PoolStrategy::Multiplexed => Ok(Self::Multiplexed(
+            PoolStrategy::Multiplexed => Ok(Self::Multiplexed(Box::new(
                 MultiplexedPool::new(config, host, port).await?,
-            )),
+            ))),
             PoolStrategy::Pool => Ok(Self::Pool(Box::new(
                 ConnectionPool::new(config.clone(), host, port, config.pool.max_size).await?,
             ))),
@@ -297,6 +333,10 @@ impl Pool {
     }
 
     /// Execute a single command through the pool.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub async fn execute_command(
         &self,
         command: String,
@@ -309,6 +349,10 @@ impl Pool {
     }
 
     /// Execute a contiguous batch and retain server errors per response.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub async fn execute_batch(&self, commands: CommandBatch) -> RedisResult<Vec<RespValue>> {
         match self {
             Self::Multiplexed(pool) => pool.execute_batch(commands).await,
@@ -317,6 +361,10 @@ impl Pool {
     }
 
     /// Open an isolated connection for a transaction or subscription.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
     pub async fn dedicated_connection(&self) -> RedisResult<RedisConnection> {
         match self {
             Self::Multiplexed(pool) => pool.dedicated_connection().await,

@@ -28,7 +28,7 @@ impl LPushCommand {
 impl Command for LPushCommand {
     type Output = i64;
 
-    fn command_name(&self) -> &str {
+    fn command_name(&self) -> &'static str {
         "LPUSH"
     }
 
@@ -84,7 +84,7 @@ impl RPushCommand {
 impl Command for RPushCommand {
     type Output = i64;
 
-    fn command_name(&self) -> &str {
+    fn command_name(&self) -> &'static str {
         "RPUSH"
     }
 
@@ -136,7 +136,7 @@ impl LPopCommand {
 impl Command for LPopCommand {
     type Output = Option<String>;
 
-    fn command_name(&self) -> &str {
+    fn command_name(&self) -> &'static str {
         "LPOP"
     }
 
@@ -151,8 +151,7 @@ impl Command for LPopCommand {
                 .map_err(|e| RedisError::Type(format!("Invalid UTF-8: {e}"))),
             RespValue::Null => Ok(None),
             _ => Err(RedisError::Type(format!(
-                "Unexpected response type for LPOP: {:?}",
-                response
+                "Unexpected response type for LPOP: {response:?}"
             ))),
         }
     }
@@ -193,7 +192,7 @@ impl RPopCommand {
 impl Command for RPopCommand {
     type Output = Option<String>;
 
-    fn command_name(&self) -> &str {
+    fn command_name(&self) -> &'static str {
         "RPOP"
     }
 
@@ -208,8 +207,7 @@ impl Command for RPopCommand {
                 .map_err(|e| RedisError::Type(format!("Invalid UTF-8: {e}"))),
             RespValue::Null => Ok(None),
             _ => Err(RedisError::Type(format!(
-                "Unexpected response type for RPOP: {:?}",
-                response
+                "Unexpected response type for RPOP: {response:?}"
             ))),
         }
     }
@@ -256,7 +254,7 @@ impl LRangeCommand {
 impl Command for LRangeCommand {
     type Output = Vec<String>;
 
-    fn command_name(&self) -> &str {
+    fn command_name(&self) -> &'static str {
         "LRANGE"
     }
 
@@ -284,8 +282,7 @@ impl Command for LRangeCommand {
                         }
                         _ => {
                             return Err(RedisError::Type(format!(
-                                "Unexpected item type in LRANGE response: {:?}",
-                                item
+                                "Unexpected item type in LRANGE response: {item:?}"
                             )))
                         }
                     }
@@ -293,8 +290,7 @@ impl Command for LRangeCommand {
                 Ok(result)
             }
             _ => Err(RedisError::Type(format!(
-                "Unexpected response type for LRANGE: {:?}",
-                response
+                "Unexpected response type for LRANGE: {response:?}"
             ))),
         }
     }
@@ -335,7 +331,7 @@ impl LLenCommand {
 impl Command for LLenCommand {
     type Output = i64;
 
-    fn command_name(&self) -> &str {
+    fn command_name(&self) -> &'static str {
         "LLEN"
     }
 
@@ -387,7 +383,7 @@ impl LIndexCommand {
 impl Command for LIndexCommand {
     type Output = Option<String>;
 
-    fn command_name(&self) -> &str {
+    fn command_name(&self) -> &'static str {
         "LINDEX"
     }
 
@@ -405,8 +401,7 @@ impl Command for LIndexCommand {
                 .map_err(|e| RedisError::Type(format!("Invalid UTF-8: {e}"))),
             RespValue::Null => Ok(None),
             _ => Err(RedisError::Type(format!(
-                "Unexpected response type for LINDEX: {:?}",
-                response
+                "Unexpected response type for LINDEX: {response:?}"
             ))),
         }
     }
@@ -453,7 +448,7 @@ impl LSetCommand {
 impl Command for LSetCommand {
     type Output = String;
 
-    fn command_name(&self) -> &str {
+    fn command_name(&self) -> &'static str {
         "LSET"
     }
 

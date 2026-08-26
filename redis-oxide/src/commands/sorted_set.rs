@@ -29,7 +29,7 @@ impl ZAddCommand {
 impl Command for ZAddCommand {
     type Output = i64;
 
-    fn command_name(&self) -> &str {
+    fn command_name(&self) -> &'static str {
         "ZADD"
     }
 
@@ -86,7 +86,7 @@ impl ZRemCommand {
 impl Command for ZRemCommand {
     type Output = i64;
 
-    fn command_name(&self) -> &str {
+    fn command_name(&self) -> &'static str {
         "ZREM"
     }
 
@@ -144,7 +144,7 @@ impl ZRangeCommand {
 impl Command for ZRangeCommand {
     type Output = Vec<String>;
 
-    fn command_name(&self) -> &str {
+    fn command_name(&self) -> &'static str {
         "ZRANGE"
     }
 
@@ -172,8 +172,7 @@ impl Command for ZRangeCommand {
                         }
                         _ => {
                             return Err(RedisError::Type(format!(
-                                "Unexpected item type in ZRANGE response: {:?}",
-                                item
+                                "Unexpected item type in ZRANGE response: {item:?}"
                             )))
                         }
                     }
@@ -181,8 +180,7 @@ impl Command for ZRangeCommand {
                 Ok(result)
             }
             _ => Err(RedisError::Type(format!(
-                "Unexpected response type for ZRANGE: {:?}",
-                response
+                "Unexpected response type for ZRANGE: {response:?}"
             ))),
         }
     }
@@ -227,7 +225,7 @@ impl ZScoreCommand {
 impl Command for ZScoreCommand {
     type Output = Option<f64>;
 
-    fn command_name(&self) -> &str {
+    fn command_name(&self) -> &'static str {
         "ZSCORE"
     }
 
@@ -250,8 +248,7 @@ impl Command for ZScoreCommand {
             }
             RespValue::Null => Ok(None),
             _ => Err(RedisError::Type(format!(
-                "Unexpected response type for ZSCORE: {:?}",
-                response
+                "Unexpected response type for ZSCORE: {response:?}"
             ))),
         }
     }
@@ -292,7 +289,7 @@ impl ZCardCommand {
 impl Command for ZCardCommand {
     type Output = i64;
 
-    fn command_name(&self) -> &str {
+    fn command_name(&self) -> &'static str {
         "ZCARD"
     }
 
@@ -344,7 +341,7 @@ impl ZRankCommand {
 impl Command for ZRankCommand {
     type Output = Option<i64>;
 
-    fn command_name(&self) -> &str {
+    fn command_name(&self) -> &'static str {
         "ZRANK"
     }
 
@@ -360,8 +357,7 @@ impl Command for ZRankCommand {
             RespValue::Integer(rank) => Ok(Some(rank)),
             RespValue::Null => Ok(None),
             _ => Err(RedisError::Type(format!(
-                "Unexpected response type for ZRANK: {:?}",
-                response
+                "Unexpected response type for ZRANK: {response:?}"
             ))),
         }
     }
@@ -406,7 +402,7 @@ impl ZRevRankCommand {
 impl Command for ZRevRankCommand {
     type Output = Option<i64>;
 
-    fn command_name(&self) -> &str {
+    fn command_name(&self) -> &'static str {
         "ZREVRANK"
     }
 
@@ -422,8 +418,7 @@ impl Command for ZRevRankCommand {
             RespValue::Integer(rank) => Ok(Some(rank)),
             RespValue::Null => Ok(None),
             _ => Err(RedisError::Type(format!(
-                "Unexpected response type for ZREVRANK: {:?}",
-                response
+                "Unexpected response type for ZREVRANK: {response:?}"
             ))),
         }
     }

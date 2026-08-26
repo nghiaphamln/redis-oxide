@@ -182,8 +182,7 @@ impl TryFrom<RespValue> for bool {
             RespValue::Integer(0) => Ok(false),
             RespValue::SimpleString(s) if s == "OK" => Ok(true),
             _ => Err(RedisError::Type(format!(
-                "Cannot convert {:?} to bool",
-                value
+                "Cannot convert {value:?} to bool"
             ))),
         }
     }
@@ -200,8 +199,7 @@ impl TryFrom<RespValue> for Option<String> {
             RespValue::SimpleString(s) => Ok(Some(s)),
             RespValue::Null => Ok(None),
             _ => Err(RedisError::Type(format!(
-                "Cannot convert {:?} to Option<String>",
-                value
+                "Cannot convert {value:?} to Option<String>"
             ))),
         }
     }
@@ -225,8 +223,7 @@ impl TryFrom<RespValue> for Vec<String> {
                         RespValue::Null => {} // Skip null values
                         _ => {
                             return Err(RedisError::Type(format!(
-                                "Cannot convert array item {:?} to string",
-                                item
+                                "Cannot convert array item {item:?} to string"
                             )))
                         }
                     }
@@ -234,8 +231,7 @@ impl TryFrom<RespValue> for Vec<String> {
                 Ok(result)
             }
             _ => Err(RedisError::Type(format!(
-                "Cannot convert {:?} to Vec<String>",
-                value
+                "Cannot convert {value:?} to Vec<String>"
             ))),
         }
     }
@@ -255,8 +251,7 @@ impl TryFrom<RespValue> for Vec<i64> {
                 Ok(result)
             }
             _ => Err(RedisError::Type(format!(
-                "Cannot convert {:?} to Vec<i64>",
-                value
+                "Cannot convert {value:?} to Vec<i64>"
             ))),
         }
     }
