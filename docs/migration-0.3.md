@@ -1,6 +1,6 @@
 # Migrating to 0.3
 
-`0.3.0-alpha.1` is a breaking reliability release. It removes unfinished
+`0.3.0-alpha.2` is a breaking reliability release. It removes unfinished
 optimisation APIs and makes previously ignored connection settings effective.
 
 ## Removed APIs
