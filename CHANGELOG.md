@@ -12,6 +12,12 @@ versioning while the public API is still stabilizing.
 - Renamed `PipelineResult::next` and `TransactionResult::next` to
   `next_result` to distinguish typed result decoding from iterator APIs.
 
+### Improved
+
+- Reduced protocol parser and integer-header allocation overhead for RESP2 and
+  RESP3, and added an ignored allocation-report harness for repeatable local
+  measurements.
+
 ### Changed
 
 - Consolidated repository documentation, package metadata, examples, and

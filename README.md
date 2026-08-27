@@ -12,11 +12,11 @@ transactions, Pub/Sub, Streams, Lua scripting, and RESP2 or RESP3.
 
 ```toml
 [dependencies]
-redis-oxide = "0.3.0-alpha.1"
+redis-oxide = "0.3.0-alpha.2"
 tokio = { version = "1", features = ["full"] }
 ```
 
-`0.3.0-alpha.1` is a breaking alpha release. Read the
+`0.3.0-alpha.2` is a breaking alpha release. Read the
 [0.3 migration guide](https://github.com/nghiaphamln/redis-oxide/blob/main/docs/migration-0.3.md)
 before upgrading from 0.2.
 

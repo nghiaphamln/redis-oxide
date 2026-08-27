@@ -18,7 +18,7 @@ cd redis-oxide-demo
 
 ```toml
 [dependencies]
-redis-oxide = "0.3.0-alpha.1"
+redis-oxide = "0.3.0-alpha.2"
 tokio = { version = "1", features = ["full"] }
 ```
 

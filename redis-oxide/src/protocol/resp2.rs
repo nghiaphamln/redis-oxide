@@ -18,6 +18,16 @@ const MAX_BULK_STRING_LENGTH: usize = 512 * 1024 * 1024;
 pub struct RespEncoder;
 
 impl RespEncoder {
+    fn write_i64(buf: &mut BytesMut, value: i64) {
+        let mut number = itoa::Buffer::new();
+        buf.put_slice(number.format(value).as_bytes());
+    }
+
+    fn write_usize(buf: &mut BytesMut, value: usize) {
+        let mut number = itoa::Buffer::new();
+        buf.put_slice(number.format(value).as_bytes());
+    }
+
     /// Encode a RESP value into a buffer
     ///
     /// # Errors
@@ -37,12 +47,12 @@ impl RespEncoder {
             }
             RespValue::Integer(i) => {
                 buf.put_u8(b':');
-                buf.put_slice(i.to_string().as_bytes());
+                Self::write_i64(buf, *i);
                 buf.put_slice(CRLF);
             }
             RespValue::BulkString(data) => {
                 buf.put_u8(b'$');
-                buf.put_slice(data.len().to_string().as_bytes());
+                Self::write_usize(buf, data.len());
                 buf.put_slice(CRLF);
                 buf.put_slice(data);
                 buf.put_slice(CRLF);
@@ -52,7 +62,7 @@ impl RespEncoder {
             }
             RespValue::Array(arr) => {
                 buf.put_u8(b'*');
-                buf.put_slice(arr.len().to_string().as_bytes());
+                Self::write_usize(buf, arr.len());
                 buf.put_slice(CRLF);
                 for item in arr {
                     Self::encode(item, buf)?;
@@ -64,10 +74,15 @@ impl RespEncoder {
 
     fn encode_bulk_argument(data: &[u8], buf: &mut BytesMut) {
         buf.put_u8(b'$');
-        buf.put_slice(data.len().to_string().as_bytes());
+        Self::write_usize(buf, data.len());
         buf.put_slice(CRLF);
         buf.put_slice(data);
         buf.put_slice(CRLF);
+    }
+
+    fn encode_integer_bulk_argument(value: i64, buf: &mut BytesMut) {
+        let mut number = itoa::Buffer::new();
+        Self::encode_bulk_argument(number.format(value).as_bytes(), buf);
     }
 
     fn encode_command_arg(arg: &RespValue, buf: &mut BytesMut) -> RedisResult<()> {
@@ -76,7 +91,7 @@ impl RespEncoder {
                 Self::encode_bulk_argument(s.as_bytes(), buf);
             }
             RespValue::Integer(i) => {
-                Self::encode_bulk_argument(i.to_string().as_bytes(), buf);
+                Self::encode_integer_bulk_argument(*i, buf);
             }
             RespValue::BulkString(data) => {
                 Self::encode_bulk_argument(data, buf);
@@ -102,12 +117,12 @@ impl RespEncoder {
         // Create array with command + args
         let total_len = 1 + args.len();
         buf.put_u8(b'*');
-        buf.put_slice(total_len.to_string().as_bytes());
+        Self::write_usize(&mut buf, total_len);
         buf.put_slice(CRLF);
 
         // Encode command
         buf.put_u8(b'$');
-        buf.put_slice(command.len().to_string().as_bytes());
+        Self::write_usize(&mut buf, command.len());
         buf.put_slice(CRLF);
         buf.put_slice(command.as_bytes());
         buf.put_slice(CRLF);
@@ -154,10 +169,7 @@ impl RespDecoder {
         buf.advance(1); // Skip '+'
 
         if let Some(line) = Self::read_line(buf)? {
-            Ok(Some(RespValue::SimpleString(
-                String::from_utf8(line)
-                    .map_err(|e| RedisError::Protocol(format!("Invalid UTF-8: {e}")))?,
-            )))
+            Ok(Some(RespValue::SimpleString(Self::line_to_string(line)?)))
         } else {
             Ok(None)
         }
@@ -167,9 +179,7 @@ impl RespDecoder {
         buf.advance(1); // Skip '-'
 
         if let Some(line) = Self::read_line(buf)? {
-            Ok(Some(RespValue::Error(String::from_utf8(line).map_err(
-                |e| RedisError::Protocol(format!("Invalid UTF-8: {e}")),
-            )?)))
+            Ok(Some(RespValue::Error(Self::line_to_string(line)?)))
         } else {
             Ok(None)
         }
@@ -179,11 +189,7 @@ impl RespDecoder {
         buf.advance(1); // Skip ':'
 
         if let Some(line) = Self::read_line(buf)? {
-            let num_str = String::from_utf8(line)
-                .map_err(|e| RedisError::Protocol(format!("Invalid UTF-8: {e}")))?;
-            let num = num_str
-                .parse::<i64>()
-                .map_err(|e| RedisError::Protocol(format!("Invalid integer: {e}")))?;
+            let num = Self::parse_i64(line, "integer")?;
             Ok(Some(RespValue::Integer(num)))
         } else {
             Ok(None)
@@ -197,11 +203,7 @@ impl RespDecoder {
             return Ok(None);
         };
 
-        let len_str = String::from_utf8(len_line)
-            .map_err(|e| RedisError::Protocol(format!("Invalid UTF-8: {e}")))?;
-        let len = len_str
-            .parse::<i64>()
-            .map_err(|e| RedisError::Protocol(format!("Invalid bulk string length: {e}")))?;
+        let len = Self::parse_i64(len_line, "bulk string length")?;
 
         if len == -1 {
             return Ok(Some(RespValue::Null));
@@ -248,11 +250,7 @@ impl RespDecoder {
             return Ok(None);
         };
 
-        let len_str = String::from_utf8(len_line)
-            .map_err(|e| RedisError::Protocol(format!("Invalid UTF-8: {e}")))?;
-        let len = len_str
-            .parse::<i64>()
-            .map_err(|e| RedisError::Protocol(format!("Invalid array length: {e}")))?;
+        let len = Self::parse_i64(len_line, "array length")?;
 
         if len == -1 {
             return Ok(Some(RespValue::Null));
@@ -282,16 +280,32 @@ impl RespDecoder {
         Ok(Some(RespValue::Array(arr)))
     }
 
-    fn read_line(buf: &mut Cursor<&[u8]>) -> RedisResult<Option<Vec<u8>>> {
+    fn line_as_str(line: &[u8]) -> RedisResult<&str> {
+        std::str::from_utf8(line)
+            .map_err(|error| RedisError::Protocol(format!("Invalid UTF-8: {error}")))
+    }
+
+    fn line_to_string(line: &[u8]) -> RedisResult<String> {
+        String::from_utf8(line.to_vec())
+            .map_err(|error| RedisError::Protocol(format!("Invalid UTF-8: {error}")))
+    }
+
+    fn parse_i64(line: &[u8], value_type: &str) -> RedisResult<i64> {
+        Self::line_as_str(line)?
+            .parse::<i64>()
+            .map_err(|error| RedisError::Protocol(format!("Invalid {value_type}: {error}")))
+    }
+
+    fn read_line<'a>(buf: &mut Cursor<&'a [u8]>) -> RedisResult<Option<&'a [u8]>> {
         let start = usize::try_from(buf.position()).map_err(|_| {
             RedisError::Protocol("RESP cursor position exceeds platform size".to_string())
         })?;
-        let slice = buf.get_ref();
+        let slice = *buf.get_ref();
 
         // Find CRLF
         for i in start..slice.len().saturating_sub(1) {
             if slice[i] == b'\r' && slice[i + 1] == b'\n' {
-                let line = slice[start..i].to_vec();
+                let line = &slice[start..i];
                 buf.set_position((i + 2) as u64);
                 return Ok(Some(line));
             }
@@ -327,6 +341,24 @@ mod tests {
         let value = RespValue::Integer(1000);
         RespEncoder::encode(&value, &mut buf).unwrap();
         assert_eq!(&buf[..], b":1000\r\n");
+    }
+
+    #[test]
+    fn encodes_integer_bounds_and_collection_headers() {
+        let cases: &[(i64, &[u8])] = &[
+            (i64::MIN, b":-9223372036854775808\r\n"),
+            (i64::MAX, b":9223372036854775807\r\n"),
+        ];
+
+        for (value, expected) in cases {
+            let mut buf = BytesMut::new();
+            RespEncoder::encode(&RespValue::Integer(*value), &mut buf).unwrap();
+            assert_eq!(&buf[..], *expected);
+        }
+
+        let mut buf = BytesMut::new();
+        RespEncoder::encode(&RespValue::Array(vec![RespValue::Null; 10]), &mut buf).unwrap();
+        assert_eq!(&buf[..5], b"*10\r\n");
     }
 
     #[test]
@@ -442,6 +474,23 @@ mod tests {
         let mut cursor = Cursor::new(&data[..]);
         let result = RespDecoder::decode(&mut cursor).unwrap();
         assert!(result.is_none());
+    }
+
+    #[test]
+    fn leaves_incomplete_nested_frames_undecoded() {
+        let data = b"*2\r\n+OK\r\n$3\r\nfo";
+        let mut cursor = Cursor::new(&data[..]);
+        let result = RespDecoder::decode(&mut cursor).unwrap();
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn rejects_invalid_utf8_in_text_and_headers() {
+        let mut invalid_simple_string = Cursor::new(&b"+\xff\r\n"[..]);
+        assert!(RespDecoder::decode(&mut invalid_simple_string).is_err());
+
+        let mut invalid_bulk_header = Cursor::new(&b"$\xff\r\n"[..]);
+        assert!(RespDecoder::decode(&mut invalid_bulk_header).is_err());
     }
 
     #[test]
